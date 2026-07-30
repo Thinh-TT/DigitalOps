@@ -36,7 +36,7 @@ DigitalOps là một hệ thống điều hành số dành cho tổ chức Mặt
 
 **Xác thực:** ASP.NET Core Identity + JWT (không dùng Keycloak riêng).
 
-**AI:** gọi API của nhà cung cấp LLM qua HTTP, bọc trong lớp service riêng (dễ đổi provider/mock khi test).
+**AI:** kiến trúc RAG kết hợp LLM qua HTTP service abstraction, dùng cho gợi ý điều phối, sinh nháp và hỗ trợ thẩm định. LLM provider/model, embedding, vector store và pipeline ingestion là các quyết định Draft, chờ thành viên phụ trách AI phê duyệt theo 02-architecture/03-ai-rag-design.md. PostgreSQL full-text search vẫn là chức năng tìm kiếm chính thức của MVP.
 
 **Tự động hóa nhắc hạn:** `IHostedService` chạy định kỳ trong chính API.
 
