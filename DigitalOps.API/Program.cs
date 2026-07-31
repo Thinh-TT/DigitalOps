@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
+using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
@@ -75,6 +76,7 @@ builder.Services.AddSingleton<
 builder.Services.AddScoped<IMemberImportService, MemberImportService>();
 builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
 builder.Services.AddScoped<IDocumentCatalogService, DocumentCatalogService>();
+builder.Services.AddScoped<IIncomingDocumentService, IncomingDocumentService>();
 builder.Services
     .AddOptions<DocumentCatalogSeedOptions>()
     .Bind(builder.Configuration.GetSection(DocumentCatalogSeedOptions.SectionName));

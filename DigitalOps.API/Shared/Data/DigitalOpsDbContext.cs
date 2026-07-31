@@ -1,4 +1,5 @@
 using DigitalOps.API.Features.Drafting;
+using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -18,6 +19,8 @@ public sealed class DigitalOpsDbContext(
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
 
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+
+    public DbSet<IncomingDocument> IncomingDocuments => Set<IncomingDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

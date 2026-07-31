@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
+using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Shared.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -31,7 +32,7 @@ public sealed class PostgreSqlConnectionSmokeTests
 
     [Fact]
     [Trait("Category", "PostgreSqlIntegration")]
-    public async Task Initial_baseline_creates_the_expected_schema_when_applied()
+    public async Task Current_migrations_create_the_expected_schema_when_applied()
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DigitalOps");
 
@@ -59,7 +60,8 @@ public sealed class PostgreSqlConnectionSmokeTests
             "staff",
             "members",
             "document_types",
-            "document_templates"
+            "document_templates",
+            "incoming_documents"
         };
 
         var tables = await ReadStringColumnAsync(
@@ -71,7 +73,7 @@ public sealed class PostgreSqlConnectionSmokeTests
               AND table_name = ANY (ARRAY[
                   'asp_net_roles', 'asp_net_users', 'asp_net_role_claims', 'asp_net_user_claims',
                   'asp_net_user_logins', 'asp_net_user_roles', 'asp_net_user_tokens', 'staff',
-                  'members', 'document_types', 'document_templates'
+                  'members', 'document_types', 'document_templates', 'incoming_documents'
               ]);
             """);
 
@@ -95,7 +97,7 @@ public sealed class PostgreSqlConnectionSmokeTests
             SELECT indexname
             FROM pg_indexes
             WHERE schemaname = 'public'
-              AND tablename IN ('members', 'staff', 'document_types', 'document_templates');
+              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents');
             """);
 
         var expectedIndexes = new[]
@@ -111,7 +113,13 @@ public sealed class PostgreSqlConnectionSmokeTests
             "ix_document_types_is_active",
             "ix_document_templates_document_type_id",
             "ix_document_templates_is_active",
-            "ux_document_templates_type_name"
+            "ux_document_templates_type_name",
+            "ix_incoming_documents_document_type_id",
+            "ix_incoming_documents_status_deadline",
+            "ix_incoming_documents_assigned_status",
+            "ix_incoming_documents_reference_sender",
+            "ix_incoming_documents_suggested_staff_id",
+            "ix_incoming_documents_confirmed_by_staff_id"
         };
 
         Assert.All(expectedIndexes, index => Assert.Contains(index, indexes));
@@ -131,6 +139,7 @@ public sealed class PostgreSqlConnectionSmokeTests
         await AssertDuplicateDocumentTypeIsRejectedAsync(connectionString);
         await AssertInvalidFormatRulesAreRejectedAsync(connectionString);
         await AssertInvalidMemberStatusIsRejectedAsync(connectionString);
+        await AssertInvalidIncomingDatesAreRejectedAsync(connectionString);
     }
 
     private static async Task AssertDuplicateDocumentTypeIsRejectedAsync(string connectionString)
@@ -180,6 +189,32 @@ public sealed class PostgreSqlConnectionSmokeTests
         {
             FullName = "Invalid status test member",
             Status = (MemberStatus)999
+        });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());
+        await transaction.RollbackAsync();
+    }
+
+    private static async Task AssertInvalidIncomingDatesAreRejectedAsync(string connectionString)
+    {
+        await using var dbContext = CreateDbContext(connectionString);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var documentType = new DocumentType
+        {
+            Code = $"TEST-{Guid.NewGuid():N}",
+            Name = "Incoming constraint test type"
+        };
+        dbContext.DocumentTypes.Add(documentType);
+        await dbContext.SaveChangesAsync();
+        dbContext.IncomingDocuments.Add(new IncomingDocument
+        {
+            ReferenceNumber = "TEST/INVALID-DATE",
+            SenderOrg = "Test sender",
+            Summary = "Invalid incoming dates",
+            ReceivedDate = new DateOnly(2026, 8, 2),
+            Deadline = new DateOnly(2026, 8, 1),
+            DocumentTypeId = documentType.Id,
+            Status = IncomingDocumentStatus.New
         });
 
         await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());

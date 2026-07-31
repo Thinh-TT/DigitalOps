@@ -9,7 +9,7 @@ export function AuthStatusBoundary() {
   if (status === "initializing") {
     return (
       <main className="fullscreen-state" aria-label="Đang tải phiên làm việc">
-        <Spin size="large" tip="Đang tải phiên làm việc..." />
+        <Spin size="large" description="Đang tải phiên làm việc..." />
       </main>
     );
   }

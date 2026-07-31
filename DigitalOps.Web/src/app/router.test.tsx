@@ -9,9 +9,22 @@ import {
 import type { Role } from "../shared/auth/types";
 import * as memberService from "../shared/members/member-service";
 import * as catalogService from "../shared/document-catalog/document-catalog-service";
+import * as incomingService from "../shared/incoming-documents/incoming-document-service";
 
 vi.mock("../shared/members/member-service");
 vi.mock("../shared/document-catalog/document-catalog-service");
+vi.mock("../shared/incoming-documents/incoming-document-service");
+
+beforeEach(() => {
+  vi.mocked(incomingService.getIncomingDocuments).mockResolvedValue({
+    items: [],
+    page: 1,
+    pageSize: 20,
+    totalCount: 0,
+    totalPages: 0,
+  });
+  vi.mocked(catalogService.getAllDocumentTypes).mockResolvedValue([]);
+});
 
 describe("route guards and App Shell", () => {
   it("redirects an anonymous user to login", async () => {
@@ -141,6 +154,21 @@ describe("route guards and App Shell", () => {
     expect(
       await screen.findByText("Không có quyền truy cập"),
     ).toBeInTheDocument();
+  });
+
+  it("keeps SCR-008 detail under BusinessAccess and SCR-008 create under Clerk", async () => {
+    renderRoute(
+      "/incoming-documents/new",
+      createAuthValue("authenticated", ["Leader"], false),
+    );
+    expect(await screen.findByText("Không có quyền truy cập")).toBeInTheDocument();
+
+    renderRoute(
+      "/incoming-documents",
+      createAuthValue("authenticated", ["Leader"], false),
+    );
+    expect(await screen.findByRole("heading", { name: "Văn bản đến" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Tiếp nhận văn bản$/ })).not.toBeInTheDocument();
   });
 });
 

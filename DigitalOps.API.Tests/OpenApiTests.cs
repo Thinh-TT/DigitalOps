@@ -244,6 +244,63 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.Contains("formatRules", templateRequest.GetRawText());
         Assert.True(schemas.TryGetProperty("DocumentTemplateResponse", out _));
         Assert.True(schemas.TryGetProperty("DocumentTypeReference", out _));
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/incoming-documents",
+            out var incomingDocumentsPath));
+        Assert.True(incomingDocumentsPath.TryGetProperty("get", out var incomingDocumentsGet));
+        Assert.True(incomingDocumentsPath.TryGetProperty("post", out var incomingDocumentsPost));
+        var incomingQueryParameters = incomingDocumentsGet
+            .GetProperty("parameters")
+            .EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToArray();
+        foreach (var parameter in new[]
+        {
+            "q",
+            "documentTypeId",
+            "status",
+            "assignedToStaffId",
+            "deadlineFrom",
+            "deadlineTo",
+            "page",
+            "pageSize"
+        })
+        {
+            Assert.Contains(parameter, incomingQueryParameters);
+        }
+        Assert.True(incomingDocumentsPost.GetProperty("responses").TryGetProperty("201", out _));
+        Assert.True(incomingDocumentsPost.GetProperty("responses").TryGetProperty("400", out _));
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/incoming-documents/{id}",
+            out var incomingDocumentDetailPath));
+        Assert.True(incomingDocumentDetailPath.TryGetProperty("get", out var incomingDetailGet));
+        Assert.True(incomingDocumentDetailPath.TryGetProperty("patch", out var incomingDetailPatch));
+        Assert.True(incomingDetailGet.GetProperty("responses").TryGetProperty("404", out _));
+        Assert.True(incomingDetailPatch.GetProperty("responses").TryGetProperty("409", out _));
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/incoming-documents/{id}/complete",
+            out var incomingCompletePath));
+        var incomingCompleteResponses = incomingCompletePath
+            .GetProperty("post")
+            .GetProperty("responses");
+        foreach (var statusCode in new[] { "200", "401", "403", "404", "409" })
+        {
+            Assert.True(incomingCompleteResponses.TryGetProperty(statusCode, out _));
+        }
+
+        Assert.True(schemas.TryGetProperty("IncomingDocumentCreateRequest", out _));
+        Assert.True(schemas.TryGetProperty("IncomingDocumentUpdateRequest", out _));
+        Assert.True(schemas.TryGetProperty("IncomingDocumentResponse", out var incomingResponse));
+        Assert.Contains("attachments", incomingResponse.GetRawText());
+        Assert.True(schemas.TryGetProperty("IncomingStaffReference", out _));
+        Assert.True(schemas.TryGetProperty("IncomingAttachmentResponse", out _));
+        Assert.True(schemas.TryGetProperty("IncomingDocumentStatus", out var incomingStatus));
+        Assert.Equal(
+            new[] { "New", "InProgress", "Completed", "Overdue" },
+            ResolveEnumValues(incomingStatus, schemas));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(

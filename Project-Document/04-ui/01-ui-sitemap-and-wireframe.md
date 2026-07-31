@@ -286,6 +286,19 @@ active có type cha active; type inactive hiện read-only trong lựa chọn hi
 - [Xác nhận/giao lại] dùng Staff active từ GET /staff?activeOnly=true. Thành công cập nhật toàn bộ resource, bao gồm InProgress và metadata xác nhận.
 - [Hoàn tất] chỉ hiện cho Clerk hoặc Staff được giao khi chưa Completed. Sau Completed, ẩn mọi action sửa/điều phối/upload/xóa file; tải file vẫn hoạt động.
 
+Boundary UI T2-02:
+
+- SCR-008 dùng filter từ khóa/loại/trạng thái/khoảng deadline, paging server-side
+  và giữ query khi đi list → create/detail → quay lại. Nút tiếp nhận chỉ hiện cho
+  Clerk; form create chỉ tải loại active và kiểm tra ngày trước khi gọi API.
+- SCR-009 cho BusinessAccess xem read-only; chỉ Clerk sửa partial khi chưa
+  Completed. Loại inactive hiện tại vẫn hiển thị nhưng lựa chọn mới chỉ gồm loại
+  active. Lỗi `400` map vào field, `404` dùng not-found và `409` giữ nguyên form.
+- Trong T2-02, panel Điều phối và Attachment chỉ đọc/empty state, không gọi API
+  AI/assignment/upload. `attachments: []` là contract typed tạm thời trước T2-03.
+  Nút hoàn tất chỉ hiện với `InProgress`/`Overdue`, đã được giao và caller là Clerk
+  hoặc Assigned Staff.
+
 ### 8.4. SCR-012 và SCR-013 — Editor, AI draft và review
 
 ```text

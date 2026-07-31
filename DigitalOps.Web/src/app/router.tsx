@@ -35,15 +35,15 @@ import {
   DocumentTypeListPage,
 } from "../pages/DocumentCatalogPages";
 import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
+import {
+  IncomingDocumentCreatePage,
+  IncomingDocumentDetailPage,
+  IncomingDocumentListPage,
+} from "../pages/IncomingDocumentPages";
 
 const commonRoutes: RouteObject[] = [
-  placeholder("incoming-documents", "SCR-008", "Văn bản đến", "Danh sách văn bản đến."),
-  placeholder(
-    "incoming-documents/:id",
-    "SCR-009",
-    "Chi tiết văn bản đến",
-    "Thông tin tiếp nhận, file đính kèm và điều phối.",
-  ),
+  { path: "incoming-documents", element: <IncomingDocumentListPage /> },
+  { path: "incoming-documents/:id", element: <IncomingDocumentDetailPage /> },
   placeholder("reminders", "SCR-010", "Thông báo", "Danh sách nhắc hạn của tài khoản."),
   placeholder("outgoing-documents", "SCR-011", "Văn bản đi", "Danh sách văn bản đi."),
   placeholder(
@@ -128,12 +128,10 @@ export const appRoutes: RouteObject[] = [
                   {
                     element: <RoleRoute allowedRoles={["Clerk"]} />,
                     children: [
-                      placeholder(
-                        "incoming-documents/new",
-                        "SCR-008",
-                        "Tiếp nhận văn bản đến",
-                        "Tạo văn bản đến mới.",
-                      ),
+                      {
+                        path: "incoming-documents/new",
+                        element: <IncomingDocumentCreatePage />,
+                      },
                       placeholder(
                         "archive-queue",
                         "SCR-015",

@@ -349,6 +349,11 @@ Index chính:
 
 `reference_number` không đặt unique toàn cục vì số văn bản do nhiều đơn vị bên ngoài phát hành.
 
+Boundary migration: `AddIncomingDocuments` của T2-02 tạo bảng, FK, check
+constraint và các B-tree index nêu trên, ngoại trừ GIN full-text. Bảng
+`attachments` thuộc T2-03; GIN `ix_incoming_documents_summary_fts` thuộc T4-02,
+không nằm trong migration T2-02.
+
 ### 3.6. `outgoing_documents` — Văn bản soạn thảo/văn bản đi
 
 | Thuộc tính / cột                                             | Kiểu PostgreSQL | Null  | Khóa / Mặc định         | Mô tả                                       |
@@ -573,6 +578,10 @@ Quy tắc hoàn tất:
 - Khi deadline đã qua và văn bản chưa hoàn tất, background worker chuyển trạng thái sang `Overdue`.
 - Văn bản `Completed` không phát sinh thêm nhắc hạn.
 - Chạy lại AI chỉ thay thế bộ gợi ý mới nhất; không tạo bảng history trong MVP.
+- T2-02 chỉ tạo/sửa dữ liệu hành chính và hoàn tất. Task này không tự chuyển
+  `New`/`InProgress` sang `Overdue`; Reminder Worker của T2-05 thực hiện việc đó.
+- Khi loại hiện tại bị vô hiệu hóa, vẫn được sửa trường hành chính khác; create
+  hoặc đổi `document_type_id` chỉ nhận loại active.
 
 ### 4.6. Quy tắc `outgoing_documents`
 

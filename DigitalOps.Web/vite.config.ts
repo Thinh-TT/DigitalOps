@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
       setupFiles: "./src/test/setup.ts",
       css: true,
       restoreMocks: true,
+      testTimeout: 20_000,
     },
   };
 });

@@ -1,5 +1,6 @@
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
+using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ public sealed class BaselineModelTests
         var staff = GetEntityType<Staff>(model);
         var documentType = GetEntityType<DocumentType>(model);
         var documentTemplate = GetEntityType<DocumentTemplate>(model);
+        var incomingDocument = GetEntityType<IncomingDocument>(model);
 
         Assert.Equal("members", member.GetTableName());
         Assert.Equal("uuid", member.FindProperty(nameof(Member.Id))!.GetColumnType());
@@ -52,6 +54,30 @@ public sealed class BaselineModelTests
         AssertIndex(documentTemplate, "ix_document_templates_document_type_id", isUnique: false);
         AssertIndex(documentTemplate, "ix_document_templates_is_active", isUnique: false);
         AssertIndex(documentTemplate, "ux_document_templates_type_name", isUnique: true);
+
+        Assert.Equal("incoming_documents", incomingDocument.GetTableName());
+        Assert.Equal("date", incomingDocument.FindProperty(nameof(IncomingDocument.ReceivedDate))!.GetColumnType());
+        Assert.Equal("date", incomingDocument.FindProperty(nameof(IncomingDocument.Deadline))!.GetColumnType());
+        Assert.Equal("numeric(5,4)", incomingDocument.FindProperty(nameof(IncomingDocument.AssignmentConfidence))!.GetColumnType());
+        Assert.Equal("timestamptz", incomingDocument.FindProperty(nameof(IncomingDocument.CompletedAt))!.GetColumnType());
+        Assert.Equal(
+            "status IN ('New', 'InProgress', 'Completed', 'Overdue')",
+            GetCheckConstraint(incomingDocument, "ck_incoming_documents_status").Sql);
+        Assert.Equal(
+            "received_date <= deadline",
+            GetCheckConstraint(incomingDocument, "ck_incoming_documents_received_deadline").Sql);
+        Assert.Equal(
+            6,
+            incomingDocument.GetCheckConstraints().Count());
+        AssertIndex(incomingDocument, "ix_incoming_documents_document_type_id", isUnique: false);
+        AssertIndex(incomingDocument, "ix_incoming_documents_status_deadline", isUnique: false);
+        AssertIndex(incomingDocument, "ix_incoming_documents_assigned_status", isUnique: false);
+        AssertIndex(incomingDocument, "ix_incoming_documents_reference_sender", isUnique: false);
+        AssertIndex(incomingDocument, "ix_incoming_documents_suggested_staff_id", isUnique: false);
+        AssertIndex(incomingDocument, "ix_incoming_documents_confirmed_by_staff_id", isUnique: false);
+        Assert.All(
+            incomingDocument.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
 
         Assert.Equal("asp_net_users", GetEntityType<ApplicationUser>(model).GetTableName());
         Assert.Equal("asp_net_roles", model.FindEntityType("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>")!.GetTableName());

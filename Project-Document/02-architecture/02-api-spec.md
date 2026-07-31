@@ -319,6 +319,12 @@ inactive vẫn được phép. Vô hiệu hóa type không cascade trạng thái
 | `AssignmentConfirmRequest` | `assignedToStaffId` |
 | `ReminderResponse` | `id`, `incomingDocumentId`, `referenceNumber`, `summary`, `reminderKind`, `reminderDate`, `deliveryStatus`, `createdAt`, `readAt?` |
 
+`documentType` dùng `DocumentTypeReference { id, code, name }`. Các staff
+reference trong response dùng `{ id, fullName, position, department }`.
+`attachments` luôn hiện diện; trước T2-03, T2-02 trả mảng typed rỗng theo metadata
+`{ id, fileName, uploadedBy, uploadedAt, extractionStatus, extractedAt }`, không
+expose URL file, extracted text hoặc lỗi kỹ thuật.
+
 ### 9.2. Endpoint incoming document và assignment
 
 | Method | Path | Auth/role | Request/query | Thành công | Lỗi đáng chú ý |
@@ -332,6 +338,23 @@ inactive vẫn được phép. Vô hiệu hóa type không cascade trạng thái
 | `POST` | `/incoming-documents/{id}/complete` | Clerk hoặc Assigned Staff | — | `200 IncomingDocumentResponse` | `403`, `409` đã Completed |
 
 `POST /assignment` được dùng cho xác nhận lần đầu và giao lại. AI không thể tự tạo assignment; `503` từ suggestion không thay đổi gợi ý, assignment hoặc status hiện có.
+
+Quy tắc T2-02:
+
+- Chuỗi create/PATCH được trim; `referenceNumber` tối đa 100,
+  `senderOrg` tối đa 255 và `summary` không rỗng. Ngày dùng `YYYY-MM-DD` và giá
+  trị cuối cùng phải thỏa `receivedDate <= deadline`.
+- PATCH phân biệt field bỏ qua với `null`, không nhận `null` và payload rỗng trả
+  `400`. Không cho PATCH status, assignment hoặc `completedAt`; resource
+  `Completed` trả `409`.
+- Create và đổi loại yêu cầu document type active. Nếu loại hiện tại bị
+  inactive, vẫn sửa trường khác nhưng chỉ đổi sang loại active.
+- List trim `q` (tối đa 200), tìm không phân biệt hoa/thường trên số hiệu, nơi gửi
+  và trích yếu; deadline range inclusive. Mặc định sắp `receivedDate DESC`,
+  `createdAt DESC`, rồi `id`; page 1, pageSize 20, tối đa 100.
+- Complete chỉ chuyển `InProgress`/`Overdue → Completed` khi đã có người xử lý
+  chính, ghi `completedAt` UTC. Clerk hoặc đúng Assigned Staff được gọi; caller
+  khác nhận `403`, trạng thái không hợp lệ/gọi lại nhận `409`.
 
 ### 9.3. Endpoint reminder
 
