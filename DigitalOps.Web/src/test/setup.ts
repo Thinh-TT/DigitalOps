@@ -1,10 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -30,5 +31,12 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
-vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-vi.stubGlobal("scrollTo", vi.fn());
+const getComputedStyle = window.getComputedStyle.bind(window);
+
+beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+  vi.stubGlobal("scrollTo", vi.fn());
+  vi.spyOn(window, "getComputedStyle").mockImplementation(
+    (element) => getComputedStyle(element),
+  );
+});

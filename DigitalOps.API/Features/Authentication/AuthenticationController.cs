@@ -43,6 +43,9 @@ public sealed class AuthenticationController(
         var response = await authenticationService.GetCurrentUserAsync(
             claims.IdentityUserId,
             claims.StaffId,
+            User.FindAll(JwtClaimNames.Role)
+                .Select(claim => claim.Value)
+                .ToArray(),
             cancellationToken);
 
         return response is null ? Forbid() : Ok(response);

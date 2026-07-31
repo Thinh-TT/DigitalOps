@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Features.Authentication;
+using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Errors;
 using DigitalOps.API.Shared.Identity;
@@ -61,6 +62,16 @@ builder.Services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IAccessTokenService, JwtAccessTokenService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IStaffManagementService, StaffManagementService>();
+builder.Services
+    .AddOptions<IdentityBootstrapOptions>()
+    .Bind(builder.Configuration.GetSection(IdentityBootstrapOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<
+    IValidateOptions<IdentityBootstrapOptions>,
+    IdentityBootstrapOptionsValidator>();
+builder.Services.AddScoped<IIdentityInitializer, IdentityInitializer>();
+builder.Services.AddHostedService<IdentityInitializationHostedService>();
 
 builder.Services
     .AddAuthentication(options =>

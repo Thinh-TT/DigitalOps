@@ -54,6 +54,7 @@ public sealed class AuthenticationService(
     public async Task<CurrentUserResponse?> GetCurrentUserAsync(
         Guid identityUserId,
         Guid staffId,
+        IReadOnlyCollection<string> tokenRoles,
         CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByIdAsync(identityUserId.ToString());
@@ -68,10 +69,9 @@ public sealed class AuthenticationService(
             return null;
         }
 
-        var roles = await userManager.GetRolesAsync(user);
         return new CurrentUserResponse(
             ToStaffReference(staff),
-            NormalizeRoles(roles),
+            NormalizeRoles(tokenRoles.Where(SystemRoles.All.Contains)),
             user.MustChangePassword);
     }
 

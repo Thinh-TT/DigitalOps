@@ -70,6 +70,27 @@ public sealed class CurrentStaffAccessHandlerTests
     }
 
     [Fact]
+    public async Task Database_password_reset_blocks_a_token_with_a_normal_claim()
+    {
+        var checker = new RecordingStaffAccessChecker(
+            isActive: true,
+            databaseMustChangePassword: true);
+        var requirement = new CurrentStaffAccessRequirement(MustChangePassword: false);
+        var context = new AuthorizationHandlerContext(
+            [requirement],
+            CreatePrincipal(mustChangePassword: false),
+            resource: null);
+        var handler = new CurrentStaffAccessHandler(checker);
+
+        await handler.HandleAsync(context);
+
+        Assert.False(context.HasSucceeded);
+        Assert.Equal(
+            CurrentStaffAccessHandler.PasswordChangeRequiredFailureReason,
+            Assert.Single(context.FailureReasons).Message);
+    }
+
+    [Fact]
     public async Task Requirement_fails_when_the_staff_link_is_inactive_or_mismatched()
     {
         var checker = new RecordingStaffAccessChecker(isActive: false);
@@ -130,17 +151,22 @@ public sealed class CurrentStaffAccessHandlerTests
         return new ClaimsPrincipal(identity);
     }
 
-    private sealed class RecordingStaffAccessChecker(bool isActive) : IStaffAccessChecker
+    private sealed class RecordingStaffAccessChecker(
+        bool isActive,
+        bool databaseMustChangePassword = false) : IStaffAccessChecker
     {
         public bool WasCalled { get; private set; }
 
-        public Task<bool> IsActiveAsync(
+        public Task<StaffAccessState?> GetAccessStateAsync(
             Guid identityUserId,
             Guid staffId,
             CancellationToken cancellationToken = default)
         {
             WasCalled = true;
-            return Task.FromResult(isActive);
+            return Task.FromResult(
+                isActive
+                    ? new StaffAccessState(databaseMustChangePassword)
+                    : null);
         }
     }
 }

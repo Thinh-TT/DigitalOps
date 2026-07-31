@@ -97,3 +97,29 @@ select {
   color: #1677ff;
   font-size: 40px;
 }
+
+.page-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.page-heading-row .ant-typography {
+  margin-top: 0;
+}
+
+.staff-form {
+  max-width: 960px;
+}
+
+.staff-form-grid,
+.staff-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+}
+
+.staff-detail-grid {
+  gap: 24px;
+}

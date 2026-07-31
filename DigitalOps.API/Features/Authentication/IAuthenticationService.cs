@@ -9,6 +9,7 @@ public interface IAuthenticationService
     Task<CurrentUserResponse?> GetCurrentUserAsync(
         Guid identityUserId,
         Guid staffId,
+        IReadOnlyCollection<string> tokenRoles,
         CancellationToken cancellationToken = default);
 
     Task<ChangePasswordResult> ChangePasswordAsync(

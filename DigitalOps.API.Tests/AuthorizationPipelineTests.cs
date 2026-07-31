@@ -164,14 +164,16 @@ public sealed class AuthorizationTestStaffAccessChecker : IStaffAccessChecker
     public static readonly Guid InactiveStaffId =
         Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
-    public Task<bool> IsActiveAsync(
+    public Task<StaffAccessState?> GetAccessStateAsync(
         Guid identityUserId,
         Guid staffId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(
             identityUserId != Guid.Empty
             && staffId != Guid.Empty
-            && staffId != InactiveStaffId);
+            && staffId != InactiveStaffId
+                ? new StaffAccessState(MustChangePassword: false)
+                : null);
 }
 
 [ApiController]

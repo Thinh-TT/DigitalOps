@@ -177,6 +177,10 @@ Các response document tái sử dụng các DTO tham chiếu sau để không l
 
 Giá trị role API: `Administrator`, `Clerk`, `Drafter`, `Leader`. UI ánh xạ sang nhãn tiếng Việt.
 
+`StaffUpdateRequest` là PATCH presence-aware: field không xuất hiện giữ nguyên
+giá trị; `null` xóa `position`, `department`, `phone`; `fullName` và `email`
+không nhận `null` hoặc chuỗi rỗng.
+
 ## 6. API Authentication Và Staff
 
 ### 6.1. Authentication
@@ -191,14 +195,33 @@ Giá trị role API: `Administrator`, `Clerk`, `Drafter`, `Leader`. UI ánh xạ
 
 | Method | Path | Auth/role | Request/query | Thành công | Lỗi đáng chú ý |
 | --- | --- | --- | --- | --- | --- |
-| `GET` | `/staff` | Administrator; Clerk nếu `activeOnly=true` | `activeOnly?`, paging | `200 PagedResponse<StaffResponse>` | `403` |
+| `GET` | `/staff` | Administrator; Clerk nếu `activeOnly=true` | `activeOnly?`, `page?`, `pageSize?` | `200 PagedResponse<StaffResponse>` | `403` |
 | `POST` | `/staff` | Administrator | `StaffCreateRequest` | `201 StaffResponse` | `409` username/email trùng |
 | `GET` | `/staff/{id}` | Administrator | — | `200 StaffResponse` | `404` |
-| `PATCH` | `/staff/{id}` | Administrator | `StaffUpdateRequest` | `200 StaffResponse` | `404`, `409` email trùng |
-| `PUT` | `/staff/{id}/roles` | Administrator | `RoleAssignmentRequest` | `200 StaffResponse` | `400` role không hợp lệ |
+| `PATCH` | `/staff/{id}` | Administrator | `StaffUpdateRequest` | `200 StaffResponse` | `404`, `409` email trùng hoặc Administrator active cuối |
+| `PUT` | `/staff/{id}/roles` | Administrator | `RoleAssignmentRequest` | `200 StaffResponse` | `400` role không hợp lệ; `409` Administrator active cuối |
 | `POST` | `/staff/{id}/reset-password` | Administrator | `ResetPasswordRequest` | `204 No Content` | `404`, `400` password không đạt policy |
 
-Reset password đặt `mustChangePassword = true`. Không có DELETE endpoint cho Staff.
+Danh sách mặc định 20 dòng, tối đa 100, sắp xếp theo `fullName` rồi `id`.
+Reset password đặt `mustChangePassword = true` trong database; vì
+`BusinessAccess` kiểm tra cả claim và trạng thái database, JWT cũ bị chặn ngay
+với type `password-change-required`. Role trong JWT là snapshot:
+`GET /auth/me` trả role từ token hiện tại, còn role mới chỉ có hiệu lực ở JWT
+được cấp tiếp theo. Không có DELETE endpoint cho Staff.
+
+### 6.3. Khởi tạo Identity
+
+- Mỗi lần API khởi động, initializer đảm bảo idempotent bốn role
+  `Administrator`, `Clerk`, `Drafter`, `Leader`; initializer không chạy EF
+  migration.
+- `IdentityBootstrap__Enabled=false` là mặc định. Khi bật và chưa có
+  Administrator active, cấu hình `UserName`, `Email`, `TemporaryPassword`,
+  `FullName`, `Position`, `Department`, `Phone` tạo Identity user và Staff trong
+  một transaction, với `EmailConfirmed=true`, lockout enabled và
+  `MustChangePassword=true`.
+- Bootstrap không reset hoặc ghi đè tài khoản đã tồn tại. Cấu hình không thể tạo
+  quan hệ Administrator hợp lệ làm startup thất bại, nhưng log không chứa mật
+  khẩu.
 
 ## 7. DTO/API Members Và Import Excel
 

@@ -16,6 +16,11 @@ import {
   LoginPage,
 } from "../pages/AuthPages";
 import { FeaturePlaceholderPage } from "../pages/FeaturePlaceholderPage";
+import {
+  StaffCreatePage,
+  StaffDetailPage,
+  StaffListPage,
+} from "../pages/StaffPages";
 import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
 
 const commonRoutes: RouteObject[] = [
@@ -38,9 +43,18 @@ const commonRoutes: RouteObject[] = [
 ];
 
 const administratorRoutes: RouteObject[] = [
-  placeholder("staff", "SCR-003", "Staff và role", "Danh sách tài khoản và cán bộ."),
-  placeholder("staff/new", "SCR-003", "Tạo Staff", "Tạo tài khoản và gán role."),
-  placeholder("staff/:id", "SCR-003", "Chi tiết Staff", "Cập nhật hồ sơ, role và trạng thái."),
+  {
+    path: "staff",
+    element: <StaffListPage />,
+  },
+  {
+    path: "staff/new",
+    element: <StaffCreatePage />,
+  },
+  {
+    path: "staff/:id",
+    element: <StaffDetailPage />,
+  },
   placeholder("document-types", "SCR-006", "Loại văn bản", "Danh mục loại văn bản."),
   placeholder(
     "document-types/:id",

@@ -129,19 +129,27 @@ Một `Staff` có thể được gán nhiều role. Không có role `Reviewer` r
 
 1. Administrator tạo Staff gồm họ tên, email, bộ phận, chức vụ, username/email đăng nhập và một hay nhiều role.
 2. Hệ thống tạo Identity user, password hash từ mật khẩu tạm, `MustChangePassword = true` và tạo Staff liên kết trong cùng transaction.
-3. Administrator cập nhật hồ sơ Staff hoặc role; thay đổi role có hiệu lực ở lần cấp JWT tiếp theo.
-4. Khi reset mật khẩu, hệ thống đặt mật khẩu tạm mới và bật lại `MustChangePassword`.
+3. Administrator cập nhật hồ sơ Staff hoặc role; field tùy chọn gửi `null` được
+   xóa, field không gửi giữ nguyên; thay đổi role có hiệu lực ở lần cấp JWT tiếp
+   theo.
+4. Khi reset mật khẩu, hệ thống đặt mật khẩu tạm mới và bật lại
+   `MustChangePassword`; các JWT đang có bị chặn khỏi nghiệp vụ ngay từ lần gọi
+   tiếp theo.
 5. Khi ngừng sử dụng, Administrator đặt `Staff.IsActive = false` thay vì xóa.
 
 **Ngoại lệ**
 
 - Username/email đã tồn tại hoặc Identity user đã liên kết Staff khác: từ chối tạo.
+- Không cho phép vô hiệu hóa hoặc bỏ role của Administrator đang hoạt động cuối
+  cùng.
 - Không cho phép xóa Staff đã được tham chiếu bởi văn bản/history.
 
 **Tiêu chí nghiệm thu**
 
 - Một Staff có thể đồng thời mang role Văn thư và Lãnh đạo.
 - Reset password buộc người dùng đổi password trước khi thao tác nghiệp vụ tiếp theo.
+- Bốn role hệ thống được khởi tạo idempotent; bootstrap Administrator đầu tiên
+  chỉ chạy khi cấu hình môi trường được bật và luôn dùng mật khẩu tạm.
 
 ### FR-003 — Xem, tìm kiếm và xem chi tiết hội viên
 

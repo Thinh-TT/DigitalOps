@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Authentication;
@@ -15,6 +16,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -40,6 +43,8 @@ public sealed class ApiHostSmokeTests(DigitalOpsApiFactory factory) : IClassFixt
         Assert.NotNull(scope.ServiceProvider.GetService<SignInManager<ApplicationUser>>());
         Assert.NotNull(scope.ServiceProvider.GetService<IAccessTokenService>());
         Assert.NotNull(scope.ServiceProvider.GetService<IStaffAccessChecker>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IStaffManagementService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IIdentityInitializer>());
 
         var authenticationOptions =
             scope.ServiceProvider.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
@@ -116,7 +121,10 @@ public class DigitalOpsApiFactory : WebApplicationFactory<Program>
             ]);
         });
         builder.ConfigureServices(services =>
-            services.AddDataProtection().UseEphemeralDataProtectionProvider());
+        {
+            services.AddDataProtection().UseEphemeralDataProtectionProvider();
+            services.RemoveAll<IHostedService>();
+        });
     }
 
     protected override void Dispose(bool disposing)

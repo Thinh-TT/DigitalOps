@@ -17,26 +17,34 @@ public sealed class CurrentStaffAccessHandler(IStaffAccessChecker staffAccessChe
             return;
         }
 
-        if (!await staffAccessChecker.IsActiveAsync(
-                claims.IdentityUserId,
-                claims.StaffId))
+        var accessState = await staffAccessChecker.GetAccessStateAsync(
+            claims.IdentityUserId,
+            claims.StaffId);
+        if (accessState is null)
         {
             return;
         }
 
-        if (!requirement.MustChangePassword.HasValue
-            || claims.MustChangePassword == requirement.MustChangePassword.Value)
+        if (!requirement.MustChangePassword.HasValue)
         {
             context.Succeed(requirement);
             return;
         }
 
         if (requirement.MustChangePassword == false
-            && claims.MustChangePassword)
+            && (claims.MustChangePassword || accessState.MustChangePassword))
         {
             context.Fail(new AuthorizationFailureReason(
                 this,
                 PasswordChangeRequiredFailureReason));
+            return;
+        }
+
+        if (requirement.MustChangePassword == false
+            || claims.MustChangePassword
+            || accessState.MustChangePassword)
+        {
+            context.Succeed(requirement);
         }
     }
 }

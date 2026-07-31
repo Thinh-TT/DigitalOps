@@ -10,7 +10,10 @@ public static class SystemRoles
 
     public const string Leader = nameof(Leader);
 
+    public static readonly IReadOnlyList<string> Ordered =
+        [Administrator, Clerk, Drafter, Leader];
+
     public static readonly IReadOnlySet<string> All = new HashSet<string>(
-        [Administrator, Clerk, Drafter, Leader],
+        Ordered,
         StringComparer.Ordinal);
 }

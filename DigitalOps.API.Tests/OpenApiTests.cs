@@ -97,6 +97,43 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.True(schemas.TryGetProperty("LoginResponse", out _));
         Assert.True(schemas.TryGetProperty("CurrentUserResponse", out _));
         Assert.True(schemas.TryGetProperty("ChangePasswordRequest", out _));
+
+        Assert.True(paths.TryGetProperty("/api/v1/staff", out var staffPath));
+        Assert.True(staffPath.GetProperty("get").TryGetProperty("security", out _));
+        Assert.True(staffPath.GetProperty("post").TryGetProperty("security", out _));
+        var staffQueryParameters = staffPath
+            .GetProperty("get")
+            .GetProperty("parameters")
+            .EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToArray();
+        Assert.Contains("activeOnly", staffQueryParameters);
+        Assert.Contains("page", staffQueryParameters);
+        Assert.Contains("pageSize", staffQueryParameters);
+        Assert.True(
+            paths.TryGetProperty("/api/v1/staff/{id}", out var staffDetailPath));
+        Assert.True(staffDetailPath.TryGetProperty("get", out _));
+        Assert.True(staffDetailPath.TryGetProperty("patch", out _));
+        Assert.True(
+            paths.TryGetProperty(
+                "/api/v1/staff/{id}/roles",
+                out var staffRolesPath));
+        Assert.True(staffRolesPath.TryGetProperty("put", out _));
+        Assert.True(
+            paths.TryGetProperty(
+                "/api/v1/staff/{id}/reset-password",
+                out var resetPasswordPath));
+        Assert.True(
+            resetPasswordPath
+                .GetProperty("post")
+                .GetProperty("responses")
+                .TryGetProperty("204", out _));
+
+        Assert.True(schemas.TryGetProperty("StaffCreateRequest", out _));
+        Assert.True(schemas.TryGetProperty("StaffUpdateRequest", out _));
+        Assert.True(schemas.TryGetProperty("RoleAssignmentRequest", out _));
+        Assert.True(schemas.TryGetProperty("ResetPasswordRequest", out _));
+        Assert.True(schemas.TryGetProperty("StaffResponse", out _));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(

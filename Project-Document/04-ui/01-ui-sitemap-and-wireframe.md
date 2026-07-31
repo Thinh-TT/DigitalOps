@@ -198,6 +198,12 @@ Khi action không hợp lệ do trạng thái, không hiển thị hoặc disabl
 
 Các endpoint trong bảng được gọi với tiền tố /api/v1. Route UI không cần phản chiếu chính xác API route.
 
+SCR-003 chỉ gửi field hồ sơ đã thay đổi; xóa chức vụ, bộ phận hoặc điện thoại
+gửi `null`. Vô hiệu hóa cần modal xác nhận, reset mật khẩu dùng modal
+nhập/xác nhận mật khẩu tạm, và lỗi `409` giữ dữ liệu form để người dùng xử lý.
+Nếu Administrator tự vô hiệu hóa thành công, UI xóa phiên và chuyển về
+`/login`.
+
 ## 8. Wireframe chi tiết
 
 ### 8.1. SCR-001 và SCR-002 — Xác thực
