@@ -19,7 +19,11 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-builder.Services.AddDbContext<DigitalOpsDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<DigitalOpsDbContext>(options => options
+    .UseNpgsql(
+        connectionString,
+        npgsql => npgsql.MigrationsHistoryTable("__digitalops_ef_migrations_history", "public"))
+    .UseSnakeCaseNamingConvention());
 
 var app = builder.Build();
 
