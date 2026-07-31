@@ -411,6 +411,13 @@ Ví dụ `review_issues`:
 
 ### 3.7. `attachments` — File đính kèm
 
+Schema bên dưới là đích cuối của MVP cho cả incoming và outgoing. Migration
+`AddIncomingAttachments` của T2-03 triển khai theo pha: chỉ có
+`incoming_document_id NOT NULL`, chưa có `outgoing_document_id`; T3-01 sẽ đổi
+incoming FK thành nullable, thêm outgoing FK và check đúng một parent khi bảng
+`outgoing_documents` được triển khai. Cách chia pha này tránh tạo sớm persistence
+văn bản đi chỉ để thỏa một FK chưa sử dụng.
+
 | Thuộc tính / cột                              | Kiểu PostgreSQL | Null  | Khóa / Mặc định         | Mô tả                     |
 | --------------------------------------------- | --------------- | ----- | ----------------------- | ------------------------- |
 | `Id` / `id`                                   | `uuid`          | Không | PK, `gen_random_uuid()` | Định danh file            |
@@ -432,7 +439,9 @@ Index chính:
 - Index `ix_attachments_outgoing_document_id`.
 - Index `ix_attachments_uploaded_by_staff_id`.
 - Index `ix_attachments_extraction_status` trên `extraction_status`.
-- GIN full-text index `ix_attachments_extracted_text_fts` trên `to_tsvector('simple', coalesce(extracted_text, ''))`.
+- GIN full-text index `ix_attachments_extracted_text_fts` trên
+  `to_tsvector('simple', coalesce(extracted_text, ''))` được tạo ở T4-02, sau
+  khi Text Extraction Worker T4-01 đã hoàn tất.
 
 Database không lưu dữ liệu binary. `extracted_text` chỉ lưu text được trích xuất từ PDF có text layer, DOCX và XLSX; ảnh/PDF scan không OCR trong MVP. Khi xóa một attachment hợp lệ, service phải xóa object/file và bản ghi database theo một quy trình có xử lý lỗi.
 
@@ -632,7 +641,8 @@ Quy tắc trạng thái:
 
 ### 4.7. Quy tắc `attachments`
 
-Mỗi attachment phải thuộc đúng một tài liệu:
+Trong migration T2-03, mỗi attachment bắt buộc thuộc một incoming document.
+Khi T3-01 bổ sung parent outgoing, mỗi attachment phải thuộc đúng một tài liệu:
 
 ```sql
 num_nonnulls(incoming_document_id, outgoing_document_id) = 1
@@ -641,6 +651,8 @@ num_nonnulls(incoming_document_id, outgoing_document_id) = 1
 Ngoài ra:
 
 - `file_url` lưu đường dẫn tương đối hoặc object key do storage service quản lý; không tin cậy URL do client tự gửi.
+- T2-03 dùng local disk ngoài web root qua storage abstraction, object key sinh
+  từ document/attachment GUID; tên file người dùng chỉ dùng làm tên hiển thị.
 - Không cascade delete attachment khi xóa tài liệu.
 - Chỉ cho xóa attachment qua service để có thể đồng bộ với file/object thực tế.
 - `extraction_status IN ('Pending', 'Processing', 'Succeeded', 'Failed', 'Unsupported')`.
@@ -775,6 +787,11 @@ Luồng dữ liệu:
 6. Với ảnh hoặc PDF scan không có text, worker đánh dấu `Unsupported`; upload vẫn thành công.
 7. Khi tải xuống, API kiểm tra quyền truy cập tài liệu trước khi trả file hoặc signed URL.
 8. Khi xóa, service xử lý đồng bộ file/object và metadata; lỗi một phía phải được ghi log và có khả năng retry.
+
+Boundary T2-03: PDF/DOCX/XLSX dừng ở trạng thái `Pending`, ảnh ở
+`Unsupported`; trạng thái `Pending` trong database là hàng đợi bền vững cho
+worker T4-01. Không có worker, OCR, outgoing attachment hoặc GIN index trong
+task này.
 
 ### 5.5. Trích xuất text và tìm kiếm toàn văn
 

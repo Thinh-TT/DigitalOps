@@ -1,10 +1,13 @@
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
   PlusOutlined,
   ReloadOutlined,
   SaveOutlined,
   SearchOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
@@ -21,8 +24,10 @@ import {
   Table,
   Tag,
   Typography,
+  Upload,
   type FormInstance,
   type TableProps,
+  type UploadProps,
 } from "antd";
 import { useEffect, useState } from "react";
 import {
@@ -39,11 +44,16 @@ import type { DocumentTypeResponse } from "../shared/document-catalog/types";
 import {
   completeIncomingDocument,
   createIncomingDocument,
+  deleteAttachment,
+  downloadAttachment,
   getIncomingDocument,
   getIncomingDocuments,
+  uploadIncomingAttachment,
   updateIncomingDocument,
 } from "../shared/incoming-documents/incoming-document-service";
 import type {
+  AttachmentResponse,
+  ExtractionStatus,
   IncomingDocumentResponse,
   IncomingDocumentStatus,
   IncomingDocumentUpdateRequest,
@@ -422,6 +432,9 @@ export function IncomingDocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState(readSuccess(location.state));
@@ -523,6 +536,106 @@ export function IncomingDocumentDetailPage() {
     }
   };
 
+  const refreshAfterAttachmentConflict = async () => {
+    try {
+      const latest = await getIncomingDocument(id);
+      setDocument(latest);
+      setFormValues(latest, form);
+    } catch {
+      // Keep the attachment error visible; the user can use the page retry flow.
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    if (document === null) {
+      return;
+    }
+
+    setUploading(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const attachment = await uploadIncomingAttachment(document.id, file);
+      setDocument((current) => current === null
+        ? current
+        : {
+            ...current,
+            attachments: sortAttachments([attachment, ...current.attachments]),
+          });
+      setSuccessMessage("Đã tải file đính kèm lên.");
+    } catch (error) {
+      setErrorMessage(getAttachmentErrorMessage(error, "Không thể tải file lên."));
+      if (error instanceof ApiError && error.status === 409) {
+        await refreshAfterAttachmentConflict();
+      }
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownload = async (attachment: AttachmentResponse) => {
+    setDownloadingId(attachment.id);
+    setErrorMessage(null);
+    try {
+      const downloaded = await downloadAttachment(attachment.id);
+      triggerDownload(
+        downloaded.blob,
+        downloaded.fileName ?? attachment.fileName,
+      );
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, "Không thể tải file đính kèm."));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDelete = async (attachment: AttachmentResponse) => {
+    setDeletingId(attachment.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await deleteAttachment(attachment.id);
+      setDocument((current) => current === null
+        ? current
+        : {
+            ...current,
+            attachments: current.attachments.filter(
+              (item) => item.id !== attachment.id,
+            ),
+          });
+      setSuccessMessage("Đã xóa file đính kèm.");
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, "Không thể xóa file đính kèm."));
+      if (error instanceof ApiError && error.status === 409) {
+        await refreshAfterAttachmentConflict();
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const uploadProps: UploadProps = {
+    accept: ".pdf,.docx,.xlsx,.jpg,.jpeg,.png",
+    multiple: false,
+    maxCount: 1,
+    showUploadList: false,
+    disabled: !editable || uploading,
+    customRequest: (options) => {
+      if (!(options.file instanceof File)) {
+        options.onError?.(new Error("File tải lên không hợp lệ."));
+        return;
+      }
+
+      void handleUpload(options.file).then(
+        () => options.onSuccess?.({}, options.file),
+        (error: unknown) => options.onError?.(
+          error instanceof Error ? error : new Error("Upload failed."),
+        ),
+      );
+    },
+  };
+
   const canComplete = document !== null
     && document.assignedToStaff !== null
     && (document.status === "InProgress" || document.status === "Overdue")
@@ -617,16 +730,100 @@ export function IncomingDocumentDetailPage() {
               </Popconfirm>
             )}
           </Card>
-          <Card title="File đính kèm">
+          <Card
+            title="File đính kèm"
+            extra={editable ? (
+              <Upload {...uploadProps}>
+                <Button icon={<UploadOutlined />} loading={uploading}>
+                  Thêm file
+                </Button>
+              </Upload>
+            ) : undefined}
+          >
             {document.attachments.length === 0 ? (
-              <Empty description="Chưa có file đính kèm. Chức năng upload được triển khai ở T2-03." />
+              <Empty description="Chưa có file đính kèm." />
             ) : (
-              <Space orientation="vertical">
-                {document.attachments.map((attachment) => (
-                  <Typography.Text key={attachment.id}>{attachment.fileName}</Typography.Text>
-                ))}
-              </Space>
+              <Table<AttachmentResponse>
+                className="attachment-table"
+                rowKey="id"
+                size="small"
+                pagination={false}
+                scroll={{ x: 760 }}
+                dataSource={document.attachments}
+                columns={[
+                  {
+                    title: "Tên file",
+                    dataIndex: "fileName",
+                    key: "fileName",
+                    ellipsis: true,
+                  },
+                  {
+                    title: "Người tải",
+                    key: "uploadedBy",
+                    width: 180,
+                    render: (_, attachment) => attachment.uploadedBy.fullName,
+                  },
+                  {
+                    title: "Tải lên lúc",
+                    dataIndex: "uploadedAt",
+                    key: "uploadedAt",
+                    width: 170,
+                    render: formatDateTime,
+                  },
+                  {
+                    title: "Trích xuất",
+                    dataIndex: "extractionStatus",
+                    key: "extractionStatus",
+                    width: 150,
+                    render: (status: ExtractionStatus) => (
+                      <ExtractionStatusTag status={status} />
+                    ),
+                  },
+                  {
+                    title: "Thao tác",
+                    key: "actions",
+                    fixed: "right",
+                    width: editable ? 160 : 90,
+                    render: (_, attachment) => (
+                      <Space size="small">
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<DownloadOutlined />}
+                          loading={downloadingId === attachment.id}
+                          onClick={() => void handleDownload(attachment)}
+                        >
+                          Tải
+                        </Button>
+                        {editable && (
+                          <Popconfirm
+                            title="Xóa file đính kèm?"
+                            description="File và metadata sẽ bị xóa khỏi văn bản."
+                            okText="Xóa"
+                            okButtonProps={{ danger: true }}
+                            cancelText="Hủy"
+                            onConfirm={() => handleDelete(attachment)}
+                          >
+                            <Button
+                              danger
+                              type="link"
+                              size="small"
+                              icon={<DeleteOutlined />}
+                              loading={deletingId === attachment.id}
+                            >
+                              Xóa
+                            </Button>
+                          </Popconfirm>
+                        )}
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
             )}
+            <Typography.Text className="attachment-hint" type="secondary">
+              Hỗ trợ PDF, DOCX, XLSX, JPG, JPEG và PNG; dung lượng do máy chủ kiểm soát.
+            </Typography.Text>
           </Card>
         </div>
       )}
@@ -734,6 +931,17 @@ function IncomingStatusTag({ status }: { status: IncomingDocumentStatus }) {
     InProgress: { color: "processing", label: "Đang xử lý" },
     Overdue: { color: "error", label: "Quá hạn" },
     Completed: { color: "success", label: "Hoàn tất" },
+  };
+  return <Tag color={config[status].color}>{config[status].label}</Tag>;
+}
+
+function ExtractionStatusTag({ status }: { status: ExtractionStatus }) {
+  const config: Record<ExtractionStatus, { color: string; label: string }> = {
+    Pending: { color: "blue", label: "Chờ trích xuất" },
+    Processing: { color: "processing", label: "Đang trích xuất" },
+    Succeeded: { color: "success", label: "Đã trích xuất" },
+    Failed: { color: "error", label: "Trích xuất lỗi" },
+    Unsupported: { color: "default", label: "Không hỗ trợ" },
   };
   return <Tag color={config[status].color}>{config[status].label}</Tag>;
 }
@@ -891,6 +1099,37 @@ function formatStaff(staff: IncomingStaffReference | null): string {
   if (staff === null) return "—";
   const details = [staff.position, staff.department].filter(Boolean).join(" — ");
   return details === "" ? staff.fullName : `${staff.fullName} (${details})`;
+}
+
+function sortAttachments(attachments: AttachmentResponse[]): AttachmentResponse[] {
+  return [...attachments].sort((left, right) => {
+    const byDate = right.uploadedAt.localeCompare(left.uploadedAt);
+    return byDate === 0 ? left.id.localeCompare(right.id) : byDate;
+  });
+}
+
+function getAttachmentErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    if (error.status === 413) {
+      return "File vượt giới hạn dung lượng cho phép.";
+    }
+    if (error.status === 415) {
+      return "File không đúng định dạng PDF, DOCX, XLSX, JPG, JPEG hoặc PNG.";
+    }
+  }
+
+  return getErrorMessage(error, fallback);
+}
+
+function triggerDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

@@ -299,6 +299,18 @@ Boundary UI T2-02:
   Nút hoàn tất chỉ hiện với `InProgress`/`Overdue`, đã được giao và caller là Clerk
   hoặc Assigned Staff.
 
+Boundary UI T2-03:
+
+- Panel Attachment của SCR-009 hiển thị metadata thật, status extraction, tải
+  file qua API cho mọi BusinessAccess và nút thêm/xóa chỉ cho Clerk khi incoming
+  chưa Completed. Xóa luôn có xác nhận.
+- Upload gửi từng file bằng multipart, không tự đặt Content-Type; `413/415` xóa
+  file khỏi danh sách local và hiển thị lý do. UI không nhận storage path,
+  extracted text hoặc lỗi extraction.
+- PDF/DOCX/XLSX hiển thị Chờ trích xuất, ảnh hiển thị Không hỗ trợ. UI không có
+  nút chạy worker hoặc OCR. Attachment của SCR-012 được nối vào component/API
+  chung ở T3-01.
+
 ### 8.4. SCR-012 và SCR-013 — Editor, AI draft và review
 
 ```text

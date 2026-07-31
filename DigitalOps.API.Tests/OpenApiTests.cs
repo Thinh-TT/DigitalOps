@@ -296,11 +296,50 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.True(schemas.TryGetProperty("IncomingDocumentResponse", out var incomingResponse));
         Assert.Contains("attachments", incomingResponse.GetRawText());
         Assert.True(schemas.TryGetProperty("IncomingStaffReference", out _));
-        Assert.True(schemas.TryGetProperty("IncomingAttachmentResponse", out _));
+        Assert.True(schemas.TryGetProperty("AttachmentResponse", out var attachmentResponse));
+        Assert.DoesNotContain("fileUrl", attachmentResponse.GetRawText());
+        Assert.DoesNotContain("storageKey", attachmentResponse.GetRawText());
+        Assert.DoesNotContain("extractedText", attachmentResponse.GetRawText());
+        Assert.DoesNotContain("extractionError", attachmentResponse.GetRawText());
+        Assert.True(schemas.TryGetProperty("ExtractionStatus", out var extractionStatus));
+        Assert.Equal(
+            new[] { "Pending", "Processing", "Succeeded", "Failed", "Unsupported" },
+            ResolveEnumValues(extractionStatus, schemas));
         Assert.True(schemas.TryGetProperty("IncomingDocumentStatus", out var incomingStatus));
         Assert.Equal(
             new[] { "New", "InProgress", "Completed", "Overdue" },
             ResolveEnumValues(incomingStatus, schemas));
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/incoming-documents/{incomingDocumentId}/attachments",
+            out var incomingAttachmentPath));
+        var uploadOperation = incomingAttachmentPath.GetProperty("post");
+        Assert.True(uploadOperation
+            .GetProperty("requestBody")
+            .GetProperty("content")
+            .TryGetProperty("multipart/form-data", out var multipart));
+        Assert.Contains("file", multipart.GetRawText());
+        foreach (var statusCode in new[]
+        {
+            "201", "400", "401", "403", "404", "409", "413", "415", "500"
+        })
+        {
+            Assert.True(uploadOperation
+                .GetProperty("responses")
+                .TryGetProperty(statusCode, out _));
+        }
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/attachments/{id}/download",
+            out var attachmentDownloadPath));
+        Assert.True(attachmentDownloadPath.TryGetProperty("get", out _));
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/attachments/{id}",
+            out var attachmentDeletePath));
+        Assert.True(attachmentDeletePath.TryGetProperty("delete", out var attachmentDelete));
+        Assert.True(attachmentDelete
+            .GetProperty("responses")
+            .TryGetProperty("204", out _));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(

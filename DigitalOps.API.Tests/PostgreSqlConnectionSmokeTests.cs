@@ -1,3 +1,4 @@
+using DigitalOps.API.Features.Attachments;
 using System.Text.Json;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
@@ -61,7 +62,8 @@ public sealed class PostgreSqlConnectionSmokeTests
             "members",
             "document_types",
             "document_templates",
-            "incoming_documents"
+            "incoming_documents",
+            "attachments"
         };
 
         var tables = await ReadStringColumnAsync(
@@ -73,7 +75,8 @@ public sealed class PostgreSqlConnectionSmokeTests
               AND table_name = ANY (ARRAY[
                   'asp_net_roles', 'asp_net_users', 'asp_net_role_claims', 'asp_net_user_claims',
                   'asp_net_user_logins', 'asp_net_user_roles', 'asp_net_user_tokens', 'staff',
-                  'members', 'document_types', 'document_templates', 'incoming_documents'
+                  'members', 'document_types', 'document_templates', 'incoming_documents',
+                  'attachments'
               ]);
             """);
 
@@ -97,7 +100,7 @@ public sealed class PostgreSqlConnectionSmokeTests
             SELECT indexname
             FROM pg_indexes
             WHERE schemaname = 'public'
-              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents');
+              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents', 'attachments');
             """);
 
         var expectedIndexes = new[]
@@ -119,7 +122,10 @@ public sealed class PostgreSqlConnectionSmokeTests
             "ix_incoming_documents_assigned_status",
             "ix_incoming_documents_reference_sender",
             "ix_incoming_documents_suggested_staff_id",
-            "ix_incoming_documents_confirmed_by_staff_id"
+            "ix_incoming_documents_confirmed_by_staff_id",
+            "ix_attachments_incoming_document_id",
+            "ix_attachments_uploaded_by_staff_id",
+            "ix_attachments_extraction_status"
         };
 
         Assert.All(expectedIndexes, index => Assert.Contains(index, indexes));
@@ -140,6 +146,7 @@ public sealed class PostgreSqlConnectionSmokeTests
         await AssertInvalidFormatRulesAreRejectedAsync(connectionString);
         await AssertInvalidMemberStatusIsRejectedAsync(connectionString);
         await AssertInvalidIncomingDatesAreRejectedAsync(connectionString);
+        await AssertInvalidAttachmentStatusIsRejectedAsync(connectionString);
     }
 
     private static async Task AssertDuplicateDocumentTypeIsRejectedAsync(string connectionString)
@@ -215,6 +222,60 @@ public sealed class PostgreSqlConnectionSmokeTests
             Deadline = new DateOnly(2026, 8, 1),
             DocumentTypeId = documentType.Id,
             Status = IncomingDocumentStatus.New
+        });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());
+        await transaction.RollbackAsync();
+    }
+
+    private static async Task AssertInvalidAttachmentStatusIsRejectedAsync(
+        string connectionString)
+    {
+        await using var dbContext = CreateDbContext(connectionString);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var documentType = new DocumentType
+        {
+            Code = $"TEST-{Guid.NewGuid():N}",
+            Name = "Attachment constraint type"
+        };
+        var user = new DigitalOps.API.Shared.Identity.ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = $"attachment-{Guid.NewGuid():N}",
+            NormalizedUserName = $"ATTACHMENT-{Guid.NewGuid():N}",
+            Email = $"attachment-{Guid.NewGuid():N}@test.local",
+            NormalizedEmail = $"ATTACHMENT-{Guid.NewGuid():N}@TEST.LOCAL"
+        };
+        var staff = new DigitalOps.API.Shared.Identity.Staff
+        {
+            Id = Guid.NewGuid(),
+            IdentityUserId = user.Id,
+            IdentityUser = user,
+            FullName = "Attachment constraint staff",
+            Email = user.Email!,
+            IsActive = true
+        };
+        var incoming = new IncomingDocument
+        {
+            ReferenceNumber = "TEST/ATTACHMENT",
+            SenderOrg = "Test sender",
+            Summary = "Attachment constraint",
+            ReceivedDate = new DateOnly(2026, 8, 1),
+            Deadline = new DateOnly(2026, 8, 2),
+            DocumentType = documentType,
+            Status = IncomingDocumentStatus.New
+        };
+        dbContext.AddRange(documentType, staff, incoming);
+        await dbContext.SaveChangesAsync();
+        dbContext.Attachments.Add(new Attachment
+        {
+            IncomingDocumentId = incoming.Id,
+            StorageKey = "incoming/test/invalid.pdf",
+            FileName = "invalid.pdf",
+            UploadedByStaffId = staff.Id,
+            ExtractionStatus = (ExtractionStatus)999,
+            UploadedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         });
 
         await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());

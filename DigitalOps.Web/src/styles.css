@@ -197,3 +197,11 @@ select {
 .incoming-complete-button {
   margin-top: 20px;
 }
+
+.attachment-table {
+  margin-bottom: 12px;
+}
+
+.attachment-hint {
+  display: block;
+}

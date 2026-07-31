@@ -19,7 +19,8 @@ public sealed class SharedDatabasePreflightTests
         "members",
         "document_types",
         "document_templates",
-        "incoming_documents"
+        "incoming_documents",
+        "attachments"
     ];
 
     [Fact]
@@ -45,7 +46,8 @@ public sealed class SharedDatabasePreflightTests
               AND table_name = ANY (ARRAY[
                   'asp_net_roles', 'asp_net_users', 'asp_net_role_claims', 'asp_net_user_claims',
                   'asp_net_user_logins', 'asp_net_user_roles', 'asp_net_user_tokens', 'staff',
-                  'members', 'document_types', 'document_templates', 'incoming_documents'
+                  'members', 'document_types', 'document_templates', 'incoming_documents',
+                  'attachments'
               ]);
             """);
 
@@ -65,13 +67,16 @@ public sealed class SharedDatabasePreflightTests
             connection,
             "SELECT migration_id FROM public.__digitalops_ef_migrations_history;");
 
-        Assert.Equal(2, migrationIds.Length);
+        Assert.Equal(3, migrationIds.Length);
         Assert.Contains(
             migrationIds,
             migrationId => migrationId.EndsWith("_InitialBaseline", StringComparison.Ordinal));
         Assert.Contains(
             migrationIds,
             migrationId => migrationId.EndsWith("_AddIncomingDocuments", StringComparison.Ordinal));
+        Assert.Contains(
+            migrationIds,
+            migrationId => migrationId.EndsWith("_AddIncomingAttachments", StringComparison.Ordinal));
     }
 
     private static async Task<bool> ScalarBooleanAsync(NpgsqlConnection connection, string commandText)

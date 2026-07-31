@@ -1,4 +1,5 @@
 using DigitalOps.API.Features.Drafting;
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 
@@ -45,6 +46,8 @@ public sealed class IncomingDocument : IAuditableEntity
     public IncomingDocumentStatus Status { get; set; } = IncomingDocumentStatus.New;
 
     public DateTime? CompletedAt { get; set; }
+
+    public ICollection<Attachment> Attachments { get; set; } = [];
 
     public DateTime CreatedAt { get; set; }
 

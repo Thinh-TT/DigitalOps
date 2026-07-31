@@ -58,11 +58,12 @@ export async function apiRequest<T>(
 export async function apiDownload(
   path: string,
   options: ApiRequestOptions = {},
+  accept = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ): Promise<DownloadedFile> {
   const response = await sendRequest(
     path,
     options,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    accept,
   );
 
   return {

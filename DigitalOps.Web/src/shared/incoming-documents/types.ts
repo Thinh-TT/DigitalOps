@@ -6,7 +6,7 @@ export type IncomingDocumentStatus =
   | "Completed"
   | "Overdue";
 
-export type AttachmentExtractionStatus =
+export type ExtractionStatus =
   | "Pending"
   | "Processing"
   | "Succeeded"
@@ -20,12 +20,12 @@ export interface IncomingStaffReference {
   department: string | null;
 }
 
-export interface IncomingAttachmentResponse {
+export interface AttachmentResponse {
   id: string;
   fileName: string;
   uploadedBy: IncomingStaffReference;
   uploadedAt: string;
-  extractionStatus: AttachmentExtractionStatus;
+  extractionStatus: ExtractionStatus;
   extractedAt: string | null;
 }
 
@@ -46,7 +46,7 @@ export interface IncomingDocumentResponse {
   assignmentConfirmedAt: string | null;
   status: IncomingDocumentStatus;
   completedAt: string | null;
-  attachments: IncomingAttachmentResponse[];
+  attachments: AttachmentResponse[];
   createdAt: string;
   updatedAt: string;
 }

@@ -321,9 +321,9 @@ inactive vẫn được phép. Vô hiệu hóa type không cascade trạng thái
 
 `documentType` dùng `DocumentTypeReference { id, code, name }`. Các staff
 reference trong response dùng `{ id, fullName, position, department }`.
-`attachments` luôn hiện diện; trước T2-03, T2-02 trả mảng typed rỗng theo metadata
-`{ id, fileName, uploadedBy, uploadedAt, extractionStatus, extractedAt }`, không
-expose URL file, extracted text hoặc lỗi kỹ thuật.
+`attachments` luôn hiện diện và từ T2-03 chứa metadata thật theo
+`AttachmentResponse`, sắp theo `uploadedAt DESC`, sau đó `id`. Response không
+expose URL/object key, extracted text hoặc lỗi kỹ thuật.
 
 ### 9.2. Endpoint incoming document và assignment
 
@@ -373,10 +373,15 @@ Reminder Worker không có public API. Job tạo reminder idempotent trực ti�
 | --- | --- |
 | Upload body | `multipart/form-data` với form field bắt buộc `file` |
 | Kiểu file | PDF, DOCX, XLSX, JPG, JPEG, PNG |
-| Kích thước | Theo cấu hình server; vượt mức trả `413` |
+| Kích thước | `AttachmentStorage.MaxFileSizeBytes`, mặc định 10 MiB; vượt mức trả `413` |
 | Thành công | `201 AttachmentResponse` |
 | Download | `200` stream với `Content-Disposition: attachment`; không trả FileUrl |
 | Text extraction | PDF/DOCX/XLSX trả `Pending` và xử lý nền; ảnh `Unsupported`; PDF scan có thể chuyển `Unsupported` |
+
+Server chuẩn hóa tên hiển thị, sinh object key riêng và kiểm tra extension cùng
+signature/cấu trúc file. MIME từ client không phải nguồn tin cậy duy nhất; nội
+dung giả mạo trả `415`. File được lưu local ngoài web root qua
+`IAttachmentStorage`; API không phục vụ trực tiếp đường dẫn storage.
 
 ### 10.2. Endpoint attachment
 
@@ -388,6 +393,12 @@ Reminder Worker không có public API. Job tạo reminder idempotent trực ti�
 | `DELETE` | `/attachments/{id}` | Clerk với incoming; Drafter sở hữu outgoing | — | `204 No Content` | `403`, `409` parent không editable |
 
 API không expose endpoint text extraction job. Client đọc lại document/attachment response để thấy `extractionStatus` thay đổi.
+
+Boundary triển khai: T2-03 chỉ bật upload/delete cho incoming và download dùng
+chung. Endpoint upload outgoing cùng ownership rule được bổ sung ở T3-01 sau
+khi `outgoing_documents` tồn tại; không tạo stub hoặc FK không được kiểm soát.
+Trong T2-03, `Pending` chính là trigger bền vững để T4-01 xử lý sau, không dùng
+queue in-memory.
 
 ## 11. DTO/API OutgoingDocuments, AI Drafting Và Review
 

@@ -1,10 +1,15 @@
-import { apiRequest } from "../api/api-client";
+import {
+  apiDownload,
+  apiRequest,
+  type DownloadedFile,
+} from "../api/api-client";
 import type { PagedResponse } from "../api/types";
 import type {
   IncomingDocumentCreateRequest,
   IncomingDocumentListParameters,
   IncomingDocumentResponse,
   IncomingDocumentUpdateRequest,
+  AttachmentResponse,
 } from "./types";
 
 export function getIncomingDocuments(
@@ -47,6 +52,27 @@ export function completeIncomingDocument(
     `/incoming-documents/${id}/complete`,
     { method: "POST" },
   );
+}
+
+export function uploadIncomingAttachment(
+  incomingDocumentId: string,
+  file: File,
+): Promise<AttachmentResponse> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+
+  return apiRequest<AttachmentResponse>(
+    `/incoming-documents/${incomingDocumentId}/attachments`,
+    { method: "POST", body: form },
+  );
+}
+
+export function downloadAttachment(id: string): Promise<DownloadedFile> {
+  return apiDownload(`/attachments/${id}/download`, {}, "*/*");
+}
+
+export function deleteAttachment(id: string): Promise<void> {
+  return apiRequest<void>(`/attachments/${id}`, { method: "DELETE" });
 }
 
 function buildQuery(parameters: IncomingDocumentListParameters): string {

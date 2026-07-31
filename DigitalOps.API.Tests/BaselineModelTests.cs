@@ -1,3 +1,4 @@
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.IncomingDocuments;
@@ -22,6 +23,7 @@ public sealed class BaselineModelTests
         var documentType = GetEntityType<DocumentType>(model);
         var documentTemplate = GetEntityType<DocumentTemplate>(model);
         var incomingDocument = GetEntityType<IncomingDocument>(model);
+        var attachment = GetEntityType<Attachment>(model);
 
         Assert.Equal("members", member.GetTableName());
         Assert.Equal("uuid", member.FindProperty(nameof(Member.Id))!.GetColumnType());
@@ -78,6 +80,23 @@ public sealed class BaselineModelTests
         Assert.All(
             incomingDocument.GetForeignKeys(),
             foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
+
+        Assert.Equal("attachments", attachment.GetTableName());
+        Assert.Equal("uuid", attachment.FindProperty(nameof(Attachment.IncomingDocumentId))!.GetColumnType());
+        Assert.False(attachment.FindProperty(nameof(Attachment.IncomingDocumentId))!.IsNullable);
+        Assert.Equal("file_url", attachment.FindProperty(nameof(Attachment.StorageKey))!.GetColumnName());
+        Assert.Equal("timestamptz", attachment.FindProperty(nameof(Attachment.UploadedAt))!.GetColumnType());
+        Assert.Equal(
+            "extraction_status IN ('Pending', 'Processing', 'Succeeded', 'Failed', 'Unsupported')",
+            GetCheckConstraint(attachment, "ck_attachments_extraction_status").Sql);
+        Assert.Equal(3, attachment.GetCheckConstraints().Count());
+        AssertIndex(attachment, "ix_attachments_incoming_document_id", isUnique: false);
+        AssertIndex(attachment, "ix_attachments_uploaded_by_staff_id", isUnique: false);
+        AssertIndex(attachment, "ix_attachments_extraction_status", isUnique: false);
+        Assert.All(
+            attachment.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
+        Assert.Null(attachment.FindProperty("OutgoingDocumentId"));
 
         Assert.Equal("asp_net_users", GetEntityType<ApplicationUser>(model).GetTableName());
         Assert.Equal("asp_net_roles", model.FindEntityType("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>")!.GetTableName());

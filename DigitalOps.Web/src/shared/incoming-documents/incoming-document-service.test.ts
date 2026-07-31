@@ -2,7 +2,10 @@ import { writeSession } from "../auth/session-store";
 import {
   completeIncomingDocument,
   createIncomingDocument,
+  deleteAttachment,
+  downloadAttachment,
   getIncomingDocuments,
+  uploadIncomingAttachment,
   updateIncomingDocument,
 } from "./incoming-document-service";
 
@@ -56,6 +59,52 @@ describe("incoming-document-service", () => {
       "/api/v1/incoming-documents/incoming-id/complete",
     );
     expect(fetchMock.mock.calls[2][1]?.method).toBe("POST");
+  });
+
+  it("uploads multipart, downloads a blob and deletes an attachment", async () => {
+    writeValidSession();
+    const pdfBlob = new Blob(["%PDF-1.7"], { type: "application/pdf" });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ id: "attachment-id" }))
+      .mockResolvedValueOnce(new Response(pdfBlob, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": "attachment; filename*=UTF-8''report.pdf",
+        },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["%PDF-1.7"], "report.pdf", {
+      type: "application/pdf",
+    });
+
+    await uploadIncomingAttachment("incoming-id", file);
+    const downloaded = await downloadAttachment("attachment-id");
+    await deleteAttachment("attachment-id");
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/v1/incoming-documents/incoming-id/attachments",
+    );
+    const uploadOptions = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(uploadOptions.method).toBe("POST");
+    expect(uploadOptions.body).toBeInstanceOf(FormData);
+    expect(new Headers(uploadOptions.headers).has("Content-Type")).toBe(false);
+    const uploadedFile = (uploadOptions.body as FormData).get("file") as File;
+    expect(uploadedFile.name).toBe(file.name);
+    expect(uploadedFile.size).toBe(file.size);
+
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/v1/attachments/attachment-id/download",
+    );
+    expect(new Headers(fetchMock.mock.calls[1][1]?.headers).get("Accept")).toBe("*/*");
+    expect(downloaded.fileName).toBe("report.pdf");
+    expect(downloaded.blob.type).toBe("application/pdf");
+
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      "/api/v1/attachments/attachment-id",
+    );
+    expect(fetchMock.mock.calls[2][1]?.method).toBe("DELETE");
   });
 });
 

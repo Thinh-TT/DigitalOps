@@ -1,3 +1,4 @@
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
@@ -255,7 +256,9 @@ public sealed class IncomingDocumentService(
             .Include(document => document.DocumentType)
             .Include(document => document.SuggestedStaff)
             .Include(document => document.AssignedToStaff)
-            .Include(document => document.AssignmentConfirmedByStaff);
+            .Include(document => document.AssignmentConfirmedByStaff)
+            .Include(document => document.Attachments)
+                .ThenInclude(attachment => attachment.UploadedByStaff);
 
     private static Dictionary<string, string[]> ValidateCreate(
         IncomingDocumentCreateRequest request)
@@ -430,7 +433,11 @@ public sealed class IncomingDocumentService(
             document.AssignmentConfirmedAt,
             document.Status,
             document.CompletedAt,
-            Array.Empty<IncomingAttachmentResponse>(),
+            document.Attachments
+                .OrderByDescending(attachment => attachment.UploadedAt)
+                .ThenBy(attachment => attachment.Id)
+                .Select(AttachmentMappings.ToResponse)
+                .ToArray(),
             document.CreatedAt,
             document.UpdatedAt);
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -30,6 +30,7 @@ beforeEach(() => {
     totalCount: 0,
     totalPages: 0,
   });
+  vi.mocked(incomingService.deleteAttachment).mockResolvedValue(undefined);
 });
 
 describe("Incoming document pages", () => {
@@ -144,6 +145,99 @@ describe("Incoming document pages", () => {
     expect(screen.queryByRole("button", { name: /Lưu thay đổi$/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Chưa có gợi ý hoặc phân công/)).toBeInTheDocument();
     expect(screen.getByText(/Chưa có file đính kèm/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Thêm file$/ })).not.toBeInTheDocument();
+  });
+
+  it("lets Clerk upload and download attachments while updating metadata", async () => {
+    const original = createIncoming({ attachments: [createAttachment()] });
+    const uploaded = createAttachment({
+      id: "new-attachment",
+      fileName: "ảnh.png",
+      extractionStatus: "Unsupported",
+      uploadedAt: "2026-07-31T10:00:00Z",
+    });
+    vi.mocked(incomingService.getIncomingDocument).mockResolvedValue(original);
+    vi.mocked(incomingService.uploadIncomingAttachment).mockResolvedValue(uploaded);
+    vi.mocked(incomingService.downloadAttachment).mockResolvedValue({
+      blob: new Blob(["pdf"], { type: "application/pdf" }),
+      fileName: "report.pdf",
+    });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:attachment"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    renderIncomingRoute(
+      `/incoming-documents/${original.id}`,
+      "/incoming-documents/:id",
+      <IncomingDocumentDetailPage />,
+      ["Clerk"],
+    );
+
+    expect(await screen.findByText("report.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Chờ trích xuất")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tải$/ }));
+    await waitFor(() => expect(incomingService.downloadAttachment)
+      .toHaveBeenCalledWith("attachment-id"));
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    const png = new File(["png"], "ảnh.png", { type: "image/png" });
+    fireEvent.change(input!, { target: { files: [png] } });
+    await waitFor(() => expect(incomingService.uploadIncomingAttachment)
+      .toHaveBeenCalledWith(original.id, png));
+    expect(await screen.findByText("ảnh.png")).toBeInTheDocument();
+    expect(screen.getByText("Không hỗ trợ")).toBeInTheDocument();
+
+  });
+
+  it("confirms attachment deletion and removes its metadata", async () => {
+    const original = createIncoming({ attachments: [createAttachment()] });
+    vi.mocked(incomingService.getIncomingDocument).mockResolvedValue(original);
+    renderIncomingRoute(
+      `/incoming-documents/${original.id}`,
+      "/incoming-documents/:id",
+      <IncomingDocumentDetailPage />,
+      ["Clerk"],
+    );
+
+    await screen.findByText("report.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /Xóa$/ }));
+    const buttons = await screen.findAllByRole("button", { name: /Xóa$/ });
+    fireEvent.click(buttons[buttons.length - 1]);
+
+    await waitFor(() => expect(incomingService.deleteAttachment)
+      .toHaveBeenCalledWith("attachment-id"));
+    await waitFor(() => expect(screen.queryByText("report.pdf")).not.toBeInTheDocument());
+  });
+
+  it("shows a clear unsupported-file error and keeps existing attachments", async () => {
+    const user = userEvent.setup();
+    const original = createIncoming({ attachments: [createAttachment()] });
+    vi.mocked(incomingService.getIncomingDocument).mockResolvedValue(original);
+    vi.mocked(incomingService.uploadIncomingAttachment).mockRejectedValue(
+      new ApiError(415, { status: 415, detail: "Sai định dạng." }),
+    );
+    renderIncomingRoute(
+      `/incoming-documents/${original.id}`,
+      "/incoming-documents/:id",
+      <IncomingDocumentDetailPage />,
+      ["Clerk"],
+    );
+
+    await screen.findByText("report.pdf");
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    await user.upload(
+      input!,
+      new File(["fake"], "fake.pdf", { type: "application/pdf" }),
+    );
+
+    expect(await screen.findByText(/File không đúng định dạng PDF/)).toBeInTheDocument();
+    expect(screen.getByText("report.pdf")).toBeInTheDocument();
   });
 
   it("allows assigned staff to complete and refreshes the response", async () => {
@@ -268,6 +362,25 @@ function createIncoming(
     attachments: [],
     createdAt: "2026-07-31T00:00:00Z",
     updatedAt: "2026-07-31T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function createAttachment(
+  overrides: Partial<IncomingDocumentResponse["attachments"][number]> = {},
+): IncomingDocumentResponse["attachments"][number] {
+  return {
+    id: "attachment-id",
+    fileName: "report.pdf",
+    uploadedBy: {
+      id: "current-staff",
+      fullName: "Nguyễn Văn A",
+      position: "Chuyên viên",
+      department: "Văn phòng",
+    },
+    uploadedAt: "2026-07-31T09:00:00Z",
+    extractionStatus: "Pending",
+    extractedAt: null,
     ...overrides,
   };
 }

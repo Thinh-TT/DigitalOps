@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.StaffManagement;
@@ -16,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -428,6 +430,10 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
     private const string Password = "Valid1!Password";
     private readonly SqliteConnection _connection =
         new("Data Source=:memory:");
+    private readonly string _attachmentRootPath = Path.Combine(
+        Path.GetTempPath(),
+        "digitalops-api-attachment-tests",
+        Guid.NewGuid().ToString("N"));
 
     public StaffManagementApiFactory()
     {
@@ -453,6 +459,14 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
+
+        builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(
+            [
+                new KeyValuePair<string, string?>(
+                    $"{AttachmentStorageOptions.SectionName}:RootPath",
+                    _attachmentRootPath)
+            ]));
 
         builder.ConfigureServices(services =>
         {
@@ -486,6 +500,10 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
         if (disposing)
         {
             _connection.Dispose();
+            if (Directory.Exists(_attachmentRootPath))
+            {
+                Directory.Delete(_attachmentRootPath, recursive: true);
+            }
         }
 
         base.Dispose(disposing);

@@ -73,6 +73,8 @@ Mở `DigitalOps.API/.env` và thay toàn bộ placeholder. Không commit file n
 | `MemberImport__MaxFileSizeBytes` | Không | Dung lượng tối đa file XLSX; mặc định 10 MiB |
 | `MemberImport__MaxRows` | Không | Số dòng dữ liệu tối đa mỗi lần import; mặc định 10.000 |
 | `MemberImport__MaxExpandedWorkbookBytes` | Không | Tổng dung lượng giải nén XLSX tối đa; mặc định 100 MiB |
+| `AttachmentStorage__RootPath` | Không | Thư mục local lưu attachment ngoài web root; mặc định `App_Data/attachments` |
+| `AttachmentStorage__MaxFileSizeBytes` | Không | Dung lượng tối đa mỗi attachment; mặc định 10 MiB, tối đa cấu hình 100 MiB |
 | `DocumentCatalogSeed__Enabled` | Không | Seed 7 loại và 7 mẫu văn bản cho local/demo; mặc định `false` |
 | `IdentityBootstrap__Enabled` | Có | Bật/tắt tạo Administrator đầu tiên |
 | `IdentityBootstrap__UserName` | Khi bootstrap | Username Administrator |
@@ -187,6 +189,22 @@ DocumentCatalogSeed__Enabled=false
 
 Seed chỉ dành cho local/demo, không bật trong production. Cơ chế này không tự áp
 dụng migration và không tạo schema mới.
+
+### Chuẩn bị local attachment storage
+
+Mặc định API lưu file dưới `DigitalOps.API/App_Data/attachments`; thư mục được
+tạo ở lần upload đầu tiên, nằm ngoài web root và đã được gitignore. Có thể cấu
+hình đường dẫn tuyệt đối ngoài repository:
+
+```dotenv
+AttachmentStorage__RootPath=D:\DigitalOpsData\attachments
+AttachmentStorage__MaxFileSizeBytes=10485760
+```
+
+Tài khoản chạy API phải có quyền tạo/đọc/ghi/xóa trong thư mục này. Khi deploy,
+mount storage bền vững và backup riêng cùng database; không trỏ root vào
+`wwwroot`, ổ đĩa gốc hoặc thư mục tạm không được persist. T2-03 chỉ lưu file và
+đặt trạng thái `Pending`/`Unsupported`; worker trích xuất text thuộc T4-01.
 
 Từ thư mục gốc repository:
 

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Features.IncomingDocuments;
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Authentication;
@@ -46,6 +47,15 @@ public sealed class ApiHostSmokeTests(DigitalOpsApiFactory factory) : IClassFixt
         Assert.NotNull(scope.ServiceProvider.GetService<IStaffAccessChecker>());
         Assert.NotNull(scope.ServiceProvider.GetService<IStaffManagementService>());
         Assert.NotNull(scope.ServiceProvider.GetService<IIncomingDocumentService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IAttachmentService>());
+        Assert.IsType<LocalAttachmentStorage>(
+            scope.ServiceProvider.GetRequiredService<IAttachmentStorage>());
+        Assert.Equal(
+            AttachmentStorageOptions.DefaultMaxFileSizeBytes,
+            scope.ServiceProvider
+                .GetRequiredService<IOptions<AttachmentStorageOptions>>()
+                .Value
+                .MaxFileSizeBytes);
         Assert.NotNull(scope.ServiceProvider.GetService<IIdentityInitializer>());
 
         var authenticationOptions =

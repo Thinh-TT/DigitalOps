@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using Microsoft.AspNetCore.Mvc;
 
@@ -169,24 +170,6 @@ public sealed record IncomingStaffReference(
     string? Position,
     string? Department);
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
-public enum AttachmentExtractionStatus
-{
-    Pending,
-    Processing,
-    Succeeded,
-    Failed,
-    Unsupported
-}
-
-public sealed record IncomingAttachmentResponse(
-    Guid Id,
-    string FileName,
-    IncomingStaffReference UploadedBy,
-    DateTime UploadedAt,
-    AttachmentExtractionStatus ExtractionStatus,
-    DateTime? ExtractedAt);
-
 public sealed record IncomingDocumentResponse(
     Guid Id,
     string ReferenceNumber,
@@ -204,6 +187,6 @@ public sealed record IncomingDocumentResponse(
     DateTime? AssignmentConfirmedAt,
     IncomingDocumentStatus Status,
     DateTime? CompletedAt,
-    IReadOnlyList<IncomingAttachmentResponse> Attachments,
+    IReadOnlyList<AttachmentResponse> Attachments,
     DateTime CreatedAt,
     DateTime UpdatedAt);

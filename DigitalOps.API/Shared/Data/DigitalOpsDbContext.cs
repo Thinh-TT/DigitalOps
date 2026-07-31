@@ -1,3 +1,4 @@
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
@@ -21,6 +22,8 @@ public sealed class DigitalOpsDbContext(
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
 
     public DbSet<IncomingDocument> IncomingDocuments => Set<IncomingDocument>();
+
+    public DbSet<Attachment> Attachments => Set<Attachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
@@ -77,6 +78,15 @@ builder.Services.AddScoped<IMemberImportService, MemberImportService>();
 builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
 builder.Services.AddScoped<IDocumentCatalogService, DocumentCatalogService>();
 builder.Services.AddScoped<IIncomingDocumentService, IncomingDocumentService>();
+builder.Services
+    .AddOptions<AttachmentStorageOptions>()
+    .Bind(builder.Configuration.GetSection(AttachmentStorageOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<
+    IValidateOptions<AttachmentStorageOptions>,
+    AttachmentStorageOptionsValidator>();
+builder.Services.AddSingleton<IAttachmentStorage, LocalAttachmentStorage>();
+builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services
     .AddOptions<DocumentCatalogSeedOptions>()
     .Bind(builder.Configuration.GetSection(DocumentCatalogSeedOptions.SectionName));
