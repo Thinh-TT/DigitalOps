@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
 using Microsoft.EntityFrameworkCore;
@@ -8,17 +7,12 @@ namespace DigitalOps.API.Features.Members;
 public sealed class MemberManagementService(
     DigitalOpsDbContext dbContext) : IMemberManagementService
 {
-    private static readonly IReadOnlySet<string> AllowedGenders =
-        new HashSet<string>(
-            ["Male", "Female", "Other"],
-            StringComparer.Ordinal);
-
     public async Task<PagedResponse<MemberResponse>> GetListAsync(
         MemberListQuery query,
         CancellationToken cancellationToken = default)
     {
         var members = dbContext.Members.AsNoTracking();
-        var normalizedQuery = NormalizeSearchQuery(query.Q);
+        var normalizedQuery = MemberProfileRules.NormalizeSearchQuery(query.Q);
 
         if (normalizedQuery is not null)
         {
@@ -54,7 +48,7 @@ public sealed class MemberManagementService(
         var members = dbContext.Members
             .AsNoTracking()
             .Where(member => member.Status == MemberStatus.Active);
-        var normalizedQuery = NormalizeSearchQuery(query.Q);
+        var normalizedQuery = MemberProfileRules.NormalizeSearchQuery(query.Q);
 
         if (normalizedQuery is not null)
         {
@@ -104,16 +98,16 @@ public sealed class MemberManagementService(
         var member = new Member
         {
             Id = Guid.NewGuid(),
-            FullName = NormalizeFullName(request.FullName!),
+            FullName = MemberProfileRules.NormalizeFullName(request.FullName!),
             DateOfBirth = request.DateOfBirth,
-            Gender = NormalizeOptional(request.Gender),
-            Address = NormalizeOptional(request.Address),
-            Phone = NormalizePhone(request.Phone),
-            Email = NormalizeEmail(request.Email),
-            Position = NormalizeOptional(request.Position),
+            Gender = MemberProfileRules.NormalizeOptional(request.Gender),
+            Address = MemberProfileRules.NormalizeOptional(request.Address),
+            Phone = MemberProfileRules.NormalizePhone(request.Phone),
+            Email = MemberProfileRules.NormalizeEmail(request.Email),
+            Position = MemberProfileRules.NormalizeOptional(request.Position),
             JoinDate = request.JoinDate,
             Status = MemberStatus.Active,
-            Notes = NormalizeOptional(request.Notes)
+            Notes = MemberProfileRules.NormalizeOptional(request.Notes)
         };
 
         dbContext.Members.Add(member);
@@ -175,7 +169,7 @@ public sealed class MemberManagementService(
     {
         if (request.HasFullName)
         {
-            member.FullName = NormalizeFullName(request.FullName!);
+            member.FullName = MemberProfileRules.NormalizeFullName(request.FullName!);
         }
 
         if (request.HasDateOfBirth)
@@ -185,27 +179,27 @@ public sealed class MemberManagementService(
 
         if (request.HasGender)
         {
-            member.Gender = NormalizeOptional(request.Gender);
+            member.Gender = MemberProfileRules.NormalizeOptional(request.Gender);
         }
 
         if (request.HasAddress)
         {
-            member.Address = NormalizeOptional(request.Address);
+            member.Address = MemberProfileRules.NormalizeOptional(request.Address);
         }
 
         if (request.HasPhone)
         {
-            member.Phone = NormalizePhone(request.Phone);
+            member.Phone = MemberProfileRules.NormalizePhone(request.Phone);
         }
 
         if (request.HasEmail)
         {
-            member.Email = NormalizeEmail(request.Email);
+            member.Email = MemberProfileRules.NormalizeEmail(request.Email);
         }
 
         if (request.HasPosition)
         {
-            member.Position = NormalizeOptional(request.Position);
+            member.Position = MemberProfileRules.NormalizeOptional(request.Position);
         }
 
         if (request.HasJoinDate)
@@ -220,7 +214,7 @@ public sealed class MemberManagementService(
 
         if (request.HasNotes)
         {
-            member.Notes = NormalizeOptional(request.Notes);
+            member.Notes = MemberProfileRules.NormalizeOptional(request.Notes);
         }
     }
 
@@ -233,44 +227,39 @@ public sealed class MemberManagementService(
         if ((creating && !request.HasFullName)
             || (request.HasFullName && string.IsNullOrWhiteSpace(request.FullName)))
         {
-            AddError(errors, "fullName", "Họ và tên không được để trống.");
-        }
-
-        if (request.HasFullName && request.FullName?.Length > 200)
-        {
-            AddError(errors, "fullName", "Họ và tên không được vượt quá 200 ký tự.");
-        }
-
-        var gender = NormalizeOptional(request.Gender);
-        if (request.HasGender
-            && gender is not null
-            && !AllowedGenders.Contains(gender))
-        {
-            AddError(
+            MemberProfileRules.AddError(
                 errors,
-                "gender",
-                "Giới tính phải là Male, Female hoặc Other.");
+                "fullName",
+                "Họ và tên không được để trống.");
+        }
+        else if (request.HasFullName)
+        {
+            MemberProfileRules.ValidateFullName(request.FullName, errors);
         }
 
-        var phone = NormalizePhone(request.Phone);
-        if (request.HasPhone
-            && phone is not null
-            && !new PhoneAttribute().IsValid(phone))
+        if (request.HasGender)
         {
-            AddError(errors, "phone", "Số điện thoại không đúng định dạng.");
+            MemberProfileRules.ValidateGender(request.Gender, errors);
         }
 
-        var email = NormalizeEmail(request.Email);
-        if (request.HasEmail
-            && email is not null
-            && !new EmailAddressAttribute().IsValid(email))
+        if (request.HasPhone)
         {
-            AddError(errors, "email", "Email không đúng định dạng.");
+            MemberProfileRules.ValidatePhone(request.Phone, errors);
+        }
+
+        if (request.HasEmail)
+        {
+            MemberProfileRules.ValidateEmail(request.Email, errors);
+        }
+
+        if (request.HasPosition)
+        {
+            MemberProfileRules.ValidatePosition(request.Position, errors);
         }
 
         if (request.HasStatus && request.Status != MemberStatus.Active)
         {
-            AddError(
+            MemberProfileRules.AddError(
                 errors,
                 "status",
                 creating
@@ -282,20 +271,6 @@ public sealed class MemberManagementService(
             pair => pair.Key,
             pair => pair.Value.ToArray(),
             StringComparer.Ordinal);
-    }
-
-    private static void AddError(
-        IDictionary<string, List<string>> errors,
-        string field,
-        string message)
-    {
-        if (!errors.TryGetValue(field, out var fieldErrors))
-        {
-            fieldErrors = [];
-            errors[field] = fieldErrors;
-        }
-
-        fieldErrors.Add(message);
     }
 
     private static PagedResponse<T> CreatePage<T>(
@@ -328,30 +303,4 @@ public sealed class MemberManagementService(
             member.CreatedAt,
             member.UpdatedAt);
 
-    private static string NormalizeFullName(string value) =>
-        CollapseWhitespace(value);
-
-    private static string? NormalizePhone(string? value)
-    {
-        var normalized = NormalizeOptional(value);
-        return normalized is null ? null : CollapseWhitespace(normalized);
-    }
-
-    private static string? NormalizeEmail(string? value) =>
-        NormalizeOptional(value)?.ToLowerInvariant();
-
-    private static string? NormalizeOptional(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string? NormalizeSearchQuery(string? value) =>
-        string.IsNullOrWhiteSpace(value)
-            ? null
-            : CollapseWhitespace(value).ToLowerInvariant();
-
-    private static string CollapseWhitespace(string value) =>
-        string.Join(
-            ' ',
-            value.Split(
-                (char[]?)null,
-                StringSplitOptions.RemoveEmptyEntries));
 }

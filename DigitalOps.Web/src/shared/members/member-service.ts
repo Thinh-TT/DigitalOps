@@ -1,7 +1,12 @@
-import { apiRequest } from "../api/api-client";
+import {
+  apiDownload,
+  apiRequest,
+  type DownloadedFile,
+} from "../api/api-client";
 import type { PagedResponse } from "../api/types";
 import type {
   MemberCreateRequest,
+  MemberImportResult,
   MemberListParameters,
   MemberLookupParameters,
   MemberLookupResponse,
@@ -51,6 +56,20 @@ export function updateMember(
 export function deactivateMember(id: string): Promise<MemberResponse> {
   return apiRequest<MemberResponse>(`/members/${id}/deactivate`, {
     method: "POST",
+  });
+}
+
+export function downloadMemberImportTemplate(): Promise<DownloadedFile> {
+  return apiDownload("/members/import-template");
+}
+
+export function importMembers(file: File): Promise<MemberImportResult> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+
+  return apiRequest<MemberImportResult>("/members/import", {
+    method: "POST",
+    body: form,
   });
 }
 

@@ -129,6 +129,10 @@ select {
   max-width: 960px;
 }
 
+.member-import-stack {
+  width: 100%;
+}
+
 .member-search-input {
   width: min(360px, 100%);
 }

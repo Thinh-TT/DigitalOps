@@ -61,3 +61,21 @@ export interface MemberUpdateRequest {
   status?: "Active";
   notes?: string | null;
 }
+
+export interface MemberImportRowError {
+  rowNumber: number;
+  field: string;
+  message: string;
+}
+
+export interface MemberImportResult {
+  importedCount: number;
+  totalRows: number;
+  errors: MemberImportRowError[];
+}
+
+export interface MemberImportProblemDetails {
+  importedCount: 0;
+  totalRows: number;
+  errors: MemberImportRowError[];
+}

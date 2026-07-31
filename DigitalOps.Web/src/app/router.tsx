@@ -26,6 +26,7 @@ import {
   MemberDetailPage,
   MemberListPage,
 } from "../pages/MemberPages";
+import { MemberImportPage } from "../pages/MemberImportPage";
 import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
 
 const commonRoutes: RouteObject[] = [
@@ -97,10 +98,13 @@ const memberRoutes: RouteObject[] = [
     element: <MemberCreatePage />,
   },
   {
+    path: "members/import",
+    element: <MemberImportPage />,
+  },
+  {
     path: "members/:id",
     element: <MemberDetailPage />,
   },
-  placeholder("members/import", "SCR-005", "Import hội viên", "Nhập dữ liệu hội viên từ XLSX."),
 ];
 
 export const appRoutes: RouteObject[] = [

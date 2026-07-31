@@ -5,6 +5,7 @@ import {
   SaveOutlined,
   SearchOutlined,
   StopOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
@@ -236,13 +237,21 @@ export function MemberListPage() {
             Tra cứu và quản lý hồ sơ hội viên đã số hóa.
           </Typography.Text>
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => navigate("/members/new")}
-        >
-          Tạo hội viên
-        </Button>
+        <Space wrap>
+          <Button
+            icon={<UploadOutlined />}
+            onClick={() => navigate("/members/import")}
+          >
+            Import Excel
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => navigate("/members/new")}
+          >
+            Tạo hội viên
+          </Button>
+        </Space>
       </div>
 
       <Card>

@@ -15,6 +15,11 @@ export interface ApiRequestOptions extends RequestInit {
   authenticated?: boolean;
 }
 
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string | null;
+}
+
 const accessEventListeners = new Set<AccessEventListener>();
 const apiBaseUrl = (
   import.meta.env.VITE_API_BASE_URL ?? "/api/v1"
@@ -41,10 +46,40 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
+  const response = await sendRequest(path, options, "application/json");
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+export async function apiDownload(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<DownloadedFile> {
+  const response = await sendRequest(
+    path,
+    options,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+
+  return {
+    blob: await response.blob(),
+    fileName: readDownloadFileName(response.headers.get("Content-Disposition")),
+  };
+}
+
+async function sendRequest(
+  path: string,
+  options: ApiRequestOptions,
+  accept: string,
+): Promise<Response> {
   const { authenticated = true, ...requestOptions } = options;
   const headers = new Headers(requestOptions.headers);
 
-  headers.set("Accept", "application/json");
+  headers.set("Accept", accept);
 
   if (
     requestOptions.body !== undefined &&
@@ -84,11 +119,7 @@ export async function apiRequest<T>(
     throw new ApiError(response.status, problem);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
+  return response;
 }
 
 function buildApiUrl(path: string): string {
@@ -121,4 +152,22 @@ function publishAccessEvent(event: AccessEvent): void {
   for (const listener of accessEventListeners) {
     listener(event);
   }
+}
+
+function readDownloadFileName(contentDisposition: string | null): string | null {
+  if (contentDisposition === null) {
+    return null;
+  }
+
+  const encodedMatch = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+  if (encodedMatch?.[1] !== undefined) {
+    try {
+      return decodeURIComponent(encodedMatch[1].trim());
+    } catch {
+      return encodedMatch[1].trim();
+    }
+  }
+
+  const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
+  return match?.[1]?.trim() ?? null;
 }

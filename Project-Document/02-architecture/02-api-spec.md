@@ -234,6 +234,7 @@ với type `password-change-required`. Role trong JWT là snapshot:
 | `MemberLookupResponse` | `id`, `fullName`, `position` |
 | `MemberImportResult` | `importedCount`, `totalRows`, `errors` |
 | `MemberImportRowError` | `rowNumber`, `field`, `message` |
+| `MemberImportProblemDetails` | RFC ProblemDetails và các extension `importedCount = 0`, `totalRows`, `errors: MemberImportRowError[]` |
 
 ### 7.2. Endpoint Members
 
@@ -245,10 +246,16 @@ với type `password-change-required`. Role trong JWT là snapshot:
 | `GET` | `/members/{id}` | Administrator, Clerk | — | `200 MemberResponse` | `404`, `403` |
 | `PATCH` | `/members/{id}` | Administrator, Clerk | `MemberUpsertRequest` dạng partial | `200 MemberResponse` | `400`, `404` |
 | `POST` | `/members/{id}/deactivate` | Administrator, Clerk | — | `200 MemberResponse` | `404`, `409` nếu đã Inactive |
-| `GET` | `/members/import-template` | Administrator, Clerk | — | `200` stream `.xlsx` | `403` |
-| `POST` | `/members/import` | Administrator, Clerk | `multipart/form-data`: `file` | `200 MemberImportResult` | `415`, `422` row errors |
+| `GET` | `/members/import-template` | Administrator, Clerk | — | `200` stream `DigitalOps-Member-Import-Template.xlsx` | `403` |
+| `POST` | `/members/import` | Administrator, Clerk | `multipart/form-data`: `file` | `200 MemberImportResult` | `400`, `413`, `415`, `422 MemberImportProblemDetails` |
 
-Import là all-or-nothing. `422` trả toàn bộ `MemberImportRowError`; database không ghi bất kỳ dòng nào nếu có lỗi.
+Import là all-or-nothing. `422` trả toàn bộ `MemberImportRowError`; database không ghi bất kỳ dòng nào nếu có lỗi. `rowNumber = 0` dành cho lỗi workbook, `1` dành cho header và từ `2` trở đi là số dòng Excel thực tế. `field` dùng mã ổn định của Member hoặc `file`/`duplicateKey`.
+
+Template có sheet dữ liệu `Hội viên`, header hàng 1 theo đúng thứ tự: `Họ và tên`, `Ngày sinh`, `Giới tính`, `Địa chỉ`, `Số điện thoại`, `Email`, `Chức vụ`, `Ngày gia nhập`, `Trạng thái`, `Ghi chú`. Sheet `Hướng dẫn` mô tả quy tắc nhập và sheet danh mục ẩn cung cấp validation cho Gender (`Male`, `Female`, `Other`) và Status (`Active`, `Inactive`). Ngày dùng `yyyy-mm-dd`, điện thoại là Text; Status trống mặc định `Active`.
+
+Import mặc định giới hạn file 10 MiB, tối đa 10.000 dòng dữ liệu và giới hạn 100 MiB dung lượng giải nén; các ngưỡng được cấu hình bằng section `MemberImport`. Header phải đúng tên/thứ tự, dòng hoàn toàn trống được bỏ qua. File khác `.xlsx`, sai signature hoặc workbook hỏng trả `415`; sai sheet/header hoặc dữ liệu nghiệp vụ trả `422`.
+
+Khóa trùng `FullName + DateOfBirth + Phone` được so sau chuẩn hóa trên cả hội viên Active/Inactive và trong chính file. FullName không phân biệt hoa thường; DateOfBirth và Phone so chính xác; `null` ở hai phía được coi là bằng nhau.
 
 PATCH phân biệt field không gửi với `null`: field không gửi giữ nguyên, còn `null`
 xóa giá trị của field nullable. `fullName` và `status` không nhận `null`. POST gửi

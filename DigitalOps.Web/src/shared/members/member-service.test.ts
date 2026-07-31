@@ -2,8 +2,10 @@ import { writeSession } from "../auth/session-store";
 import {
   createMember,
   deactivateMember,
+  downloadMemberImportTemplate,
   getMemberLookup,
   getMembers,
+  importMembers,
   updateMember,
 } from "./member-service";
 
@@ -83,6 +85,50 @@ describe("member-service", () => {
       "POST",
       undefined,
     );
+  });
+
+  it("downloads the XLSX template and uploads multipart without a content type override", async () => {
+    writeValidSession();
+    const templateBlob = new Blob(["xlsx"], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(templateBlob, {
+        status: 200,
+        headers: {
+          "Content-Type": templateBlob.type,
+          "Content-Disposition":
+            "attachment; filename=DigitalOps-Member-Import-Template.xlsx",
+        },
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        importedCount: 1,
+        totalRows: 1,
+        errors: [],
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["members"], "members.xlsx", {
+      type: templateBlob.type,
+    });
+
+    const downloaded = await downloadMemberImportTemplate();
+    const imported = await importMembers(file);
+
+    expect(downloaded.fileName).toBe("DigitalOps-Member-Import-Template.xlsx");
+    expect(downloaded.blob.type).toBe(templateBlob.type);
+    expect(imported.importedCount).toBe(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/members/import-template");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/members/import");
+    const downloadHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(downloadHeaders.get("Accept")).toBe(templateBlob.type);
+    const uploadOptions = fetchMock.mock.calls[1][1] as RequestInit;
+    const uploadHeaders = new Headers(uploadOptions.headers);
+    expect(uploadOptions.method).toBe("POST");
+    expect(uploadHeaders.has("Content-Type")).toBe(false);
+    expect(uploadOptions.body).toBeInstanceOf(FormData);
+    const uploadedFile = (uploadOptions.body as FormData).get("file") as File;
+    expect(uploadedFile.name).toBe(file.name);
+    expect(uploadedFile.size).toBe(file.size);
   });
 });
 

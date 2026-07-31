@@ -70,6 +70,9 @@ Mở `DigitalOps.API/.env` và thay toàn bộ placeholder. Không commit file n
 | `Jwt__Audience` | Có | Audience của access token |
 | `Jwt__SigningKey` | Có | Secret ký JWT, tối thiểu 32 byte UTF-8 |
 | `Jwt__AccessTokenLifetimeMinutes` | Có | Thời hạn access token |
+| `MemberImport__MaxFileSizeBytes` | Không | Dung lượng tối đa file XLSX; mặc định 10 MiB |
+| `MemberImport__MaxRows` | Không | Số dòng dữ liệu tối đa mỗi lần import; mặc định 10.000 |
+| `MemberImport__MaxExpandedWorkbookBytes` | Không | Tổng dung lượng giải nén XLSX tối đa; mặc định 100 MiB |
 | `IdentityBootstrap__Enabled` | Có | Bật/tắt tạo Administrator đầu tiên |
 | `IdentityBootstrap__UserName` | Khi bootstrap | Username Administrator |
 | `IdentityBootstrap__Email` | Khi bootstrap | Email Administrator |

@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+MemberWorkbookGraphics.Configure();
 AddLocalEnvironmentFile(builder);
 
 var connectionString = builder.Configuration.GetConnectionString("DigitalOps")
@@ -63,6 +64,14 @@ builder.Services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IAccessTokenService, JwtAccessTokenService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services
+    .AddOptions<MemberImportOptions>()
+    .Bind(builder.Configuration.GetSection(MemberImportOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<
+    IValidateOptions<MemberImportOptions>,
+    MemberImportOptionsValidator>();
+builder.Services.AddScoped<IMemberImportService, MemberImportService>();
 builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
 builder.Services.AddScoped<IStaffManagementService, StaffManagementService>();
 builder.Services

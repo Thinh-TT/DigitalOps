@@ -88,6 +88,24 @@ describe("route guards and App Shell", () => {
       await screen.findByText("Không có quyền truy cập"),
     ).toBeInTheDocument();
   });
+
+  it("allows Administrator and Clerk to open SCR-005 and blocks other roles", async () => {
+    renderRoute(
+      "/members/import",
+      createAuthValue("authenticated", ["Administrator"], false),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Import hội viên" }),
+    ).toBeInTheDocument();
+
+    renderRoute(
+      "/members/import",
+      createAuthValue("authenticated", ["Drafter"], false),
+    );
+    expect(
+      await screen.findByText("Không có quyền truy cập"),
+    ).toBeInTheDocument();
+  });
 });
 
 function renderRoute(path: string, authValue: AuthContextValue) {

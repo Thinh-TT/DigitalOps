@@ -354,8 +354,10 @@ và API văn bản đi.
 ### 9.3. Import hội viên và tìm kiếm toàn văn
 
 1. Administrator/Clerk tải template tại SCR-005, chọn một XLSX và gửi import.
-2. Nếu API trả 422, màn hình hiển thị bảng rowNumber, field, message; không báo import một phần. Nếu thành công, hiển thị importedCount/totalRows và điều hướng hoặc tải lại SCR-004.
-3. Staff active mở SCR-016, nhập q từ 2 ký tự, thêm filter tùy chọn và duyệt trang kết quả. Click [Mở chi tiết] giữ khả năng quay lại với query/filter đang dùng.
+2. Template dùng header tiếng Việt cố định, ngày `yyyy-mm-dd`, điện thoại dạng Text và danh sách mã Gender/Status. Màn hình chỉ chọn một `.xlsx`, không auto-upload và hiển thị tên/kích thước trước khi gửi.
+3. Nếu API trả 422, màn hình hiển thị bảng Dòng/Cột/Nguyên nhân, map field kỹ thuật sang tên cột tiếng Việt và khẳng định không có dòng nào được nhập. Lỗi 400/413/415 giữ file để người dùng xem hoặc thay thế.
+4. Nếu thành công, hiển thị importedCount/totalRows, xóa file đã chọn và cung cấp action về SCR-004 hoặc import tệp khác.
+5. Staff active mở SCR-016, nhập q từ 2 ký tự, thêm filter tùy chọn và duyệt trang kết quả. Click [Mở chi tiết] giữ khả năng quay lại với query/filter đang dùng.
 
 ## 10. Traceability Matrix
 

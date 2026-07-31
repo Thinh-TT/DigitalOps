@@ -164,9 +164,40 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
                 .GetProperty("post")
                 .GetProperty("responses")
                 .TryGetProperty("409", out _));
+        Assert.True(
+            paths.TryGetProperty(
+                "/api/v1/members/import-template",
+                out var memberImportTemplatePath));
+        Assert.True(
+            memberImportTemplatePath
+                .GetProperty("get")
+                .GetProperty("responses")
+                .GetProperty("200")
+                .GetProperty("content")
+                .TryGetProperty(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    out _));
+        Assert.True(
+            paths.TryGetProperty(
+                "/api/v1/members/import",
+                out var memberImportPath));
+        var memberImportOperation = memberImportPath.GetProperty("post");
+        Assert.True(
+            memberImportOperation
+                .GetProperty("requestBody")
+                .GetProperty("content")
+                .TryGetProperty("multipart/form-data", out _));
+        var memberImportResponses = memberImportOperation.GetProperty("responses");
+        foreach (var statusCode in new[] { "200", "400", "413", "415", "422" })
+        {
+            Assert.True(memberImportResponses.TryGetProperty(statusCode, out _));
+        }
         Assert.True(schemas.TryGetProperty("MemberUpsertRequest", out _));
         Assert.True(schemas.TryGetProperty("MemberResponse", out _));
         Assert.True(schemas.TryGetProperty("MemberLookupResponse", out _));
+        Assert.True(schemas.TryGetProperty("MemberImportResult", out _));
+        Assert.True(schemas.TryGetProperty("MemberImportRowError", out _));
+        Assert.True(schemas.TryGetProperty("MemberImportProblemDetails", out _));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(
