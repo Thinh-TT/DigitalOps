@@ -20,7 +20,11 @@ public sealed class AuthorizationPipelineTests(AuthorizationApiFactory factory)
 
         var response = await client.GetAsync("/_test/authorization/business");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await ProblemDetailsAssert.HasContractAsync(
+            response,
+            HttpStatusCode.Unauthorized,
+            "unauthorized",
+            "/_test/authorization/business");
     }
 
     [Fact]
@@ -35,7 +39,11 @@ public sealed class AuthorizationPipelineTests(AuthorizationApiFactory factory)
         var forbiddenResponse = await client.GetAsync("/_test/authorization/business");
 
         Assert.Equal(HttpStatusCode.OK, allowedResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
+        await ProblemDetailsAssert.HasContractAsync(
+            forbiddenResponse,
+            HttpStatusCode.Forbidden,
+            "forbidden",
+            "/_test/authorization/business");
     }
 
     [Fact]
@@ -50,7 +58,11 @@ public sealed class AuthorizationPipelineTests(AuthorizationApiFactory factory)
         var forbiddenResponse = await client.GetAsync("/_test/authorization/password-change-required");
 
         Assert.Equal(HttpStatusCode.OK, allowedResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
+        await ProblemDetailsAssert.HasContractAsync(
+            forbiddenResponse,
+            HttpStatusCode.Forbidden,
+            "forbidden",
+            "/_test/authorization/password-change-required");
     }
 
     [Fact]
@@ -65,7 +77,11 @@ public sealed class AuthorizationPipelineTests(AuthorizationApiFactory factory)
 
         var response = await client.GetAsync("/_test/authorization/business");
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await ProblemDetailsAssert.HasContractAsync(
+            response,
+            HttpStatusCode.Forbidden,
+            "forbidden",
+            "/_test/authorization/business");
     }
 
     [Theory]
@@ -86,7 +102,11 @@ public sealed class AuthorizationPipelineTests(AuthorizationApiFactory factory)
         var forbiddenResponse = await client.GetAsync($"/_test/authorization/{route}");
 
         Assert.Equal(HttpStatusCode.OK, allowedResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
+        await ProblemDetailsAssert.HasContractAsync(
+            forbiddenResponse,
+            HttpStatusCode.Forbidden,
+            "forbidden",
+            $"/_test/authorization/{route}");
     }
 
     private HttpClient CreateClient() =>

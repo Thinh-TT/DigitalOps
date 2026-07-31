@@ -2,29 +2,41 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Shared.Data;
+using DigitalOps.API.Shared.Errors;
 using DigitalOps.API.Shared.Identity;
+using DigitalOps.API.Shared.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+AddLocalEnvironmentFile(builder);
 
 var connectionString = builder.Configuration.GetConnectionString("DigitalOps")
     ?? throw new InvalidOperationException(
         "Connection string 'DigitalOps' is required. Configure ConnectionStrings__DigitalOps outside source control.");
 
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+        ProblemDetailsDefaults.Apply(context.HttpContext, context.ProblemDetails);
+});
+builder.Services.AddSingleton<ProblemDetailsFactory, DigitalOpsProblemDetailsFactory>();
 builder.Services
     .AddControllers()
     .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
+        ConfigureJsonSerializer(options.JsonSerializerOptions));
+builder.Services.ConfigureHttpJsonOptions(options =>
+    ConfigureJsonSerializer(options.SerializerOptions));
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddOperationTransformer<BearerSecuritySchemeTransformer>();
+});
 
 builder.Services.AddDbContext<DigitalOpsDbContext>(options => options
     .UseNpgsql(
@@ -95,9 +107,18 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
+if (app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler();
+    app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.SwaggerEndpoint("/openapi/v1.json", "DigitalOps API v1");
+        options.DocumentTitle = "DigitalOps API";
+    });
 }
 
 app.UseHttpsRedirection();
@@ -122,6 +143,70 @@ static void RequireCurrentStaffAccess(
 {
     policy.RequireAuthenticatedUser();
     policy.AddRequirements(new CurrentStaffAccessRequirement(mustChangePassword));
+}
+
+static void ConfigureJsonSerializer(JsonSerializerOptions options)
+{
+    options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+    options.Converters.Add(new JsonStringEnumConverter());
+}
+
+static void AddLocalEnvironmentFile(WebApplicationBuilder builder)
+{
+    var envPath = Path.Combine(builder.Environment.ContentRootPath, ".env");
+
+    if (!File.Exists(envPath))
+    {
+        return;
+    }
+
+    var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var line in File.ReadLines(envPath))
+    {
+        var trimmedLine = line.Trim();
+
+        if (trimmedLine.Length == 0 || trimmedLine.StartsWith('#'))
+        {
+            continue;
+        }
+
+        if (trimmedLine.StartsWith("export ", StringComparison.Ordinal))
+        {
+            trimmedLine = trimmedLine["export ".Length..].TrimStart();
+        }
+
+        var separatorIndex = trimmedLine.IndexOf('=');
+
+        if (separatorIndex <= 0)
+        {
+            continue;
+        }
+
+        var key = trimmedLine[..separatorIndex].Trim();
+        var value = trimmedLine[(separatorIndex + 1)..].Trim();
+
+        if (value.Length >= 2
+            && ((value[0] == '"' && value[^1] == '"')
+                || (value[0] == '\'' && value[^1] == '\'')))
+        {
+            value = value[1..^1];
+        }
+
+        var configurationKey = key.Replace("__", ":", StringComparison.Ordinal);
+
+        if (Environment.GetEnvironmentVariable(key) is null
+            && Environment.GetEnvironmentVariable(configurationKey) is null)
+        {
+            values[configurationKey] = value;
+        }
+    }
+
+    if (values.Count > 0)
+    {
+        builder.Configuration.AddInMemoryCollection(values);
+    }
 }
 
 public partial class Program;

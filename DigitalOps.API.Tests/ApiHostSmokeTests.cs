@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Shared.Data;
@@ -5,6 +6,7 @@ using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DigitalOps.API.Tests;
@@ -64,6 +67,22 @@ public sealed class ApiHostSmokeTests(DigitalOpsApiFactory factory) : IClassFixt
             Assert.NotNull(await policyProvider.GetPolicyAsync(policyName));
         }
     }
+
+    [Fact]
+    public async Task Non_development_host_does_not_expose_openapi_or_swagger()
+    {
+        using var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions
+            {
+                BaseAddress = new Uri("https://localhost")
+            });
+
+        var openApiResponse = await client.GetAsync("/openapi/v1.json");
+        var swaggerResponse = await client.GetAsync("/swagger/index.html");
+
+        Assert.Equal(HttpStatusCode.NotFound, openApiResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, swaggerResponse.StatusCode);
+    }
 }
 
 public class DigitalOpsApiFactory : WebApplicationFactory<Program>
@@ -84,6 +103,7 @@ public class DigitalOpsApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureLogging(logging => logging.ClearProviders());
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             configuration.AddInMemoryCollection(
@@ -94,6 +114,8 @@ public class DigitalOpsApiFactory : WebApplicationFactory<Program>
                 new KeyValuePair<string, string?>("Jwt:SigningKey", TestSigningKey)
             ]);
         });
+        builder.ConfigureServices(services =>
+            services.AddDataProtection().UseEphemeralDataProtectionProvider());
     }
 
     protected override void Dispose(bool disposing)
