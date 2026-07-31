@@ -114,6 +114,7 @@ select {
 }
 
 .staff-form-grid,
+.member-form-grid,
 .staff-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -122,4 +123,16 @@ select {
 
 .staff-detail-grid {
   gap: 24px;
+}
+
+.member-form {
+  max-width: 960px;
+}
+
+.member-search-input {
+  width: min(360px, 100%);
+}
+
+.member-status-filter {
+  min-width: 200px;
 }

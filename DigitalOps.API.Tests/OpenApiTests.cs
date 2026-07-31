@@ -134,6 +134,39 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.True(schemas.TryGetProperty("RoleAssignmentRequest", out _));
         Assert.True(schemas.TryGetProperty("ResetPasswordRequest", out _));
         Assert.True(schemas.TryGetProperty("StaffResponse", out _));
+
+        Assert.True(paths.TryGetProperty("/api/v1/members", out var membersPath));
+        Assert.True(membersPath.GetProperty("get").TryGetProperty("security", out _));
+        Assert.True(membersPath.GetProperty("post").TryGetProperty("security", out _));
+        var memberQueryParameters = membersPath
+            .GetProperty("get")
+            .GetProperty("parameters")
+            .EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToArray();
+        Assert.Contains("q", memberQueryParameters);
+        Assert.Contains("status", memberQueryParameters);
+        Assert.Contains("page", memberQueryParameters);
+        Assert.Contains("pageSize", memberQueryParameters);
+        Assert.True(
+            paths.TryGetProperty("/api/v1/members/lookup", out var memberLookupPath));
+        Assert.True(memberLookupPath.TryGetProperty("get", out _));
+        Assert.True(
+            paths.TryGetProperty("/api/v1/members/{id}", out var memberDetailPath));
+        Assert.True(memberDetailPath.TryGetProperty("get", out _));
+        Assert.True(memberDetailPath.TryGetProperty("patch", out _));
+        Assert.True(
+            paths.TryGetProperty(
+                "/api/v1/members/{id}/deactivate",
+                out var memberDeactivatePath));
+        Assert.True(
+            memberDeactivatePath
+                .GetProperty("post")
+                .GetProperty("responses")
+                .TryGetProperty("409", out _));
+        Assert.True(schemas.TryGetProperty("MemberUpsertRequest", out _));
+        Assert.True(schemas.TryGetProperty("MemberResponse", out _));
+        Assert.True(schemas.TryGetProperty("MemberLookupResponse", out _));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(

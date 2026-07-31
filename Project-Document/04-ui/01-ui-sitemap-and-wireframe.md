@@ -204,6 +204,12 @@ nhập/xác nhận mật khẩu tạm, và lỗi `409` giữ dữ liệu form đ
 Nếu Administrator tự vô hiệu hóa thành công, UI xóa phiên và chuyển về
 `/login`.
 
+SCR-004 tạo hội viên ở trạng thái Active, ngừng hoạt động qua modal xác nhận và
+dùng PATCH `status = Active` để kích hoạt lại. Phần văn bản đi liên quan được đặt
+ở trạng thái rỗng trong T1-03; việc gọi
+`GET /outgoing-documents?relatedMemberId=...` được nối khi T3-01 triển khai bảng
+và API văn bản đi.
+
 ## 8. Wireframe chi tiết
 
 ### 8.1. SCR-001 và SCR-002 — Xác thực

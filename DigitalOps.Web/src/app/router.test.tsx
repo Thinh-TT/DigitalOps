@@ -7,6 +7,9 @@ import {
   type AuthContextValue,
 } from "../shared/auth/auth-context";
 import type { Role } from "../shared/auth/types";
+import * as memberService from "../shared/members/member-service";
+
+vi.mock("../shared/members/member-service");
 
 describe("route guards and App Shell", () => {
   it("redirects an anonymous user to login", async () => {
@@ -58,6 +61,32 @@ describe("route guards and App Shell", () => {
     expect(screen.getByText("Import hội viên")).toBeInTheDocument();
     expect(screen.getByText("Hàng chờ duyệt")).toBeInTheDocument();
     expect(screen.getByText("Phát hành / lưu trữ")).toBeInTheDocument();
+  });
+
+  it("allows Administrator and Clerk to open members and blocks other roles", async () => {
+    vi.mocked(memberService.getMembers).mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      totalCount: 0,
+      totalPages: 0,
+    });
+    renderRoute(
+      "/members",
+      createAuthValue("authenticated", ["Clerk"], false),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Hội viên" }),
+    ).toBeInTheDocument();
+
+    renderRoute(
+      "/members",
+      createAuthValue("authenticated", ["Leader"], false),
+    );
+    expect(
+      await screen.findByText("Không có quyền truy cập"),
+    ).toBeInTheDocument();
   });
 });
 

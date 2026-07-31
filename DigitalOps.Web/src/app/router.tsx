@@ -21,6 +21,11 @@ import {
   StaffDetailPage,
   StaffListPage,
 } from "../pages/StaffPages";
+import {
+  MemberCreatePage,
+  MemberDetailPage,
+  MemberListPage,
+} from "../pages/MemberPages";
 import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
 
 const commonRoutes: RouteObject[] = [
@@ -83,9 +88,18 @@ const administratorRoutes: RouteObject[] = [
 ];
 
 const memberRoutes: RouteObject[] = [
-  placeholder("members", "SCR-004", "Hội viên", "Danh sách và tìm kiếm hội viên."),
-  placeholder("members/new", "SCR-004", "Tạo hội viên", "Tạo hồ sơ hội viên."),
-  placeholder("members/:id", "SCR-004", "Chi tiết hội viên", "Cập nhật hồ sơ hội viên."),
+  {
+    path: "members",
+    element: <MemberListPage />,
+  },
+  {
+    path: "members/new",
+    element: <MemberCreatePage />,
+  },
+  {
+    path: "members/:id",
+    element: <MemberDetailPage />,
+  },
   placeholder("members/import", "SCR-005", "Import hội viên", "Nhập dữ liệu hội viên từ XLSX."),
 ];
 

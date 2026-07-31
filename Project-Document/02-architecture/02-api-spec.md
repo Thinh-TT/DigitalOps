@@ -229,7 +229,7 @@ với type `password-change-required`. Role trong JWT là snapshot:
 
 | DTO | Thuộc tính |
 | --- | --- |
-| `MemberUpsertRequest` | `fullName`, `dateOfBirth?`, `gender?`, `address?`, `phone?`, `email?`, `position?`, `joinDate?`, `status?`, `notes?`; FullName bắt buộc khi POST và bắt buộc sau khi áp dụng PATCH |
+| `MemberUpsertRequest` | `fullName`, `dateOfBirth?`, `gender?`, `address?`, `phone?`, `email?`, `position?`, `joinDate?`, `status?`, `notes?`; FullName bắt buộc khi POST và bắt buộc sau khi áp dụng PATCH. POST luôn tạo `Active`; PATCH chỉ nhận `status = Active` để kích hoạt lại. Ngừng hoạt động phải dùng action `deactivate`. |
 | `MemberResponse` | `id`, toàn bộ trường Member, `createdAt`, `updatedAt` |
 | `MemberLookupResponse` | `id`, `fullName`, `position` |
 | `MemberImportResult` | `importedCount`, `totalRows`, `errors` |
@@ -249,6 +249,11 @@ với type `password-change-required`. Role trong JWT là snapshot:
 | `POST` | `/members/import` | Administrator, Clerk | `multipart/form-data`: `file` | `200 MemberImportResult` | `415`, `422` row errors |
 
 Import là all-or-nothing. `422` trả toàn bộ `MemberImportRowError`; database không ghi bất kỳ dòng nào nếu có lỗi.
+
+PATCH phân biệt field không gửi với `null`: field không gửi giữ nguyên, còn `null`
+xóa giá trị của field nullable. `fullName` và `status` không nhận `null`. POST gửi
+`status = Inactive`, hoặc PATCH gửi `status = Inactive`, đều trả validation `400`
+để không đi vòng qua action ngừng hoạt động và quy tắc conflict của action này.
 
 ## 8. DTO/API DocumentTypes Và DocumentTemplates
 
