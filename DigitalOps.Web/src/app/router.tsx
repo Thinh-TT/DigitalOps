@@ -1,0 +1,194 @@
+import {
+  createBrowserRouter,
+  type RouteObject,
+} from "react-router";
+import { AppShell } from "./AppShell";
+import {
+  AuthenticatedRoute,
+  AuthStatusBoundary,
+  BusinessAccessRoute,
+  PublicOnlyRoute,
+  RoleRoute,
+  RootRedirect,
+} from "./route-guards";
+import {
+  ChangePasswordPlaceholderPage,
+  LoginPlaceholderPage,
+} from "../pages/AuthPlaceholderPages";
+import { FeaturePlaceholderPage } from "../pages/FeaturePlaceholderPage";
+import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
+
+const commonRoutes: RouteObject[] = [
+  placeholder("incoming-documents", "SCR-008", "Văn bản đến", "Danh sách văn bản đến."),
+  placeholder(
+    "incoming-documents/:id",
+    "SCR-009",
+    "Chi tiết văn bản đến",
+    "Thông tin tiếp nhận, file đính kèm và điều phối.",
+  ),
+  placeholder("reminders", "SCR-010", "Thông báo", "Danh sách nhắc hạn của tài khoản."),
+  placeholder("outgoing-documents", "SCR-011", "Văn bản đi", "Danh sách văn bản đi."),
+  placeholder(
+    "outgoing-documents/:id",
+    "SCR-012 / SCR-013",
+    "Chi tiết văn bản đi",
+    "Soạn thảo, AI draft, review và lịch sử.",
+  ),
+  placeholder("search", "SCR-016", "Tìm kiếm toàn văn", "Tra cứu văn bản và nội dung file."),
+];
+
+const administratorRoutes: RouteObject[] = [
+  placeholder("staff", "SCR-003", "Staff và role", "Danh sách tài khoản và cán bộ."),
+  placeholder("staff/new", "SCR-003", "Tạo Staff", "Tạo tài khoản và gán role."),
+  placeholder("staff/:id", "SCR-003", "Chi tiết Staff", "Cập nhật hồ sơ, role và trạng thái."),
+  placeholder("document-types", "SCR-006", "Loại văn bản", "Danh mục loại văn bản."),
+  placeholder(
+    "document-types/:id",
+    "SCR-006",
+    "Chi tiết loại văn bản",
+    "Cập nhật mã, tên và trạng thái.",
+  ),
+  placeholder(
+    "document-templates",
+    "SCR-007",
+    "Mẫu văn bản",
+    "Danh sách mẫu văn bản.",
+  ),
+  placeholder(
+    "document-templates/new",
+    "SCR-007",
+    "Tạo mẫu văn bản",
+    "Tạo nội dung mẫu và FormatRules.",
+  ),
+  placeholder(
+    "document-templates/:id",
+    "SCR-007",
+    "Chi tiết mẫu văn bản",
+    "Cập nhật nội dung mẫu và FormatRules.",
+  ),
+];
+
+const memberRoutes: RouteObject[] = [
+  placeholder("members", "SCR-004", "Hội viên", "Danh sách và tìm kiếm hội viên."),
+  placeholder("members/new", "SCR-004", "Tạo hội viên", "Tạo hồ sơ hội viên."),
+  placeholder("members/:id", "SCR-004", "Chi tiết hội viên", "Cập nhật hồ sơ hội viên."),
+  placeholder("members/import", "SCR-005", "Import hội viên", "Nhập dữ liệu hội viên từ XLSX."),
+];
+
+export const appRoutes: RouteObject[] = [
+  {
+    element: <AuthStatusBoundary />,
+    children: [
+      {
+        index: true,
+        element: <RootRedirect />,
+      },
+      {
+        element: <PublicOnlyRoute />,
+        children: [
+          {
+            path: "login",
+            element: <LoginPlaceholderPage />,
+          },
+        ],
+      },
+      {
+        element: <AuthenticatedRoute />,
+        children: [
+          {
+            path: "change-password",
+            element: <ChangePasswordPlaceholderPage />,
+          },
+          {
+            element: <BusinessAccessRoute />,
+            children: [
+              {
+                element: <AppShell />,
+                children: [
+                  ...commonRoutes,
+                  {
+                    element: <RoleRoute allowedRoles={["Clerk"]} />,
+                    children: [
+                      placeholder(
+                        "incoming-documents/new",
+                        "SCR-008",
+                        "Tiếp nhận văn bản đến",
+                        "Tạo văn bản đến mới.",
+                      ),
+                      placeholder(
+                        "archive-queue",
+                        "SCR-015",
+                        "Phát hành / lưu trữ",
+                        "Hàng chờ cấp số và lưu trữ.",
+                      ),
+                    ],
+                  },
+                  {
+                    element: <RoleRoute allowedRoles={["Drafter"]} />,
+                    children: [
+                      placeholder(
+                        "outgoing-documents/new",
+                        "SCR-011",
+                        "Tạo văn bản đi",
+                        "Khởi tạo văn bản theo mẫu.",
+                      ),
+                    ],
+                  },
+                  {
+                    element: <RoleRoute allowedRoles={["Leader"]} />,
+                    children: [
+                      placeholder(
+                        "approval-queue",
+                        "SCR-014",
+                        "Hàng chờ duyệt",
+                        "Duyệt hoặc trả lại văn bản.",
+                      ),
+                    ],
+                  },
+                  {
+                    element: <RoleRoute allowedRoles={["Administrator"]} />,
+                    children: administratorRoutes,
+                  },
+                  {
+                    element: (
+                      <RoleRoute allowedRoles={["Administrator", "Clerk"]} />
+                    ),
+                    children: memberRoutes,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: "forbidden",
+        element: <ForbiddenPage />,
+      },
+      {
+        path: "*",
+        element: <NotFoundPage />,
+      },
+    ],
+  },
+];
+
+export const router = createBrowserRouter(appRoutes);
+
+function placeholder(
+  path: string,
+  screen: string,
+  title: string,
+  description: string,
+): RouteObject {
+  return {
+    path,
+    element: (
+      <FeaturePlaceholderPage
+        screen={screen}
+        title={title}
+        description={description}
+      />
+    ),
+  };
+}
