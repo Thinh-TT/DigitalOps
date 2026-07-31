@@ -8,8 +8,10 @@ import {
 } from "../shared/auth/auth-context";
 import type { Role } from "../shared/auth/types";
 import * as memberService from "../shared/members/member-service";
+import * as catalogService from "../shared/document-catalog/document-catalog-service";
 
 vi.mock("../shared/members/member-service");
+vi.mock("../shared/document-catalog/document-catalog-service");
 
 describe("route guards and App Shell", () => {
   it("redirects an anonymous user to login", async () => {
@@ -101,6 +103,40 @@ describe("route guards and App Shell", () => {
     renderRoute(
       "/members/import",
       createAuthValue("authenticated", ["Drafter"], false),
+    );
+    expect(
+      await screen.findByText("Không có quyền truy cập"),
+    ).toBeInTheDocument();
+  });
+
+  it("allows only Administrator to open SCR-006 and SCR-007", async () => {
+    vi.mocked(catalogService.getDocumentTypes).mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      totalCount: 0,
+      totalPages: 0,
+    });
+    vi.mocked(catalogService.getAllDocumentTypes).mockResolvedValue([]);
+    vi.mocked(catalogService.getDocumentTemplates).mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      totalCount: 0,
+      totalPages: 0,
+    });
+
+    renderRoute(
+      "/document-types",
+      createAuthValue("authenticated", ["Administrator"], false),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Loại văn bản" }),
+    ).toBeInTheDocument();
+
+    renderRoute(
+      "/document-templates",
+      createAuthValue("authenticated", ["Clerk"], false),
     );
     expect(
       await screen.findByText("Không có quyền truy cập"),

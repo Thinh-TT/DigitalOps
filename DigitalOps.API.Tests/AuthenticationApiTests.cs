@@ -438,7 +438,21 @@ public sealed class AuthenticationTestModelCustomizer(
     public override void Customize(ModelBuilder modelBuilder, DbContext context)
     {
         base.Customize(modelBuilder, context);
-        modelBuilder.Ignore<DocumentTemplate>();
-        modelBuilder.Ignore<DocumentType>();
+        modelBuilder.Entity<DocumentTemplate>()
+            .Property(template => template.FormatRules)
+            .HasConversion(
+                value => value.GetRawText(),
+                value => ParseJson(value))
+            .HasColumnName("format_rules")
+            .HasColumnType("TEXT")
+            .HasDefaultValueSql("'{}'");
+        modelBuilder.Entity<DocumentTemplate>()
+            .ToTable("document_templates", table =>
+                table.HasCheckConstraint(
+                    "ck_document_templates_format_rules_object",
+                    "json_type(format_rules) = 'object'"));
     }
+
+    private static JsonElement ParseJson(string value) =>
+        JsonDocument.Parse(value).RootElement.Clone();
 }

@@ -210,6 +210,14 @@ dùng PATCH `status = Active` để kích hoạt lại. Phần văn bản đi li
 `GET /outgoing-documents?relatedMemberId=...` được nối khi T3-01 triển khai bảng
 và API văn bản đi.
 
+SCR-006 tạo loại văn bản bằng modal tại màn danh sách và cập nhật bằng trang chi
+tiết; không có action xóa. SCR-007 dùng textarea plain text cho TemplateContent
+và textarea monospace cho FormatRules. UI parse JSON và kiểm tra `version`,
+`rules`, `code`, `required` trước khi gửi; lỗi syntax không gọi API, còn lỗi
+`400`/`422` được gắn lại đúng field. Bộ chọn template khả dụng chỉ dùng template
+active có type cha active; type inactive hiện read-only trong lựa chọn hiện tại
+để Administrator vẫn sửa hoặc vô hiệu hóa template cũ.
+
 ## 8. Wireframe chi tiết
 
 ### 8.1. SCR-001 và SCR-002 — Xác thực

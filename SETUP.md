@@ -73,6 +73,7 @@ Mở `DigitalOps.API/.env` và thay toàn bộ placeholder. Không commit file n
 | `MemberImport__MaxFileSizeBytes` | Không | Dung lượng tối đa file XLSX; mặc định 10 MiB |
 | `MemberImport__MaxRows` | Không | Số dòng dữ liệu tối đa mỗi lần import; mặc định 10.000 |
 | `MemberImport__MaxExpandedWorkbookBytes` | Không | Tổng dung lượng giải nén XLSX tối đa; mặc định 100 MiB |
+| `DocumentCatalogSeed__Enabled` | Không | Seed 7 loại và 7 mẫu văn bản cho local/demo; mặc định `false` |
 | `IdentityBootstrap__Enabled` | Có | Bật/tắt tạo Administrator đầu tiên |
 | `IdentityBootstrap__UserName` | Khi bootstrap | Username Administrator |
 | `IdentityBootstrap__Email` | Khi bootstrap | Email Administrator |
@@ -163,6 +164,29 @@ Chấp nhận hộp thoại trust của Windows, sau đó đóng và mở lại 
 cần.
 
 ## 7. Chạy API
+
+### Seed danh mục loại và mẫu văn bản cho local/demo
+
+Database phải được migrate trước khi seed. Khi cần dữ liệu mẫu, đặt trong
+`DigitalOps.API/.env`:
+
+```dotenv
+DocumentCatalogSeed__Enabled=true
+```
+
+Lần khởi động tiếp theo, API bổ sung 7 loại văn bản và 7 mẫu còn thiếu. Seed dùng
+`Code` của loại và cặp `Code + tên mẫu` làm khóa nhận diện; dữ liệu đã được
+Administrator sửa hoặc vô hiệu hóa không bị ghi đè. Nếu một loại đã vô hiệu hóa,
+mẫu còn thiếu của loại đó được bỏ qua và ghi warning.
+
+Sau khi log báo seed hoàn tất, đặt lại:
+
+```dotenv
+DocumentCatalogSeed__Enabled=false
+```
+
+Seed chỉ dành cho local/demo, không bật trong production. Cơ chế này không tự áp
+dụng migration và không tạo schema mới.
 
 Từ thư mục gốc repository:
 

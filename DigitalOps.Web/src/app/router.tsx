@@ -27,6 +27,13 @@ import {
   MemberListPage,
 } from "../pages/MemberPages";
 import { MemberImportPage } from "../pages/MemberImportPage";
+import {
+  DocumentTemplateCreatePage,
+  DocumentTemplateDetailPage,
+  DocumentTemplateListPage,
+  DocumentTypeDetailPage,
+  DocumentTypeListPage,
+} from "../pages/DocumentCatalogPages";
 import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
 
 const commonRoutes: RouteObject[] = [
@@ -61,31 +68,11 @@ const administratorRoutes: RouteObject[] = [
     path: "staff/:id",
     element: <StaffDetailPage />,
   },
-  placeholder("document-types", "SCR-006", "Loại văn bản", "Danh mục loại văn bản."),
-  placeholder(
-    "document-types/:id",
-    "SCR-006",
-    "Chi tiết loại văn bản",
-    "Cập nhật mã, tên và trạng thái.",
-  ),
-  placeholder(
-    "document-templates",
-    "SCR-007",
-    "Mẫu văn bản",
-    "Danh sách mẫu văn bản.",
-  ),
-  placeholder(
-    "document-templates/new",
-    "SCR-007",
-    "Tạo mẫu văn bản",
-    "Tạo nội dung mẫu và FormatRules.",
-  ),
-  placeholder(
-    "document-templates/:id",
-    "SCR-007",
-    "Chi tiết mẫu văn bản",
-    "Cập nhật nội dung mẫu và FormatRules.",
-  ),
+  { path: "document-types", element: <DocumentTypeListPage /> },
+  { path: "document-types/:id", element: <DocumentTypeDetailPage /> },
+  { path: "document-templates", element: <DocumentTemplateListPage /> },
+  { path: "document-templates/new", element: <DocumentTemplateCreatePage /> },
+  { path: "document-templates/:id", element: <DocumentTemplateDetailPage /> },
 ];
 
 const memberRoutes: RouteObject[] = [

@@ -273,7 +273,13 @@ xóa giá trị của field nullable. `fullName` và `status` không nhận `nul
 | `DocumentTemplateRequest` | `documentTypeId`, `name`, `templateContent`, `formatRules`, `isActive?`; bốn trường đầu bắt buộc khi POST và bắt buộc sau khi áp dụng PATCH |
 | `DocumentTemplateResponse` | `id`, `documentType`, `name`, `templateContent`, `formatRules`, `isActive`, `createdAt`, `updatedAt` |
 
-`formatRules` là JSON object theo contract database; request JSON không hợp lệ hoặc thiếu structure bắt buộc trả `422`.
+`formatRules` là JSON object theo contract database. `version` phải là số nguyên
+dương; `rules` là mảng (được phép rỗng); mỗi phần tử là object có `code` là
+chuỗi không rỗng và `required` là boolean. `code` không được trùng sau khi trim,
+so sánh phân biệt hoa/thường. Root và từng rule được phép có thuộc tính mở rộng.
+Object sai cấu trúc trả `422 ValidationProblemDetails` tại
+`errors.formatRules`; HTTP request JSON sai cú pháp vẫn trả model validation
+`400` theo `[ApiController]`.
 
 ### 8.2. Endpoint DocumentTypes
 
@@ -294,6 +300,11 @@ xóa giá trị của field nullable. `fullName` và `status` không nhận `nul
 | `PATCH` | `/document-templates/{id}` | Administrator | `DocumentTemplateRequest` dạng partial | `200 DocumentTemplateResponse` | `404`, `422` FormatRules |
 
 Không có DELETE endpoint cho document type/template. Vô hiệu hóa thực hiện qua `PATCH` với `isActive = false`.
+
+`activeOnly = true` của document template chỉ trả template active có document
+type active. Tạo template, đổi `documentTypeId` hoặc kích hoạt lại template yêu
+cầu type đích đang active; sửa nội dung hoặc vô hiệu hóa template thuộc type
+inactive vẫn được phép. Vô hiệu hóa type không cascade trạng thái template.
 
 ## 9. DTO/API IncomingDocuments, Điều Phối Và Nhắc Hạn
 

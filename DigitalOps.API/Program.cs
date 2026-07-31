@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Features.Authentication;
+using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
@@ -73,6 +74,11 @@ builder.Services.AddSingleton<
     MemberImportOptionsValidator>();
 builder.Services.AddScoped<IMemberImportService, MemberImportService>();
 builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
+builder.Services.AddScoped<IDocumentCatalogService, DocumentCatalogService>();
+builder.Services
+    .AddOptions<DocumentCatalogSeedOptions>()
+    .Bind(builder.Configuration.GetSection(DocumentCatalogSeedOptions.SectionName));
+builder.Services.AddScoped<IDocumentCatalogSeeder, DocumentCatalogSeeder>();
 builder.Services.AddScoped<IStaffManagementService, StaffManagementService>();
 builder.Services
     .AddOptions<IdentityBootstrapOptions>()
@@ -83,6 +89,7 @@ builder.Services.AddSingleton<
     IdentityBootstrapOptionsValidator>();
 builder.Services.AddScoped<IIdentityInitializer, IdentityInitializer>();
 builder.Services.AddHostedService<IdentityInitializationHostedService>();
+builder.Services.AddHostedService<DocumentCatalogSeedHostedService>();
 
 builder.Services
     .AddAuthentication(options =>

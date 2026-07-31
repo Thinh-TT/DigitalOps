@@ -198,6 +198,52 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.True(schemas.TryGetProperty("MemberImportResult", out _));
         Assert.True(schemas.TryGetProperty("MemberImportRowError", out _));
         Assert.True(schemas.TryGetProperty("MemberImportProblemDetails", out _));
+
+        Assert.True(paths.TryGetProperty("/api/v1/document-types", out var documentTypesPath));
+        Assert.True(documentTypesPath.TryGetProperty("get", out var documentTypesGet));
+        Assert.True(documentTypesPath.TryGetProperty("post", out _));
+        var documentTypeQueryParameters = documentTypesGet
+            .GetProperty("parameters")
+            .EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToArray();
+        Assert.Contains("activeOnly", documentTypeQueryParameters);
+        Assert.Contains("page", documentTypeQueryParameters);
+        Assert.Contains("pageSize", documentTypeQueryParameters);
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/document-types/{id}",
+            out var documentTypeDetailPath));
+        Assert.True(documentTypeDetailPath.TryGetProperty("get", out _));
+        Assert.True(documentTypeDetailPath.TryGetProperty("patch", out _));
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/document-templates",
+            out var documentTemplatesPath));
+        Assert.True(documentTemplatesPath.TryGetProperty("get", out var documentTemplatesGet));
+        Assert.True(documentTemplatesPath.TryGetProperty("post", out var documentTemplatesPost));
+        var documentTemplateQueryParameters = documentTemplatesGet
+            .GetProperty("parameters")
+            .EnumerateArray()
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToArray();
+        Assert.Contains("documentTypeId", documentTemplateQueryParameters);
+        Assert.Contains("activeOnly", documentTemplateQueryParameters);
+        Assert.True(documentTemplatesPost
+            .GetProperty("responses")
+            .TryGetProperty("422", out _));
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/document-templates/{id}",
+            out var documentTemplateDetailPath));
+        Assert.True(documentTemplateDetailPath.TryGetProperty("get", out _));
+        Assert.True(documentTemplateDetailPath.TryGetProperty("patch", out var templatePatch));
+        Assert.True(templatePatch.GetProperty("responses").TryGetProperty("422", out _));
+
+        Assert.True(schemas.TryGetProperty("DocumentTypeRequest", out _));
+        Assert.True(schemas.TryGetProperty("DocumentTypeResponse", out _));
+        Assert.True(schemas.TryGetProperty("DocumentTemplateRequest", out var templateRequest));
+        Assert.Contains("formatRules", templateRequest.GetRawText());
+        Assert.True(schemas.TryGetProperty("DocumentTemplateResponse", out _));
+        Assert.True(schemas.TryGetProperty("DocumentTypeReference", out _));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(

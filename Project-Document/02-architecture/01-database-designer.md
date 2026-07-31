@@ -532,7 +532,12 @@ Ngoài các cột do ASP.NET Core Identity quản lý, `ApplicationUser` bổ su
 - Chỉ type/template `is_active = true` được dùng để tạo dữ liệu mới.
 - Template đã được tham chiếu không bị xóa; nội dung văn bản đã tạo nằm riêng tại `outgoing_documents.content`.
 - `jsonb_typeof(format_rules) = 'object'`.
-- Service kiểm tra cấu trúc `version`, `rules`, `code`, `required`; database chỉ đảm bảo JSON hợp lệ và đúng loại object.
+- Service yêu cầu `version` là số nguyên dương và `rules` là mảng; mỗi rule có
+  `code` không rỗng, không trùng sau khi trim (phân biệt hoa/thường) và
+  `required` là boolean. Thuộc tính mở rộng được phép; database chỉ đảm bảo JSON
+  hợp lệ và root là object.
+- Vô hiệu hóa type không cascade `is_active` của template. Template active chỉ
+  được coi là khả dụng cho dữ liệu mới khi type cha cũng active.
 
 ### 4.5. Quy tắc `incoming_documents`
 
