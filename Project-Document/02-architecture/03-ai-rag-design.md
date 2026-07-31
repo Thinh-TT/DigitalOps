@@ -4,12 +4,12 @@
 
 | Thuộc tính                     | Giá trị                                                                                                                |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Trạng thái                     | Draft — chờ thành viên phụ trách AI của team quyết định và phê duyệt                                                   |
+| Trạng thái                     | Draft — có phương án đề xuất tạm thời; chờ thành viên phụ trách AI của team phê duyệt                                 |
 | Phạm vi                        | Thiết kế nguyên tắc cho RAG và LLM phục vụ các chức năng AI của MVP                                                    |
-| Không quyết định trong bản này | LLM provider/model, embedding model, vector store, chunking, retrieval/reranking, chi phí và thông số vận hành         |
+| Trạng thái quyết định          | Các lựa chọn ở mục 6.1 chỉ là baseline đề xuất, không phải quyết định cuối cùng hay ủy quyền triển khai                |
 | Tài liệu liên quan             | 01-project/01-ideas-and-scope.md, 03-functional/01-functional-requirements.md, 01-database-designer.md, 02-api-spec.md |
 
-Tài liệu thiết lập ranh giới và checklist quyết định để AI team có thể duyệt một kiến trúc có kiểm soát. Khi còn trạng thái Draft, tài liệu không cho phép tự triển khai vector database, bảng/chunk/embedding, endpoint RAG mới hoặc gọi provider production.
+Tài liệu thiết lập ranh giới và checklist quyết định để AI team có thể duyệt một kiến trúc có kiểm soát. Khi còn trạng thái Draft, tài liệu không cho phép tự triển khai vector database, bảng/chunk/embedding, endpoint RAG mới hoặc gọi provider production. Các đề xuất tạm thời bên dưới có thể thay đổi sau review kiến trúc, kiểm thử trên máy thực tế và đánh giá yêu cầu mở rộng.
 
 ## 2. Phạm vi AI trong MVP
 
@@ -74,6 +74,21 @@ Không index mặc định tất cả dữ liệu hội viên, attachment, draft
 
 ## 6. Các quyết định chờ AI team phê duyệt
 
+### 6.1. Phương án đề xuất tạm thời
+
+> **Lưu ý trạng thái:** đây là phương án mặc định để team thảo luận và chuẩn bị thử nghiệm nội bộ. Nó **chưa được phê duyệt cuối cùng**, không tạo cam kết công nghệ dài hạn và có thể thay đổi trước khi triển khai production.
+
+| Hạng mục | Đề xuất tạm thời | Phạm vi và điều kiện thay đổi |
+| --- | --- | --- |
+| Cách chạy AI | Chạy hoàn toàn cục bộ qua Ollama, không gọi API AI từ bên thứ ba | Phù hợp với yêu cầu không đưa dữ liệu nội bộ ra ngoài. Xem xét lại khi hạ tầng, chính sách dữ liệu hoặc yêu cầu vận hành thay đổi. |
+| LLM sinh nội dung | `qwen3:4b-instruct` ở bản quantized phù hợp | Chỉ dùng để gợi ý/sinh nháp có người kiểm tra; phải benchmark tiếng Việt, độ trễ và mức dùng RAM/VRAM trên laptop mục tiêu trước khi chốt. |
+| Embedding | `qwen3-embedding:0.6b` chạy cục bộ | Chỉ thay bằng model khác sau khi đo retrieval trên bộ dữ liệu đánh giá tiếng Việt; khi đổi model hoặc dimension phải re-embed toàn bộ index. |
+| Vector database | Qdrant chạy self-hosted | Chọn vì là vector database chuyên dụng và thuận lợi khi mở rộng. Có thể đổi nếu kết quả benchmark, khả năng vận hành hoặc quy mô thực tế không phù hợp. |
+| Nguồn tri thức giai đoạn đầu | Staff tối thiểu cho điều phối; `DocumentTemplates` đang Active; `FormatRules` liên quan | Chỉ index dữ liệu do team tạo hoặc đã được phê duyệt. Chưa index toàn bộ hội viên, draft, tài liệu chưa duyệt hay attachment mặc định. |
+| Phạm vi gợi ý | Chỉ trả về mẫu, rule hoặc người xử lý có trong nguồn dữ liệu đã được index và còn hiệu lực | Không đủ bằng chứng phải trả trạng thái “không đủ dữ liệu để gợi ý”, không suy đoán hoặc tự tạo nguồn tham chiếu. |
+
+Các giá trị như chunk size, overlap, top-k, metadata schema, HNSW parameters, cache, timeout và SLO vẫn phải được đo và ghi nhận trong session log trước khi chuyển tài liệu sang **Approved**.
+
 | Hạng mục              | Câu hỏi cần chốt                                                                        | Tác động khi được duyệt                                             |
 | --------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | LLM provider và model | Provider nào, model nào, fallback thế nào, điều kiện production là gì?                  | Typed client, secret/configuration, timeout, quota và cost control. |
@@ -121,7 +136,7 @@ Chỉ sau khi các tiêu chí và mục ở phần 6 được AI team phê duy�
 
 ## 9. Ngoài phạm vi bản baseline
 
-- Không chọn provider/model/vector store cụ thể.
+- Không coi provider/model/vector store ở mục 6.1 là quyết định cuối cùng; không tạo migration, schema index hoặc hạ tầng production chỉ dựa trên đề xuất này.
 - Không định nghĩa database table, migration, endpoint hoặc UI mới.
 - Không thay PostgreSQL full-text search bằng semantic search.
 - Không OCR ảnh/PDF scan, không tự động điều phối/phê duyệt và không dùng AI để kết luận pháp lý/nội dung.
