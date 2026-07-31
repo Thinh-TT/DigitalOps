@@ -2,6 +2,8 @@ namespace DigitalOps.API.Shared.Identity;
 
 public static class AuthorizationPolicies
 {
+    public const string CurrentStaff = nameof(CurrentStaff);
+
     public const string BusinessAccess = nameof(BusinessAccess);
 
     public const string PasswordChangeRequired = nameof(PasswordChangeRequired);

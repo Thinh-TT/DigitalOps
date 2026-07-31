@@ -24,3 +24,13 @@ export interface LoginResponse extends CurrentUserResponse {
   accessToken: string;
   expiresAt: string;
 }
+
+export interface LoginRequest {
+  userNameOrEmail: string;
+  password: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}

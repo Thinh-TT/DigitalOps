@@ -88,6 +88,11 @@ select {
   width: min(480px, 100%);
 }
 
+.auth-card-content,
+.auth-form {
+  width: 100%;
+}
+
 .auth-page-icon {
   color: #1677ff;
   font-size: 40px;

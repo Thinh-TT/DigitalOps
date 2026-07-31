@@ -6,6 +6,11 @@ public static class ProblemDetailsCatalog
 {
     public const string TypeBaseUri = "https://digitalops/errors/";
 
+    public static readonly ProblemDetailsDefinition PasswordChangeRequired =
+        new(
+            "password-change-required",
+            "Password change is required.");
+
     private static readonly IReadOnlyDictionary<int, ProblemDetailsDefinition> Definitions =
         new Dictionary<int, ProblemDetailsDefinition>
         {

@@ -80,6 +80,23 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.Contains(
             nameof(ValidationProblemDetails),
             validationResponse.GetRawText());
+
+        var paths = root.GetProperty("paths");
+        Assert.True(paths.TryGetProperty("/api/v1/auth/login", out var loginPath));
+        Assert.False(loginPath.GetProperty("post").TryGetProperty("security", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/auth/me", out var mePath));
+        Assert.True(mePath.GetProperty("get").TryGetProperty("security", out _));
+        Assert.True(
+            paths.TryGetProperty(
+                "/api/v1/auth/change-password",
+                out var changePasswordPath));
+        Assert.True(
+            changePasswordPath.GetProperty("post").TryGetProperty("security", out _));
+
+        Assert.True(schemas.TryGetProperty("LoginRequest", out _));
+        Assert.True(schemas.TryGetProperty("LoginResponse", out _));
+        Assert.True(schemas.TryGetProperty("CurrentUserResponse", out _));
+        Assert.True(schemas.TryGetProperty("ChangePasswordRequest", out _));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(

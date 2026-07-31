@@ -12,9 +12,9 @@ import {
   RootRedirect,
 } from "./route-guards";
 import {
-  ChangePasswordPlaceholderPage,
-  LoginPlaceholderPage,
-} from "../pages/AuthPlaceholderPages";
+  ChangePasswordPage,
+  LoginPage,
+} from "../pages/AuthPages";
 import { FeaturePlaceholderPage } from "../pages/FeaturePlaceholderPage";
 import { ForbiddenPage, NotFoundPage } from "../pages/StatusPages";
 
@@ -88,7 +88,7 @@ export const appRoutes: RouteObject[] = [
         children: [
           {
             path: "login",
-            element: <LoginPlaceholderPage />,
+            element: <LoginPage />,
           },
         ],
       },
@@ -97,7 +97,7 @@ export const appRoutes: RouteObject[] = [
         children: [
           {
             path: "change-password",
-            element: <ChangePasswordPlaceholderPage />,
+            element: <ChangePasswordPage />,
           },
           {
             element: <BusinessAccessRoute />,

@@ -55,6 +55,7 @@ public sealed class ApiHostSmokeTests(DigitalOpsApiFactory factory) : IClassFixt
         var expectedPolicies = new[]
         {
             AuthorizationPolicies.BusinessAccess,
+            AuthorizationPolicies.CurrentStaff,
             AuthorizationPolicies.PasswordChangeRequired,
             AuthorizationPolicies.Administrator,
             AuthorizationPolicies.Clerk,

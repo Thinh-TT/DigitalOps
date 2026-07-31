@@ -42,7 +42,7 @@ public sealed class AuthorizationPipelineTests(AuthorizationApiFactory factory)
         await ProblemDetailsAssert.HasContractAsync(
             forbiddenResponse,
             HttpStatusCode.Forbidden,
-            "forbidden",
+            "password-change-required",
             "/_test/authorization/business");
     }
 

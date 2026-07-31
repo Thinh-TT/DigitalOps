@@ -1,12 +1,14 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Errors;
 using DigitalOps.API.Shared.Identity;
 using DigitalOps.API.Shared.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +60,7 @@ builder.Services
 builder.Services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IAccessTokenService, JwtAccessTokenService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 builder.Services
     .AddAuthentication(options =>
@@ -90,8 +93,14 @@ builder.Services
 
 builder.Services.AddScoped<IStaffAccessChecker, StaffAccessChecker>();
 builder.Services.AddScoped<IAuthorizationHandler, CurrentStaffAccessHandler>();
+builder.Services.AddSingleton<
+    IAuthorizationMiddlewareResultHandler,
+    DigitalOpsAuthorizationMiddlewareResultHandler>();
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy(
+        AuthorizationPolicies.CurrentStaff,
+        policy => RequireCurrentStaffAccess(policy, mustChangePassword: null));
     options.AddPolicy(
         AuthorizationPolicies.BusinessAccess,
         policy => RequireCurrentStaffAccess(policy, mustChangePassword: false));
@@ -139,7 +148,7 @@ static void AddRolePolicy(AuthorizationOptions options, string policyName, strin
 
 static void RequireCurrentStaffAccess(
     AuthorizationPolicyBuilder policy,
-    bool mustChangePassword)
+    bool? mustChangePassword)
 {
     policy.RequireAuthenticatedUser();
     policy.AddRequirements(new CurrentStaffAccessRequirement(mustChangePassword));

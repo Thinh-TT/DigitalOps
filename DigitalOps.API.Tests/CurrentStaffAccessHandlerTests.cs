@@ -27,7 +27,46 @@ public sealed class CurrentStaffAccessHandlerTests
         await handler.HandleAsync(context);
 
         Assert.Equal(expectedSuccess, context.HasSucceeded);
-        Assert.Equal(expectedSuccess, checker.WasCalled);
+        Assert.True(checker.WasCalled);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Current_staff_requirement_accepts_both_password_states(
+        bool mustChangePassword)
+    {
+        var checker = new RecordingStaffAccessChecker(isActive: true);
+        var requirement = new CurrentStaffAccessRequirement(MustChangePassword: null);
+        var context = new AuthorizationHandlerContext(
+            [requirement],
+            CreatePrincipal(mustChangePassword),
+            resource: null);
+        var handler = new CurrentStaffAccessHandler(checker);
+
+        await handler.HandleAsync(context);
+
+        Assert.True(context.HasSucceeded);
+        Assert.True(checker.WasCalled);
+    }
+
+    [Fact]
+    public async Task Forced_password_failure_records_the_specific_reason()
+    {
+        var checker = new RecordingStaffAccessChecker(isActive: true);
+        var requirement = new CurrentStaffAccessRequirement(MustChangePassword: false);
+        var context = new AuthorizationHandlerContext(
+            [requirement],
+            CreatePrincipal(mustChangePassword: true),
+            resource: null);
+        var handler = new CurrentStaffAccessHandler(checker);
+
+        await handler.HandleAsync(context);
+
+        var reason = Assert.Single(context.FailureReasons);
+        Assert.Equal(
+            CurrentStaffAccessHandler.PasswordChangeRequiredFailureReason,
+            reason.Message);
     }
 
     [Fact]
