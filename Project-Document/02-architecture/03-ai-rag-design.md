@@ -8,7 +8,7 @@
 | Phạm vi                        | Kiến trúc RAG/LLM local-first cho MVP/demo; không phải phê duyệt production                                           |
 | AI owner/người duyệt           | Project Owner                                                                                                         |
 | Ngày quyết định                | 2026-08-01                                                                                                            |
-| Baseline quyết định            | T0-00-RAG-MVP-20260801-v3-no-ram-preflight                                                                           |
+| Baseline quyết định            | `T0-00-RAG-MVP-20260801-v3-no-ram-preflight`                                                                         |
 | Trạng thái quyết định          | Approved for MVP/demo theo approval của Project Owner ngày 2026-08-01; production vẫn cần review riêng             |
 | Tài liệu liên quan             | 01-project/01-ideas-and-scope.md, 03-functional/01-functional-requirements.md, 01-database-designer.md, 02-api-spec.md |
 
@@ -92,12 +92,11 @@ chung.
 
 ## 6. Quyết định kiến trúc T0-00
 
-Baseline `T0-00-RAG-MVP-20260731-v1` là bất biến trong một lượt evaluation.
-Người thực hiện được phép cài đặt, pull artifact, cấu hình runtime và chạy lại
-fixture/runner trên thiết bị khác; không được tự đổi model/digest, embedding,
-dimension, vector store, nguồn index, prompt contract, SLO, gate hoặc fixture.
-Mọi thay đổi các mục này cần quyết định bằng văn bản của Project Owner, baseline
-ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao nằm tại
+Baseline official hiện tại là `T0-00-RAG-MVP-20260801-v3-no-ram-preflight`.
+Các baseline v1/v2 là evidence lịch sử, không được trộn metric vào baseline v3.
+Mọi thay đổi model/digest, embedding, dimension, vector store, nguồn index,
+prompt contract, SLO, gate hoặc fixture cần quyết định bằng văn bản của Project
+Owner, baseline ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao lịch sử nằm tại
 [`t0-00-handoff.md`](../06-logs/ai-evaluation/t0-00-handoff.md).
 
 ### 6.1. Provider, model và vector store
@@ -105,7 +104,7 @@ ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao nằm t�
 | Hạng mục | Quyết định cho MVP/demo | Lý do/giới hạn |
 | --- | --- | --- |
 | Cách chạy AI | DigitalOps tự điều phối RAG; gọi Ollama HTTP API local. Không cloud và không automatic provider fallback. | Giữ dữ liệu trong máy demo và external API cost bằng 0. Lỗi trả 503 để người dùng tiếp tục thủ công. |
-| LLM | `qwen3:4b-instruct-2507-q4_K_M`; digest `0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0`. | Model text-only quantized khoảng 2,5 GB theo [Ollama model registry](https://ollama.com/library/qwen3:4b-instruct-2507-q4_K_M). Đây là candidate đã khóa để evaluation; lượt đầu trên máy 16 GB chưa đạt quality/SLO. Không tự đổi model khi gate thất bại. |
+| LLM | `qwen3:4b-instruct-2507-q4_K_M`; digest `0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0`. | Model text-only quantized khoảng 2,5 GB theo [Ollama model registry](https://ollama.com/library/qwen3/tags). Đây là candidate đã khóa để evaluation; lượt đầu trên máy 16 GB chưa đạt quality/SLO. Không tự đổi model khi gate thất bại. |
 | Embedding | `qwen3-embedding:0.6b`; digest `ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d`; 1024 chiều, cosine similarity. | Model hỗ trợ tối đa 1024 chiều theo [Qwen model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B); đổi model/dimension bắt buộc re-embed toàn bộ index. |
 | Vector store | `qdrant/qdrant:v1.18.3`; image digest `sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286`; single-node, collection `digitalops_knowledge_v1`. | Chạy local bằng Docker named volume, chỉ bind `127.0.0.1`, bật API key và tắt telemetry; không dùng Windows bind mount theo [hướng dẫn cài đặt Qdrant](https://qdrant.tech/documentation/installation/) và không thêm extension/migration PostgreSQL. |
 | Public search | PostgreSQL full-text search tiếp tục là contract FR-016. | Semantic retrieval chỉ là implementation detail của AI. |
@@ -118,12 +117,10 @@ ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao nằm t�
   chia.
 - Collection dùng vector 1024 chiều và cosine distance. Retrieval dùng
   `top-k = 5`, không reranker, filter source type/trạng thái/quyền trước query.
-- `MinScore` lấy từ evaluation: chọn ngưỡng nhỏ nhất tạo zero false-positive ở
-  các ca không đủ dữ liệu trong khi vẫn giữ Recall@5 tối thiểu 90%. Giá trị số
-  phải được ghi vào session log trước Approval.
-- Lần chạy ngày 2026-08-01 cho ra `MinScore = 0.320682`, Recall@5 và MRR@5 đều
-  1.0000; đây mới là giá trị provisional vì các gate assignment/draft/review/SLO
-  chưa đạt, chưa được dùng làm cấu hình Approved.
+- `MinScore` official được chốt từ baseline v3 là `0.316666`, tạo zero
+  false-positive trên các ca không đủ dữ liệu trong khi Recall@5 đạt 100%.
+- `0.320682` là giá trị provisional của baseline v1, chỉ giữ trong log lịch sử;
+  không dùng làm cấu hình Approved.
 - Citation nội bộ có `sourceType`, `sourceId`, `sourceVersion` và `chunkId`.
   Không expose citation hoặc raw RAG payload qua public API trong MVP.
 
@@ -139,6 +136,11 @@ ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao nằm t�
 | Timeout/SLO | Hard timeout 60 giây. Warm p95 end-to-end (retrieval + LLM + validation) của assignment/review tối đa 30 giây, draft tối đa 60 giây. |
 | Resource/cost | AI services tối đa 10 GB RAM và phải để lại ít nhất 2 GB khả dụng; external API cost bằng 0. |
 | Logging | Chỉ metric, version/digest, token count, source count, lỗi đã giảm thiểu và correlation id; không log raw prompt/completion mặc định. |
+
+Production contract vẫn giữ context `8192` và output budget assignment/review/draft
+`256/768/1024`. Runner v3 dùng context `4096`, draft `192` và review `128` cùng
+deterministic assignment/scaffold/rule-first fallback để đánh giá CPU demo; các
+giá trị đó là evaluation-only và không được âm thầm copy vào production service.
 
 Internal output schema:
 
@@ -169,6 +171,24 @@ Source reference/citation của RAG là dữ liệu nội bộ/audit cho đến 
 - Provider credentials chỉ nằm ở server-side secret/configuration; frontend không nhận API key hoặc raw provider response.
 - Full-text search của FR-016 tiếp tục dùng index PostgreSQL hiện có. Việc chọn vector store không được làm thay đổi endpoint hoặc kết quả search hiện hành nếu chưa có tài liệu/API mới được duyệt.
 
+### 7.3. Hai provider trong môi trường Development
+
+- Máy AI/demo dùng `Ai__Provider=Ollama`; đây là provider official cho baseline,
+  demo và báo cáo.
+- Máy cấu hình yếu được dùng `Ai__Provider=External` với endpoint tương thích
+  OpenAI Chat Completions, chỉ khi `ASPNETCORE_ENVIRONMENT=Development` và chỉ
+  với dữ liệu synthetic/redacted.
+- Provider được chọn một lần khi ứng dụng khởi động qua `.env`; không có
+  automatic fallback hoặc chuyển provider theo từng request. External timeout/
+  lỗi/schema invalid vẫn đi qua failure path `503` của tác vụ nghiệp vụ.
+- Embedding luôn giữ Ollama `qwen3-embedding:0.6b`, 1024 chiều và Qdrant local để
+  retrieval giữa các máy còn so sánh được. External chỉ thay LLM generation.
+- Cả hai provider phải trả cùng internal JSON Schema và được application validate
+  lại. External bắt buộc hỗ trợ strict structured output; API key không được ghi
+  vào source control hoặc log.
+- Kết quả External chỉ là `Supplemental-External`, không thay thế evidence Ollama
+  v3 và không tự thay đổi production provider policy.
+
 ## 8. Evaluation gate và tiêu chí phê duyệt
 
 Bộ fixture version 1 có 45 ca: 12 retrieval, 12 assignment, 9 draft và
@@ -188,17 +208,20 @@ Baseline `T0-00-RAG-MVP-20260801-v3-no-ram-preflight` đã chạy đủ 45 ca tr
 `LAPTOP-A07DUJIR` với một model resident tại một thời điểm. Kết quả đạt toàn bộ
 automated gate: schema 100%, assignment 100%, draft 9/9, review 12/12,
 Recall@5/MRR@5 đều 100% và operation chậm nhất 43.897 giây. `MinScore` được chốt
-ở `0.316666`; raw result có SHA-256
+ở `0.316666`; raw result được ghi hash
 `606c893f94bd4fb9c13f5df5bff400d50ac25759788026c890a52a8a8612c104`.
 Project Owner đã duyệt human draft review tối thiểu 8/9 và architecture cho
 MVP/demo. Xem
 [log-20260801-t0-00-laptop-a07dujir-v3-no-ram-preflight.md](../06-logs/session-log/log-20260801-t0-00-laptop-a07dujir-v3-no-ram-preflight.md).
 
-Runner v3 không còn điều kiện RAM khả dụng 9 GB ở preflight; RAM vẫn được đo để
-ghi evidence và kiểm tra resource gate trong lúc workload chạy theo mục 6.3.
-Runner và fixture nằm ngoài production solution. Session log ghi cấu hình máy,
-Ollama/Qdrant version, model digest, `MinScore`, metric cold/warm, mức RAM, kết
-quả human review và người duyệt.
+Runner v3 không còn điều kiện RAM khả dụng 9 GB ở preflight theo quyết định
+baseline v3; RAM vẫn được đo và gate tối thiểu 2 GB/peak 10 GB được kiểm tra trong
+lúc workload chạy. Assignment, draft và review có deterministic safeguard trong
+runner; production implementation phải tái sử dụng guardrail/validation nhưng
+không được coi scaffold fallback là bằng chứng chất lượng LLM. Runner và fixture
+nằm ngoài production solution. Session log ghi cấu hình máy, Ollama/Qdrant
+version, model digest, `MinScore`, metric cold/warm, mức RAM, kết quả human review
+và người duyệt.
 
 Mỗi lượt dùng làm evidence phải chạy đủ 45 ca trên cùng một thiết bị và cùng một
 runtime; không ghép metric giữa nhiều máy hoặc nhiều lượt. Log cũ là evidence

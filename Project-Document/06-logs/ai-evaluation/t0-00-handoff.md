@@ -5,10 +5,11 @@
 
 ## 1. Quyền quyết định và trạng thái hiện tại
 
-- Baseline bất biến: `T0-00-RAG-MVP-20260731-v1`.
+- Baseline lịch sử của runbook: `T0-00-RAG-MVP-20260731-v1`; official hiện tại là
+  `T0-00-RAG-MVP-20260801-v3-no-ram-preflight`.
 - Owner/người duyệt: **Project Owner**.
-- T0-00 hiện vẫn `[~]`; AI RAG Design hiện vẫn `Draft` vì lượt chạy ngày
-  2026-08-01 thất bại quality/SLO.
+- T0-00 đã `[x]`; AI RAG Design đã `Approved for MVP/demo` theo log v3. Runbook
+  này giữ lại để truy nguyên các lượt v1/v2; không dùng các ngưỡng cũ làm official.
 - Log máy trước đã đóng và không được sửa:
   [`log-20260731-t0-00.md`](../session-log/log-20260731-t0-00.md).
 - Chỉ được mở khóa T2-04, T3-02, T3-03 và đánh dấu T0-00 `[x]` sau khi mọi gate
@@ -36,7 +37,9 @@ official evaluation.
 | Qdrant endpoint | `http://127.0.0.1:6333`, chỉ loopback, API key bắt buộc |
 | Runtime | Một AI request đồng thời; `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, context 8192 |
 
-Profile dùng để ra quyết định Approval vẫn là Windows 16 GB CPU-first đã khóa.
+Profile dùng cho baseline v3 là Windows 16 GB CPU-first. V3 không còn preflight
+9 GB; chỉ giữ gate runtime tối thiểu 2 GB khả dụng và peak AI services tối đa
+10 GB. Profile khác phải ghi `Supplemental`, không ghép metric.
 Thiết bị khác profile phải ghi `Supplemental` và không tự dùng kết quả đó để
 đánh dấu `[x]`; không ghép metric giữa các thiết bị. Một lượt official phải
 chạy đủ 45 ca trên cùng một host và cùng runtime.

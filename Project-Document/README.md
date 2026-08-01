@@ -68,7 +68,7 @@ AI chỉ hỗ trợ gợi ý, soạn nháp và kiểm tra thể thức. AI khôn
 | ORM và database | Entity Framework Core, PostgreSQL |
 | Authentication | ASP.NET Core Identity, JWT access token, role policy |
 | Frontend | React, Vite, TypeScript, Ant Design |
-| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; đang chờ evaluation gate để Approved for MVP/demo |
+| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; baseline v3 đã Approved. Development cho phép chọn External chat qua `.env`, embedding vẫn local; production hardening còn riêng |
 | Background | IHostedService reminder, text extraction worker |
 | File storage | Local disk hoặc S3-compatible bucket |
 
@@ -78,7 +78,7 @@ AI chỉ hỗ trợ gợi ý, soạn nháp và kiểm tra thể thức. AI khôn
 2. 01-project/01-ideas-and-scope.md để xác định phạm vi và giới hạn MVP.
 3. 03-functional/01-functional-requirements.md để xác định use case/business rule.
 4. 02-architecture/01-database-designer.md và 02-architecture/02-api-spec.md cho thiết kế/triển khai backend.
-5. 02-architecture/03-ai-rag-design.md trước mọi task AI; quyết định đã khóa nhưng tài liệu còn Draft cho đến khi Project Owner xác nhận đủ evaluation gate.
+5. 02-architecture/03-ai-rag-design.md trước mọi task AI; baseline v3 đã Approved cho MVP/demo, production hardening và provider governance vẫn phải review riêng.
 6. 04-ui/01-ui-sitemap-and-wireframe.md khi làm React UI.
 7. 05-tasks/01-task-board.md để theo dõi thứ tự thực hiện và Definition of Done.
 8. 06-logs/ để biết quyết định kỹ thuật trước đó; xem AGENT.md trước khi bắt đầu thay đổi.
@@ -95,6 +95,15 @@ AI chỉ hỗ trợ gợi ý, soạn nháp và kiểm tra thể thức. AI khôn
 | Attachment, extraction, full-text search | Database Designer, API Specification, UI Sitemap |
 | React UI | UI Sitemap/Wireframe, API Specification, Functional Requirements |
 | Task/log | Task Board, Dev Log, Session Log và AGENT.md |
+
+## AI provider trong Development
+
+- Máy AI/demo: copy `DigitalOps.API/.env.ollama.example` thành `.env`.
+- Máy yếu: copy `DigitalOps.API/.env.external.example` thành `.env`, điền API key
+  local và chỉ dùng dữ liệu synthetic/redacted.
+- Chuyển provider bằng `Ai__Provider=Ollama|External`; không automatic fallback.
+- External chat không thay embedding Ollama/Qdrant và không phải provider official
+  cho demo/báo cáo.
 
 ## Quy ước bảo trì tài liệu
 

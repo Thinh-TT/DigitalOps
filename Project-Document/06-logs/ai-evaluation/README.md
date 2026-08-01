@@ -4,9 +4,10 @@ Thư mục này lưu fixture có version dùng làm bằng chứng phê duyệt 
 local-first của DigitalOps. Runner nằm ngoài production solution tại
 `tools/ai-rag-eval/Invoke-T000Evaluation.ps1`.
 
-Nếu tiếp nhận từ thiết bị khác, đọc [`t0-00-handoff.md`](t0-00-handoff.md) trước
-khi cài đặt hoặc chạy. Baseline bất biến là `T0-00-RAG-MVP-20260731-v1`; log
-`log-20260731-t0-00.md` đã đóng và không được nối thêm kết quả.
+Nếu tiếp nhận evaluation bổ sung, đọc [`t0-00-handoff.md`](t0-00-handoff.md) trước
+khi cài đặt hoặc chạy. Baseline official hiện tại là
+`T0-00-RAG-MVP-20260801-v3-no-ram-preflight`; các log v1/v2 là evidence lịch sử
+đã đóng và không được nối thêm kết quả.
 
 ## Phạm vi fixture
 
@@ -50,7 +51,10 @@ không ghi raw prompt/completion nhạy cảm.
 Gate tự động kiểm tra JSON schema, heading bắt buộc và các cụm từ bị cấm. Sau
 đó Project Owner chấm chín bản nháp theo thang 1–5 cho tiếng Việt, bám template
 và không bịa dữ kiện. Tối thiểu 8/9 bản phải đạt từ 4 điểm. Không chuyển AI RAG
-Design sang Approved hoặc đánh dấu T0-00 hoàn thành khi gate này chưa đạt.
+Design đã Approved và T0-00 đã hoàn thành theo baseline v3 sau approval của
+Project Owner. Không dùng scaffold/fallback-only pass để tuyên bố LLM quality
+production; mọi thay đổi production phải có test riêng theo context/output
+contract 8192/256-768-1024.
 
 Mỗi lượt phải chạy đủ 45 ca trên một host. Không ghép metric giữa nhiều thiết bị;
 profile khác Windows 16 GB CPU-first chỉ là `Supplemental` cho đến khi Project

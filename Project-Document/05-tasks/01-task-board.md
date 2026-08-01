@@ -94,6 +94,9 @@ Task board này bám theo:
 
 ## Ghi Chú Blockers
 
+Các dòng T0-00 từ 2026-07-31 đến 2026-08-01 là lịch sử remediation; kết luận
+hiện tại là dòng 2026-08-01 về baseline v3 và approval của Project Owner.
+
 | Ngày       | Task  | Vấn đề                           | Hướng giải quyết                                                                                            |
 | ---------- | ----- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | 2026-07-31 | T0-02 | Thiếu connection string ban đầu. | Đã cấu hình PostgreSQL local, tạo database `DigitalOps`, preflight và áp dụng `InitialBaseline` thành công. |
@@ -108,3 +111,7 @@ Task board này bám theo:
 | 2026-08-01 | T0-00 | Project Owner đã duyệt kết quả v3, human draft review tối thiểu 8/9 và architecture cho phạm vi MVP/demo. | Chuyển T0-00 sang [x] và AI RAG Design sang Approved for MVP/demo; production hardening/review vẫn là phạm vi riêng. |
 
 ## Ghi Chú Kỹ Thuật
+
+- Development AI provider được chọn qua `.env`: Ollama cho máy AI/demo và
+  External OpenAI-compatible cho máy yếu. Không automatic fallback; embedding
+  luôn Ollama/Qdrant local; public API và EF schema không đổi.

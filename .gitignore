@@ -18,6 +18,8 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.ollama.example
+!.env.external.example
 **/appsettings.Development.local.json
 
 # Local attachment objects

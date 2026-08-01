@@ -5,6 +5,7 @@ using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Shared.Data;
+using DigitalOps.API.Shared.AI;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -57,6 +58,16 @@ public sealed class ApiHostSmokeTests(DigitalOpsApiFactory factory) : IClassFixt
                 .Value
                 .MaxFileSizeBytes);
         Assert.NotNull(scope.ServiceProvider.GetService<IIdentityInitializer>());
+        Assert.IsType<OllamaAiChatClient>(
+            scope.ServiceProvider.GetRequiredService<IAiChatClient>());
+        Assert.IsType<OllamaEmbeddingClient>(
+            scope.ServiceProvider.GetRequiredService<IEmbeddingClient>());
+        Assert.Equal(
+            8192,
+            scope.ServiceProvider
+                .GetRequiredService<IOptions<AiProviderOptions>>()
+                .Value
+                .ContextTokens);
 
         var authenticationOptions =
             scope.ServiceProvider.GetRequiredService<IOptions<AuthenticationOptions>>().Value;

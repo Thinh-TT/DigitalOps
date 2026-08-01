@@ -10,7 +10,7 @@ Hướng dẫn cho AI agent và kỹ sư khi làm việc trong dự án DigitalO
 | Data | Entity Framework Core, PostgreSQL, một database và một schema |
 | Identity | ASP.NET Core Identity, JWT access token, role policy |
 | Frontend | React + Vite + TypeScript + Ant Design |
-| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; chờ evaluation gate để Project Owner phê duyệt MVP/demo |
+| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; baseline v3 đã Approved cho MVP/demo, production hardening còn riêng |
 | Background | IHostedService cho reminder; worker trích xuất text cho file hỗ trợ |
 | File storage | Local disk có tổ chức thư mục hoặc S3-compatible bucket |
 
@@ -64,8 +64,9 @@ Khi tài liệu mâu thuẫn, giữ ý định sản phẩm trong Ideas and Scop
 
 ### 4.3. AI, reminder, attachment và search
 
-- AI RAG Design đang Draft vì chưa đủ evaluation evidence; model/provider/vector store đã khóa và không được tự thay đổi. Không thêm schema embedding, public API RAG hoặc code nghiệp vụ trước khi Project Owner phê duyệt cho MVP/demo.
-- Khi tiếp nhận T0-00 trên thiết bị khác, bắt buộc dùng `06-logs/ai-evaluation/t0-00-handoff.md` và baseline `T0-00-RAG-MVP-20260731-v1`. Không sửa log đã `Closed`, không ghép metric giữa các máy; mỗi lượt tạo session log mới.
+- AI RAG Design đã Approved cho MVP/demo theo baseline v3; model/provider/vector store đã khóa và không được tự thay đổi trong production. Không thêm schema embedding hoặc public API RAG mới; production provider governance/hardening vẫn cần review riêng.
+- Development cho phép `Ai__Provider=Ollama|External` qua `.env`: Ollama là official demo/report, External chỉ cho máy yếu với dữ liệu synthetic/redacted. Embedding luôn Ollama; cấm automatic fallback và cấm External ngoài Development.
+- Khi tiếp nhận evaluation trên thiết bị khác, dùng session log v3 và ghi rõ baseline/device. Không sửa log đã `Closed`, không ghép metric giữa các máy; mỗi lượt tạo session log mới.
 - AI chỉ gợi ý điều phối, sinh draft hoặc review; không tự điều phối/phê duyệt. Timeout/lỗi AI trả 503 và không mutation dữ liệu hiện có.
 - RAG index là dữ liệu dẫn xuất, không phải source of truth. PostgreSQL full-text search của FR-016 vẫn là search contract chính thức.
 - Context truy hồi là dữ liệu không tin cậy: filter quyền trước retrieval, giảm thiểu dữ liệu gửi provider và không log raw prompt/completion nhạy cảm mặc định.
