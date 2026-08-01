@@ -59,6 +59,8 @@ import type {
   IncomingDocumentUpdateRequest,
   IncomingStaffReference,
 } from "../shared/incoming-documents/types";
+import { getOutgoingDocuments } from "../shared/outgoing-documents/outgoing-document-service";
+import type { OutgoingDocumentResponse } from "../shared/outgoing-documents/types";
 
 interface IncomingDocumentFormValues {
   referenceNumber: string;
@@ -439,6 +441,7 @@ export function IncomingDocumentDetailPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState(readSuccess(location.state));
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [relatedOutgoing, setRelatedOutgoing] = useState<OutgoingDocumentResponse[]>([]);
   const returnTo = readReturnTo(location.state);
   const isClerk = currentUser?.roles.includes("Clerk") ?? false;
   const editable = isClerk && document?.status !== "Completed";
@@ -477,6 +480,14 @@ export function IncomingDocumentDetailPage() {
       ignored = true;
     };
   }, [form, id, reloadVersion]);
+
+  useEffect(() => {
+    let ignored = false;
+    void getOutgoingDocuments({ relatedIncomingDocumentId: id, pageSize: 100 })
+      .then(response => { if (!ignored) setRelatedOutgoing(response.items); })
+      .catch(() => { if (!ignored) setRelatedOutgoing([]); });
+    return () => { ignored = true; };
+  }, [id, reloadVersion]);
 
   if (notFound) {
     return (
@@ -688,6 +699,7 @@ export function IncomingDocumentDetailPage() {
       </Card>
 
       {document !== null && (
+        <>
         <div className="incoming-detail-grid">
           <Card title="Điều phối xử lý">
             {document.assignedToStaff === null && document.suggestedStaff === null ? (
@@ -826,6 +838,25 @@ export function IncomingDocumentDetailPage() {
             </Typography.Text>
           </Card>
         </div>
+        <Card title="Văn bản đi liên quan">
+          {relatedOutgoing.length === 0 ? (
+            <Empty description="Chưa có văn bản đi liên quan." />
+          ) : (
+            <Table<OutgoingDocumentResponse>
+              rowKey="id"
+              size="small"
+              pagination={false}
+              dataSource={relatedOutgoing}
+              columns={[
+                { title: "Tiêu đề", dataIndex: "title", ellipsis: true },
+                { title: "Mẫu", render: (_, item) => item.template.name },
+                { title: "Trạng thái", dataIndex: "status" },
+                { title: "", render: (_, item) => <Button type="link" onClick={() => navigate(`/outgoing-documents/${item.id}`)}>Xem</Button> },
+              ]}
+            />
+          )}
+        </Card>
+        </>
       )}
     </Space>
   );

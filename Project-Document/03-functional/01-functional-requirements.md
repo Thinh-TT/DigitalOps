@@ -399,7 +399,8 @@ Một `Staff` có thể được gán nhiều role. Không có role `Reviewer` r
 
 1. Người soạn chọn template active.
 2. Người soạn có thể chọn một incoming document để trả lời và/hoặc một Member active liên quan.
-3. Hệ thống thay placeholder trong TemplateContent bằng dữ liệu sẵn có.
+3. Hệ thống thay placeholder trong TemplateContent bằng dữ liệu sẵn có theo allow-list case-sensitive: `{{member.fullName}}`, `dateOfBirth`, `gender`, `address`, `phone`, `email`, `position`, `joinDate`, `{{incoming.referenceNumber}}`, `senderOrg`, `summary`, `receivedDate`, `deadline`.
+4. Ngày render theo `dd/MM/yyyy`; giới tính map `Nam`, `Nữ`, `Khác`; token không biết, thiếu liên kết hoặc field null được giữ nguyên để người soạn hoàn thiện thủ công.
 4. Hệ thống tạo văn bản với Title và Content khởi tạo, `DraftedByStaffId` là người tạo, `Status = Editing`.
 5. Người soạn tiếp tục chỉnh thủ công, thêm attachment hoặc dùng FR-012.
 

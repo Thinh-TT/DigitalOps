@@ -1170,6 +1170,7 @@ function DocumentTemplateForm({
       <Form.Item
         name="templateContent"
         label="Nội dung mẫu"
+        extra="Token phân biệt hoa/thường. Hội viên: {{member.fullName}}, dateOfBirth, gender, address, phone, email, position, joinDate. Văn bản đến: {{incoming.referenceNumber}}, senderOrg, summary, receivedDate, deadline. Token thiếu dữ liệu được giữ nguyên."
         rules={[
           { required: true, whitespace: true, message: "Vui lòng nhập nội dung mẫu văn bản." },
         ]}

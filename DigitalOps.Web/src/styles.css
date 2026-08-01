@@ -206,6 +206,14 @@ select {
   display: block;
 }
 
+.document-content-preview {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  line-height: 1.65;
+}
+
 .reminder-filters {
   width: 100%;
 }

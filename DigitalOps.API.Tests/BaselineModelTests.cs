@@ -3,6 +3,7 @@ using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Reminders;
+using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public sealed class BaselineModelTests
         var documentType = GetEntityType<DocumentType>(model);
         var documentTemplate = GetEntityType<DocumentTemplate>(model);
         var incomingDocument = GetEntityType<IncomingDocument>(model);
+        var outgoingDocument = GetEntityType<OutgoingDocument>(model);
         var attachment = GetEntityType<Attachment>(model);
         var reminder = GetEntityType<ReminderHistory>(model);
 
@@ -85,20 +87,43 @@ public sealed class BaselineModelTests
 
         Assert.Equal("attachments", attachment.GetTableName());
         Assert.Equal("uuid", attachment.FindProperty(nameof(Attachment.IncomingDocumentId))!.GetColumnType());
-        Assert.False(attachment.FindProperty(nameof(Attachment.IncomingDocumentId))!.IsNullable);
+        Assert.True(attachment.FindProperty(nameof(Attachment.IncomingDocumentId))!.IsNullable);
+        Assert.True(attachment.FindProperty(nameof(Attachment.OutgoingDocumentId))!.IsNullable);
         Assert.Equal("file_url", attachment.FindProperty(nameof(Attachment.StorageKey))!.GetColumnName());
         Assert.Equal("timestamptz", attachment.FindProperty(nameof(Attachment.UploadedAt))!.GetColumnType());
         Assert.Equal(
             "extraction_status IN ('Pending', 'Processing', 'Succeeded', 'Failed', 'Unsupported')",
             GetCheckConstraint(attachment, "ck_attachments_extraction_status").Sql);
-        Assert.Equal(3, attachment.GetCheckConstraints().Count());
+        Assert.Equal(4, attachment.GetCheckConstraints().Count());
         AssertIndex(attachment, "ix_attachments_incoming_document_id", isUnique: false);
+        AssertIndex(attachment, "ix_attachments_outgoing_document_id", isUnique: false);
         AssertIndex(attachment, "ix_attachments_uploaded_by_staff_id", isUnique: false);
         AssertIndex(attachment, "ix_attachments_extraction_status", isUnique: false);
         Assert.All(
             attachment.GetForeignKeys(),
             foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
-        Assert.Null(attachment.FindProperty("OutgoingDocumentId"));
+        Assert.Equal(
+            "num_nonnulls(incoming_document_id, outgoing_document_id) = 1",
+            GetCheckConstraint(attachment, "ck_attachments_exactly_one_parent").Sql);
+
+        Assert.Equal("outgoing_documents", outgoingDocument.GetTableName());
+        Assert.Equal("uuid", outgoingDocument.FindProperty(nameof(OutgoingDocument.TemplateId))!.GetColumnType());
+        Assert.Equal("jsonb", outgoingDocument.FindProperty(nameof(OutgoingDocument.ReviewIssues))!.GetColumnType());
+        Assert.Equal(
+            "status IN ('AiDraft', 'Editing', 'PendingReview', 'ReviewFailed', 'PendingApproval', 'Approved', 'Archived')",
+            GetCheckConstraint(outgoingDocument, "ck_outgoing_documents_status").Sql);
+        Assert.Equal(7, outgoingDocument.GetCheckConstraints().Count());
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_status", isUnique: false);
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_template_id", isUnique: false);
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_related_incoming_document_id", isUnique: false);
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_related_member_id", isUnique: false);
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_drafted_by_staff_id", isUnique: false);
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_approved_by_staff_id", isUnique: false);
+        AssertIndex(outgoingDocument, "ux_outgoing_documents_reference_number", isUnique: true);
+        AssertIndex(outgoingDocument, "ix_outgoing_documents_created_at", isUnique: false);
+        Assert.All(
+            outgoingDocument.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
 
         Assert.Equal("reminder_history", reminder.GetTableName());
         Assert.Equal("date", reminder.FindProperty(nameof(ReminderHistory.ReminderDate))!.GetColumnType());

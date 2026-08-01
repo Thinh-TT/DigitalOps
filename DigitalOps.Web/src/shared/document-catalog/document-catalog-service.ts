@@ -75,6 +75,18 @@ export function getDocumentTemplate(
   return apiRequest<DocumentTemplateResponse>(`/document-templates/${id}`);
 }
 
+export async function getAllDocumentTemplates(
+  activeOnly?: boolean,
+): Promise<DocumentTemplateResponse[]> {
+  const items: DocumentTemplateResponse[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await getDocumentTemplates({ activeOnly, page, pageSize: 100 });
+    items.push(...response.items);
+    if (page >= response.totalPages) break;
+  }
+  return items;
+}
+
 export function createDocumentTemplate(
   request: DocumentTemplateCreateRequest,
 ): Promise<DocumentTemplateResponse> {

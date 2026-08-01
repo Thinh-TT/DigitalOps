@@ -413,6 +413,9 @@ queue in-memory.
 | `ReviewIssueResponse` | `ruleCode`, `severity`, `message`, `location?` |
 | `ReviewResponse` | `id`, `outgoingDocumentId`, `attemptNo`, `reviewSource`, `reviewedByStaff?`, `contentSnapshot`, `reviewResult`, `reviewIssues`, `reviewedAt`, `documentStatus` |
 
+Khi tạo văn bản đi, server render `TemplateContent` theo allow-list token case-sensitive: `{{member.fullName}}`, `dateOfBirth`, `gender`, `address`, `phone`, `email`, `position`, `joinDate`, `{{incoming.referenceNumber}}`, `senderOrg`, `summary`, `receivedDate`, `deadline`.
+Ngày render theo `dd/MM/yyyy`; giới tính map `Nam`, `Nữ`, `Khác`. Token không biết, thiếu liên kết hoặc field null được giữ nguyên để người soạn hoàn thiện thủ công.
+
 ### 11.2. Endpoint outgoing document, AI và review
 
 | Method | Path | Auth/role | Request/query | Thành công | Lỗi đáng chú ý |

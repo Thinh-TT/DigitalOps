@@ -378,7 +378,7 @@ Boundary UI T2-03:
 
 ### 9.2. Tạo văn bản đi → AI → review → duyệt → lưu trữ
 
-1. Drafter mở SCR-011, chọn template Active, nhập title và có thể liên kết incoming/member. Tạo thành công mở SCR-012 với status AiDraft.
+1. Drafter mở SCR-011, chọn template Active, nhập title và có thể liên kết incoming/member. Tạo thành công mở SCR-012 với status Editing.
 2. Drafter chỉnh Content hoặc chọn [Sinh nháp AI]. UI lưu và hiển thị aiDraftContent như bản so sánh read-only, chuyển theo trạng thái API sang Editing.
 3. Drafter gửi review tại SCR-013. Mỗi thành công hiển thị một dòng lịch sử theo attemptNo và snapshot; Failed đưa về ReviewFailed để sửa, Passed chuyển PendingApproval.
 4. Leader xử lý tại SCR-014. Approve trả Approved; Return trả Editing, không có ô approval comment vì API/database MVP không có trường comment.

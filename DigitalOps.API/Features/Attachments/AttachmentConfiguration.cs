@@ -18,6 +18,9 @@ public sealed class AttachmentConfiguration : IEntityTypeConfiguration<Attachmen
             table.HasCheckConstraint(
                 "ck_attachments_failed_error",
                 "extraction_status <> 'Failed' OR (extraction_error IS NOT NULL AND length(trim(extraction_error)) > 0)");
+            table.HasCheckConstraint(
+                "ck_attachments_exactly_one_parent",
+                "num_nonnulls(incoming_document_id, outgoing_document_id) = 1");
         });
 
         builder.HasKey(attachment => attachment.Id);
@@ -29,8 +32,10 @@ public sealed class AttachmentConfiguration : IEntityTypeConfiguration<Attachmen
             .HasDefaultValueSql("gen_random_uuid()");
         builder.Property(attachment => attachment.IncomingDocumentId)
             .HasColumnName("incoming_document_id")
-            .HasColumnType("uuid")
-            .IsRequired();
+            .HasColumnType("uuid");
+        builder.Property(attachment => attachment.OutgoingDocumentId)
+            .HasColumnName("outgoing_document_id")
+            .HasColumnType("uuid");
         builder.Property(attachment => attachment.StorageKey)
             .HasColumnName("file_url")
             .HasMaxLength(2048)
@@ -70,8 +75,11 @@ public sealed class AttachmentConfiguration : IEntityTypeConfiguration<Attachmen
         builder.HasOne(attachment => attachment.IncomingDocument)
             .WithMany(document => document.Attachments)
             .HasForeignKey(attachment => attachment.IncomingDocumentId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(attachment => attachment.OutgoingDocument)
+            .WithMany(document => document.Attachments)
+            .HasForeignKey(attachment => attachment.OutgoingDocumentId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(attachment => attachment.UploadedByStaff)
             .WithMany()
             .HasForeignKey(attachment => attachment.UploadedByStaffId)
@@ -80,6 +88,8 @@ public sealed class AttachmentConfiguration : IEntityTypeConfiguration<Attachmen
 
         builder.HasIndex(attachment => attachment.IncomingDocumentId)
             .HasDatabaseName("ix_attachments_incoming_document_id");
+        builder.HasIndex(attachment => attachment.OutgoingDocumentId)
+            .HasDatabaseName("ix_attachments_outgoing_document_id");
         builder.HasIndex(attachment => attachment.UploadedByStaffId)
             .HasDatabaseName("ix_attachments_uploaded_by_staff_id");
         builder.HasIndex(attachment => attachment.ExtractionStatus)

@@ -63,7 +63,9 @@ public sealed class PostgreSqlConnectionSmokeTests
             "document_types",
             "document_templates",
             "incoming_documents",
-            "attachments"
+            "attachments",
+            "reminder_history",
+            "outgoing_documents"
         };
 
         var tables = await ReadStringColumnAsync(
@@ -76,7 +78,7 @@ public sealed class PostgreSqlConnectionSmokeTests
                   'asp_net_roles', 'asp_net_users', 'asp_net_role_claims', 'asp_net_user_claims',
                   'asp_net_user_logins', 'asp_net_user_roles', 'asp_net_user_tokens', 'staff',
                   'members', 'document_types', 'document_templates', 'incoming_documents',
-                  'attachments'
+                  'attachments', 'reminder_history', 'outgoing_documents'
               ]);
             """);
 
@@ -100,7 +102,7 @@ public sealed class PostgreSqlConnectionSmokeTests
             SELECT indexname
             FROM pg_indexes
             WHERE schemaname = 'public'
-              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents', 'attachments');
+              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents', 'attachments', 'reminder_history', 'outgoing_documents');
             """);
 
         var expectedIndexes = new[]
@@ -124,8 +126,20 @@ public sealed class PostgreSqlConnectionSmokeTests
             "ix_incoming_documents_suggested_staff_id",
             "ix_incoming_documents_confirmed_by_staff_id",
             "ix_attachments_incoming_document_id",
+            "ix_attachments_outgoing_document_id",
             "ix_attachments_uploaded_by_staff_id",
-            "ix_attachments_extraction_status"
+            "ix_attachments_extraction_status",
+            "ix_reminder_history_incoming_document_id",
+            "ix_reminder_history_recipient_status",
+            "ux_reminder_history_idempotency",
+            "ix_outgoing_documents_status",
+            "ix_outgoing_documents_template_id",
+            "ix_outgoing_documents_related_incoming_document_id",
+            "ix_outgoing_documents_related_member_id",
+            "ix_outgoing_documents_drafted_by_staff_id",
+            "ix_outgoing_documents_approved_by_staff_id",
+            "ux_outgoing_documents_reference_number",
+            "ix_outgoing_documents_created_at"
         };
 
         Assert.All(expectedIndexes, index => Assert.Contains(index, indexes));

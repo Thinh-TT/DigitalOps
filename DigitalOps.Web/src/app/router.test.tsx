@@ -11,11 +11,13 @@ import * as memberService from "../shared/members/member-service";
 import * as catalogService from "../shared/document-catalog/document-catalog-service";
 import * as incomingService from "../shared/incoming-documents/incoming-document-service";
 import * as reminderService from "../shared/reminders/reminder-service";
+import * as outgoingService from "../shared/outgoing-documents/outgoing-document-service";
 
 vi.mock("../shared/members/member-service");
 vi.mock("../shared/document-catalog/document-catalog-service");
 vi.mock("../shared/incoming-documents/incoming-document-service");
 vi.mock("../shared/reminders/reminder-service");
+vi.mock("../shared/outgoing-documents/outgoing-document-service");
 
 beforeEach(() => {
   vi.mocked(incomingService.getIncomingDocuments).mockResolvedValue({
@@ -32,6 +34,13 @@ beforeEach(() => {
     pageSize: 1,
     totalCount: 0,
     totalPages: 0,
+  });
+  vi.mocked(outgoingService.getOutgoingDocuments).mockResolvedValue({
+    items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0,
+  });
+  vi.mocked(catalogService.getAllDocumentTemplates).mockResolvedValue([]);
+  vi.mocked(memberService.getMemberLookup).mockResolvedValue({
+    items: [], page: 1, pageSize: 100, totalCount: 0, totalPages: 0,
   });
 });
 
@@ -178,6 +187,18 @@ describe("route guards and App Shell", () => {
     );
     expect(await screen.findByRole("heading", { name: "Văn bản đến" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Tiếp nhận văn bản$/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps outgoing list/detail under BusinessAccess and create under Drafter", async () => {
+    renderRoute("/outgoing-documents", createAuthValue("authenticated", ["Leader"], false));
+    expect(await screen.findByRole("heading", { name: "Văn bản đi" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tạo văn bản đi" })).not.toBeInTheDocument();
+
+    renderRoute("/outgoing-documents/new", createAuthValue("authenticated", ["Leader"], false));
+    expect(await screen.findByText("Không có quyền truy cập")).toBeInTheDocument();
+
+    renderRoute("/outgoing-documents/new", createAuthValue("authenticated", ["Drafter"], false));
+    expect(await screen.findByRole("heading", { name: "Tạo văn bản đi" })).toBeInTheDocument();
   });
 });
 

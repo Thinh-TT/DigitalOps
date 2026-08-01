@@ -41,11 +41,18 @@ import {
   IncomingDocumentListPage,
 } from "../pages/IncomingDocumentPages";
 import { ReminderPage } from "../pages/ReminderPage";
+import {
+  OutgoingDocumentCreatePage,
+  OutgoingDocumentDetailPage,
+  OutgoingDocumentListPage,
+} from "../pages/OutgoingDocumentPages";
 
 const commonRoutes: RouteObject[] = [
   { path: "incoming-documents", element: <IncomingDocumentListPage /> },
   { path: "incoming-documents/:id", element: <IncomingDocumentDetailPage /> },
   { path: "reminders", element: <ReminderPage /> },
+  { path: "outgoing-documents", element: <OutgoingDocumentListPage /> },
+  { path: "outgoing-documents/:id", element: <OutgoingDocumentDetailPage /> },
   placeholder("outgoing-documents", "SCR-011", "Văn bản đi", "Danh sách văn bản đi."),
   placeholder(
     "outgoing-documents/:id",
@@ -144,6 +151,7 @@ export const appRoutes: RouteObject[] = [
                   {
                     element: <RoleRoute allowedRoles={["Drafter"]} />,
                     children: [
+                      { path: "outgoing-documents/new", element: <OutgoingDocumentCreatePage /> },
                       placeholder(
                         "outgoing-documents/new",
                         "SCR-011",

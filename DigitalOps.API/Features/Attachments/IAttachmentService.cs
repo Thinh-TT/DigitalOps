@@ -10,12 +10,27 @@ public interface IAttachmentService
         long fileLength,
         CancellationToken cancellationToken = default);
 
+    Task<AttachmentResult<AttachmentResponse>> UploadOutgoingAsync(
+        Guid outgoingDocumentId,
+        Guid uploadedByStaffId,
+        Stream content,
+        string fileName,
+        long fileLength,
+        CancellationToken cancellationToken = default);
+
     Task<AttachmentResult<AttachmentDownload>> DownloadAsync(
         Guid id,
         CancellationToken cancellationToken = default);
 
     Task<AttachmentResult<bool>> DeleteIncomingAsync(
         Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<AttachmentResult<bool>> DeleteAsync(
+        Guid id,
+        Guid callerStaffId,
+        bool callerIsClerk,
+        bool callerIsDrafter,
         CancellationToken cancellationToken = default);
 }
 
@@ -27,6 +42,7 @@ public enum AttachmentFailure
     Conflict,
     PayloadTooLarge,
     UnsupportedFileType,
+    Forbidden,
     Storage
 }
 
@@ -56,6 +72,9 @@ public sealed record AttachmentResult<T>(
 
     public static AttachmentResult<T> UnsupportedFileType(string detail) =>
         new(default, AttachmentFailure.UnsupportedFileType, detail, EmptyErrors());
+
+    public static AttachmentResult<T> Forbidden(string detail) =>
+        new(default, AttachmentFailure.Forbidden, detail, EmptyErrors());
 
     public static AttachmentResult<T> Storage() =>
         new(

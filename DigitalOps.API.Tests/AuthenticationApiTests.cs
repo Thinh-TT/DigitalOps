@@ -5,8 +5,10 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
+using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Hosting;
@@ -451,6 +453,28 @@ public sealed class AuthenticationTestModelCustomizer(
                 table.HasCheckConstraint(
                     "ck_document_templates_format_rules_object",
                     "json_type(format_rules) = 'object'"));
+        modelBuilder.Entity<OutgoingDocument>()
+            .Property(document => document.ReviewIssues)
+            .HasConversion(
+                value => value.GetRawText(),
+                value => ParseJson(value))
+            .HasColumnName("review_issues")
+            .HasColumnType("TEXT")
+            .HasDefaultValueSql("'[]'");
+        modelBuilder.Entity<OutgoingDocument>()
+            .ToTable("outgoing_documents", table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_outgoing_documents_review_issues_array",
+                    "json_type(review_issues) = 'array'");
+            });
+        modelBuilder.Entity<Attachment>()
+            .ToTable("attachments", table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_attachments_exactly_one_parent",
+                    "(incoming_document_id IS NOT NULL AND outgoing_document_id IS NULL) OR (incoming_document_id IS NULL AND outgoing_document_id IS NOT NULL)");
+            });
     }
 
     private static JsonElement ParseJson(string value) =>

@@ -2,6 +2,7 @@ using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
+using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -23,6 +24,8 @@ public sealed class DigitalOpsDbContext(
     public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
 
     public DbSet<IncomingDocument> IncomingDocuments => Set<IncomingDocument>();
+
+    public DbSet<OutgoingDocument> OutgoingDocuments => Set<OutgoingDocument>();
 
     public DbSet<Attachment> Attachments => Set<Attachment>();
 

@@ -6,6 +6,7 @@ using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
+using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
@@ -79,6 +80,7 @@ builder.Services.AddScoped<IMemberImportService, MemberImportService>();
 builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
 builder.Services.AddScoped<IDocumentCatalogService, DocumentCatalogService>();
 builder.Services.AddScoped<IIncomingDocumentService, IncomingDocumentService>();
+builder.Services.AddScoped<IOutgoingDocumentService, OutgoingDocumentService>();
 builder.Services
     .AddOptions<ReminderWorkerOptions>()
     .Bind(builder.Configuration.GetSection(ReminderWorkerOptions.SectionName))

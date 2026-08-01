@@ -31,7 +31,7 @@ public sealed class AttachmentsController(
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = AuthorizationPolicies.Clerk)]
+    [Authorize(Policy = AuthorizationPolicies.BusinessAccess)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
@@ -42,8 +42,18 @@ public sealed class AttachmentsController(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var result = await attachmentService.DeleteIncomingAsync(
+        if (!CurrentStaffClaims.TryRead(User, out var claims))
+        {
+            return Problem(
+                detail: "Không thể xác định cán bộ hiện tại.",
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var result = await attachmentService.DeleteAsync(
             id,
+            claims.StaffId,
+            User.IsInRole(SystemRoles.Clerk),
+            User.IsInRole(SystemRoles.Drafter),
             cancellationToken);
         return result.Succeeded
             ? NoContent()
@@ -61,6 +71,9 @@ public sealed class AttachmentsController(
             AttachmentFailure.Conflict => Problem(
                 detail: detail,
                 statusCode: StatusCodes.Status409Conflict),
+            AttachmentFailure.Forbidden => Problem(
+                detail: detail,
+                statusCode: StatusCodes.Status403Forbidden),
             AttachmentFailure.Storage => Problem(
                 detail: detail,
                 statusCode: StatusCodes.Status500InternalServerError),

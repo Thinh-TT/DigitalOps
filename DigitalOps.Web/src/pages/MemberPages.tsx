@@ -47,6 +47,8 @@ import type {
   MemberStatus,
   MemberUpdateRequest,
 } from "../shared/members/types";
+import { getOutgoingDocuments } from "../shared/outgoing-documents/outgoing-document-service";
+import type { OutgoingDocumentResponse } from "../shared/outgoing-documents/types";
 
 const genderOptions: { value: MemberGender; label: string }[] = [
   { value: "Male", label: "Nam" },
@@ -440,6 +442,7 @@ export function MemberDetailPage() {
     readNavigationSuccess(location.state),
   );
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [relatedOutgoing, setRelatedOutgoing] = useState<OutgoingDocumentResponse[]>([]);
   const returnTo = readReturnTo(location.state);
 
   useEffect(() => {
@@ -487,6 +490,14 @@ export function MemberDetailPage() {
       ignored = true;
     };
   }, [form, id, reloadVersion]);
+
+  useEffect(() => {
+    let ignored = false;
+    void getOutgoingDocuments({ relatedMemberId: id, pageSize: 100 })
+      .then(response => { if (!ignored) setRelatedOutgoing(response.items); })
+      .catch(() => { if (!ignored) setRelatedOutgoing([]); });
+    return () => { ignored = true; };
+  }, [id, reloadVersion]);
 
   if (notFound) {
     return (
@@ -643,11 +654,22 @@ export function MemberDetailPage() {
       </Card>
 
       <Card title="Văn bản đi liên quan">
-        <Empty description="Chưa có văn bản đi liên quan.">
-          <Typography.Text type="secondary">
-            Liên kết sẽ được hiển thị khi module Văn bản đi được triển khai.
-          </Typography.Text>
-        </Empty>
+        {relatedOutgoing.length === 0 ? (
+          <Empty description="Chưa có văn bản đi liên quan." />
+        ) : (
+          <Table<OutgoingDocumentResponse>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            dataSource={relatedOutgoing}
+            columns={[
+              { title: "Tiêu đề", dataIndex: "title", ellipsis: true },
+              { title: "Mẫu", render: (_, item) => item.template.name },
+              { title: "Trạng thái", dataIndex: "status" },
+              { title: "", render: (_, item) => <Button type="link" onClick={() => navigate(`/outgoing-documents/${item.id}`)}>Xem</Button> },
+            ]}
+          />
+        )}
       </Card>
 
       <Modal

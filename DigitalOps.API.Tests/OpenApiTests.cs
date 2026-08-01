@@ -340,6 +340,24 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.True(attachmentDelete
             .GetProperty("responses")
             .TryGetProperty("204", out _));
+
+        Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents", out var outgoingPath));
+        var outgoingGet = outgoingPath.GetProperty("get");
+        var outgoingQueryParameters = outgoingGet.GetProperty("parameters")
+            .EnumerateArray().Select(parameter => parameter.GetProperty("name").GetString()).ToArray();
+        foreach (var parameter in new[] { "q", "templateId", "relatedIncomingDocumentId", "relatedMemberId", "status", "draftedByStaffId", "dateFrom", "dateTo", "page", "pageSize" })
+        {
+            Assert.Contains(parameter, outgoingQueryParameters);
+        }
+        Assert.True(outgoingPath.GetProperty("post").GetProperty("responses").TryGetProperty("201", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents/{id}", out var outgoingDetailPath));
+        Assert.True(outgoingDetailPath.GetProperty("get").GetProperty("responses").TryGetProperty("404", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents/{outgoingDocumentId}/attachments", out var outgoingAttachmentPath));
+        Assert.True(outgoingAttachmentPath.GetProperty("post").GetProperty("requestBody").GetProperty("content").TryGetProperty("multipart/form-data", out _));
+        Assert.True(schemas.TryGetProperty("OutgoingDocumentCreateRequest", out _));
+        Assert.True(schemas.TryGetProperty("OutgoingDocumentResponse", out _));
+        Assert.True(schemas.TryGetProperty("OutgoingDocumentStatus", out var outgoingStatus));
+        Assert.Equal(new[] { "Editing", "AiDraft", "PendingReview", "ReviewFailed", "PendingApproval", "Approved", "Archived" }, ResolveEnumValues(outgoingStatus, schemas));
     }
 
     private static IReadOnlyCollection<string> ResolveEnumValues(
