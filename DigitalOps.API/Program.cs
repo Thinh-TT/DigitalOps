@@ -11,6 +11,7 @@ using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Errors;
+using DigitalOps.API.Shared.AI;
 using DigitalOps.API.Shared.Identity;
 using DigitalOps.API.Shared.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -67,6 +68,7 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddDigitalOpsAi(builder.Configuration);
 builder.Services.AddSingleton<IAccessTokenService, JwtAccessTokenService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services
@@ -168,6 +170,16 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+var aiOptions = app.Services.GetRequiredService<IOptions<AiProviderOptions>>().Value;
+app.Logger.LogInformation(
+    "AI provider configured: {Provider}/{Model}; embedding: {EmbeddingProvider}/{EmbeddingModel}; automatic fallback: {AutomaticFallback}",
+    aiOptions.Provider,
+    string.Equals(aiOptions.Provider, AiProviderNames.External, StringComparison.OrdinalIgnoreCase)
+        ? aiOptions.External.Model
+        : aiOptions.Ollama.LlmModel,
+    aiOptions.Embedding.Provider,
+    aiOptions.Embedding.Model,
+    aiOptions.AutomaticFallback);
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();

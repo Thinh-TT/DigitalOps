@@ -11,7 +11,11 @@
 
 ### 1.2. Phạm vi
 
-API mô tả các nhóm Authentication, Staff, Members, document type/template, incoming document, attachment, reminder, outgoing document, AI/review, approval/archive và full-text search. Kiến trúc RAG/LLM local-first đã khóa quyết định và đang chờ evaluation gate để Project Owner phê duyệt cho MVP/demo; đây vẫn là implementation detail của các tác vụ AI và không tạo public endpoint mới trong contract này.
+API mô tả các nhóm Authentication, Staff, Members, document type/template, incoming document, attachment, reminder, outgoing document, AI/review, approval/archive và full-text search. Kiến trúc RAG/LLM local-first đã được Project Owner phê duyệt cho MVP/demo theo baseline v3; đây vẫn là implementation detail của các tác vụ AI và không tạo public endpoint mới trong contract này. Production hardening được review riêng.
+
+Trong Development, backend có thể chọn Ollama hoặc External chat provider qua
+server-side `.env`; lựa chọn này không xuất hiện trong DTO/route và không thay đổi
+behavior `503` khi provider lỗi. Embedding/retrieval vẫn local.
 
 Không có endpoint cho refresh token, server-side logout, OCR, email/SMS reminder, Citizen Portal hoặc search service ngoài PostgreSQL trong MVP.
 
