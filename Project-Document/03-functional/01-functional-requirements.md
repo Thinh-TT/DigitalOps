@@ -26,7 +26,7 @@
 | --- | --- |
 | ASP.NET Core Identity + JWT | Đăng nhập, role, đổi mật khẩu, khóa tài khoản |
 | PostgreSQL + EF Core | Lưu dữ liệu nghiệp vụ, history, reminder và full-text index |
-| RAG + LLM service (Draft chờ duyệt) | Gợi ý điều phối, sinh nháp, kiểm tra thể thức; xem 02-architecture/03-ai-rag-design.md để biết phạm vi và approval gate |
+| RAG local-first + Ollama (quyết định đã khóa, chờ evaluation gate) | Gợi ý điều phối, sinh nháp, kiểm tra thể thức; xem 02-architecture/03-ai-rag-design.md để biết phạm vi và approval gate của Project Owner |
 | File storage | Lưu file đính kèm ngoài database |
 | Text extraction worker | Trích xuất text từ PDF có text layer, DOCX và XLSX |
 | Reminder worker | Tạo nhắc trước hạn, đến hạn và quá hạn |

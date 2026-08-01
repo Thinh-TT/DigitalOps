@@ -22,6 +22,9 @@ Project-Document/
 ├── 05-tasks/
 │   └── 01-task-board.md
 ├── 06-logs/
+│   ├── ai-evaluation/
+│   │   ├── README.md
+│   │   └── t0-00-cases.json
 │   ├── dev-log.md
 │   └── session-log/
 │       └── 00-template.md
@@ -37,7 +40,7 @@ Project-Document/
 | Tổng quan | 01-project/01-ideas-and-scope.md | Mục tiêu sản phẩm, phạm vi MVP, ngoài phạm vi và công nghệ. |
 | Database | 02-architecture/01-database-designer.md | ERD, bảng, constraint, trạng thái, luồng dữ liệu và full-text search. |
 | API | 02-architecture/02-api-spec.md | REST API /api/v1, DTO, JWT/policy, error response và endpoint mapping. |
-| AI RAG/LLM | 02-architecture/03-ai-rag-design.md | Baseline RAG/LLM, guardrail, approval gate và quyết định do AI team phụ trách. |
+| AI RAG/LLM | 02-architecture/03-ai-rag-design.md | Kiến trúc local-first, guardrail và evaluation gate do Project Owner phê duyệt. |
 | Functional | 03-functional/01-functional-requirements.md | Vai trò, FR-001 đến FR-016 và business rule. |
 | UI | 04-ui/01-ui-sitemap-and-wireframe.md | Sitemap React, route, role navigation, wireframe và UI traceability. |
 | UI style | 04-ui/02-color-guidelines.md | Không gian dành cho guideline visual ở giai đoạn đại tu UI sau MVP. |
@@ -63,7 +66,7 @@ AI chỉ hỗ trợ gợi ý, soạn nháp và kiểm tra thể thức. AI khôn
 | ORM và database | Entity Framework Core, PostgreSQL |
 | Authentication | ASP.NET Core Identity, JWT access token, role policy |
 | Frontend | React, Vite, TypeScript, Ant Design |
-| AI | RAG orchestration + LLM qua HTTP service abstraction; provider/model/embedding/vector store chờ AI team phê duyệt |
+| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; đang chờ evaluation gate để Approved for MVP/demo |
 | Background | IHostedService reminder, text extraction worker |
 | File storage | Local disk hoặc S3-compatible bucket |
 
@@ -73,7 +76,7 @@ AI chỉ hỗ trợ gợi ý, soạn nháp và kiểm tra thể thức. AI khôn
 2. 01-project/01-ideas-and-scope.md để xác định phạm vi và giới hạn MVP.
 3. 03-functional/01-functional-requirements.md để xác định use case/business rule.
 4. 02-architecture/01-database-designer.md và 02-architecture/02-api-spec.md cho thiết kế/triển khai backend.
-5. 02-architecture/03-ai-rag-design.md trước mọi task AI; tài liệu đang Draft và chỉ AI team được chốt quyết định công nghệ.
+5. 02-architecture/03-ai-rag-design.md trước mọi task AI; quyết định đã khóa nhưng tài liệu còn Draft cho đến khi Project Owner xác nhận đủ evaluation gate.
 6. 04-ui/01-ui-sitemap-and-wireframe.md khi làm React UI.
 7. 05-tasks/01-task-board.md để theo dõi thứ tự thực hiện và Definition of Done.
 8. 06-logs/ để biết quyết định kỹ thuật trước đó; xem AGENT.md trước khi bắt đầu thay đổi.

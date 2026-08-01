@@ -10,7 +10,7 @@ Hướng dẫn cho AI agent và kỹ sư khi làm việc trong dự án DigitalO
 | Data | Entity Framework Core, PostgreSQL, một database và một schema |
 | Identity | ASP.NET Core Identity, JWT access token, role policy |
 | Frontend | React + Vite + TypeScript + Ant Design |
-| AI | RAG orchestration kết hợp LLM HTTP service abstraction; provider/model/embedding/vector store chờ AI team phê duyệt |
+| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; chờ evaluation gate để Project Owner phê duyệt MVP/demo |
 | Background | IHostedService cho reminder; worker trích xuất text cho file hỗ trợ |
 | File storage | Local disk có tổ chức thư mục hoặc S3-compatible bucket |
 
@@ -25,12 +25,12 @@ MVP xử lý hồ sơ hội viên, văn bản đến, điều phối có AI gợ
 | 03-functional/01-functional-requirements.md | Use case FR-001 đến FR-016, role và business rule |
 | 02-architecture/01-database-designer.md | Schema, quan hệ, trạng thái, constraint và migration rule |
 | 02-architecture/02-api-spec.md | REST contract /api/v1, DTO, quyền, error response |
-| 02-architecture/03-ai-rag-design.md | Baseline RAG/LLM, guardrail và các quyết định chờ AI team phê duyệt |
+| 02-architecture/03-ai-rag-design.md | Quyết định RAG/LLM local-first, guardrail và evaluation gate do Project Owner duyệt |
 | 04-ui/01-ui-sitemap-and-wireframe.md | Route web, màn hình, wireframe và UI traceability |
 | 05-tasks/01-task-board.md | Theo dõi thứ tự triển khai, dependency và Definition of Done |
 | 06-logs/dev-log.md, 06-logs/session-log/ | Quyết định, blocker và bài học của các session trước |
 
-Khi tài liệu mâu thuẫn, giữ ý định sản phẩm trong Ideas and Scope và Functional Requirements; sau đó đồng bộ Database Designer, API Specification và UI Sitemap trước khi viết code. Chỉ áp dụng quyết định trong AI RAG Design sau khi tài liệu được AI team đánh dấu Approved. Không tự suy diễn endpoint, bảng, trạng thái hoặc role mới.
+Khi tài liệu mâu thuẫn, giữ ý định sản phẩm trong Ideas and Scope và Functional Requirements; sau đó đồng bộ Database Designer, API Specification và UI Sitemap trước khi viết code. Chỉ triển khai code nghiệp vụ RAG/LLM sau khi AI RAG Design đạt đủ gate và được Project Owner đánh dấu Approved for MVP/demo. Không tự suy diễn endpoint, bảng, trạng thái hoặc role mới.
 
 ## 3. Cách bắt đầu một task
 
@@ -64,7 +64,7 @@ Khi tài liệu mâu thuẫn, giữ ý định sản phẩm trong Ideas and Scop
 
 ### 4.3. AI, reminder, attachment và search
 
-- AI RAG Design đang Draft. Không tự chọn vector store/model/provider, thêm schema index/embedding hoặc public API RAG trước khi AI team phê duyệt.
+- AI RAG Design đang Draft vì chưa đủ evaluation evidence; model/provider/vector store đã khóa và không được tự thay đổi. Không thêm schema embedding, public API RAG hoặc code nghiệp vụ trước khi Project Owner phê duyệt cho MVP/demo.
 - AI chỉ gợi ý điều phối, sinh draft hoặc review; không tự điều phối/phê duyệt. Timeout/lỗi AI trả 503 và không mutation dữ liệu hiện có.
 - RAG index là dữ liệu dẫn xuất, không phải source of truth. PostgreSQL full-text search của FR-016 vẫn là search contract chính thức.
 - Context truy hồi là dữ liệu không tin cậy: filter quyền trước retrieval, giảm thiểu dữ liệu gửi provider và không log raw prompt/completion nhạy cảm mặc định.

@@ -36,7 +36,7 @@ DigitalOps là một hệ thống điều hành số dành cho tổ chức Mặt
 
 **Xác thực:** ASP.NET Core Identity + JWT (không dùng Keycloak riêng).
 
-**AI:** kiến trúc RAG kết hợp LLM qua HTTP service abstraction, dùng cho gợi ý điều phối, sinh nháp và hỗ trợ thẩm định. LLM provider/model, embedding, vector store và pipeline ingestion là các quyết định Draft, chờ thành viên phụ trách AI phê duyệt theo 02-architecture/03-ai-rag-design.md. PostgreSQL full-text search vẫn là chức năng tìm kiếm chính thức của MVP.
+**AI:** kiến trúc RAG local-first do DigitalOps điều phối, gọi Ollama qua HTTP với Qwen3 và dùng Qdrant làm derived vector index cho gợi ý điều phối, sinh nháp và hỗ trợ thẩm định. Quyết định đã khóa nhưng còn chờ evaluation gate và Project Owner phê duyệt cho MVP/demo theo 02-architecture/03-ai-rag-design.md. PostgreSQL full-text search vẫn là chức năng tìm kiếm chính thức của MVP.
 
 **Tự động hóa nhắc hạn:** `IHostedService` chạy định kỳ trong chính API.
 

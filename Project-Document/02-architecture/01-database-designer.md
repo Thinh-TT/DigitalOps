@@ -69,6 +69,15 @@ Các bảng Identity được ánh xạ sang tên `snake_case`, ví dụ `AspNet
 - Các bảng `FormatRules` và `ReviewIssues` không được chuẩn hóa thành nhiều bảng con trong MVP.
 - Không OCR ảnh hoặc PDF scan trong MVP; chỉ trích xuất text từ PDF có text layer, DOCX và XLSX.
 
+### 1.6. Ranh giới dữ liệu RAG
+
+PostgreSQL tiếp tục là system of record. Qdrant là external derived index có thể
+tái tạo từ dữ liệu nguồn đã được phép trong PostgreSQL; vì vậy MVP không thêm
+bảng embedding, cột vector, EF migration hoặc quan hệ khóa ngoại cho Qdrant.
+Collection `digitalops_knowledge_v1` và payload/index lifecycle được mô tả tại
+`03-ai-rag-design.md`. Docker named volume chỉ cung cấp persistence local cho
+demo và không được xem là backup nghiệp vụ.
+
 ## 2. Sơ Đồ ER (Entity Relationship)
 
 ```mermaid

@@ -11,7 +11,7 @@
 
 ### 1.2. Phạm vi
 
-API mô tả các nhóm Authentication, Staff, Members, document type/template, incoming document, attachment, reminder, outgoing document, AI/review, approval/archive và full-text search. RAG/LLM là implementation detail của các tác vụ AI, đang chờ AI team phê duyệt và không tạo public endpoint mới trong bản contract này.
+API mô tả các nhóm Authentication, Staff, Members, document type/template, incoming document, attachment, reminder, outgoing document, AI/review, approval/archive và full-text search. Kiến trúc RAG/LLM local-first đã khóa quyết định và đang chờ evaluation gate để Project Owner phê duyệt cho MVP/demo; đây vẫn là implementation detail của các tác vụ AI và không tạo public endpoint mới trong contract này.
 
 Không có endpoint cho refresh token, server-side logout, OCR, email/SMS reminder, Citizen Portal hoặc search service ngoài PostgreSQL trong MVP.
 
