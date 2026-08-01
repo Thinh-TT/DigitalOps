@@ -2,6 +2,7 @@ using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
+using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -24,6 +25,8 @@ public sealed class DigitalOpsDbContext(
     public DbSet<IncomingDocument> IncomingDocuments => Set<IncomingDocument>();
 
     public DbSet<Attachment> Attachments => Set<Attachment>();
+
+    public DbSet<ReminderHistory> ReminderHistory => Set<ReminderHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

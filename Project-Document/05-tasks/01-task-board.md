@@ -58,7 +58,7 @@ Task board này bám theo:
 | T2-02 | Tiếp nhận và quản lý văn bản đến (API + UI SCR-008, SCR-009)                                  | FR-007   | `[x]`  | P0       | T2-01        | Tạo/sửa incoming đúng trạng thái `New`; validate `ReceivedDate <= Deadline`; khóa sửa dữ liệu hành chính sau `Completed`.                                    |
 | T2-03 | Quản lý attachment incoming và trigger trích xuất text (API + UI, phần attachment của SCR-009) | FR-008   | `[x]`  | P0       | T2-02        | Upload/download qua API đúng quyền theo tài liệu cha; `ExtractionStatus` đặt đúng `Pending`/`Unsupported` theo loại file; test `413`/`415`.                  |
 | T2-04 | AI gợi ý và xác nhận điều phối (API + UI SCR-009)                                             | FR-009   | `[ ]`  | P0       | T0-00, T2-02 | AI service gọi qua interface/typed client; lỗi/timeout AI không đổi assignment (trả `503`); Văn thư luôn là người xác nhận cuối; test AI lỗi không mutation. |
-| T2-05 | Nhắc hạn tự động và đọc thông báo (Reminder Worker + UI SCR-010)                              | FR-010   | `[ ]`  | P0       | T2-02        | Worker idempotent theo unique key `(incoming_document_id, recipient, kind, date)`; chuyển `Overdue` đúng lúc; test chạy lại không tạo reminder trùng.        |
+| T2-05 | Nhắc hạn tự động và đọc thông báo (Reminder Worker + UI SCR-010)                              | FR-010   | `[x]`  | P0       | T2-02        | Worker idempotent theo unique key `(incoming_document_id, recipient, kind, date)`; chuyển `Overdue` đúng lúc; test chạy lại không tạo reminder trùng.        |
 
 ## 7. Phase 3 — Văn Bản Đi: Soạn Thảo, AI, Thẩm Định, Phê Duyệt, Lưu Trữ
 

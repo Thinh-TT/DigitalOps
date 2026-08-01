@@ -40,11 +40,12 @@ import {
   IncomingDocumentDetailPage,
   IncomingDocumentListPage,
 } from "../pages/IncomingDocumentPages";
+import { ReminderPage } from "../pages/ReminderPage";
 
 const commonRoutes: RouteObject[] = [
   { path: "incoming-documents", element: <IncomingDocumentListPage /> },
   { path: "incoming-documents/:id", element: <IncomingDocumentDetailPage /> },
-  placeholder("reminders", "SCR-010", "Thông báo", "Danh sách nhắc hạn của tài khoản."),
+  { path: "reminders", element: <ReminderPage /> },
   placeholder("outgoing-documents", "SCR-011", "Văn bản đi", "Danh sách văn bản đi."),
   placeholder(
     "outgoing-documents/:id",

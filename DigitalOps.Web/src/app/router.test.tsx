@@ -10,10 +10,12 @@ import type { Role } from "../shared/auth/types";
 import * as memberService from "../shared/members/member-service";
 import * as catalogService from "../shared/document-catalog/document-catalog-service";
 import * as incomingService from "../shared/incoming-documents/incoming-document-service";
+import * as reminderService from "../shared/reminders/reminder-service";
 
 vi.mock("../shared/members/member-service");
 vi.mock("../shared/document-catalog/document-catalog-service");
 vi.mock("../shared/incoming-documents/incoming-document-service");
+vi.mock("../shared/reminders/reminder-service");
 
 beforeEach(() => {
   vi.mocked(incomingService.getIncomingDocuments).mockResolvedValue({
@@ -24,6 +26,13 @@ beforeEach(() => {
     totalPages: 0,
   });
   vi.mocked(catalogService.getAllDocumentTypes).mockResolvedValue([]);
+  vi.mocked(reminderService.getReminders).mockResolvedValue({
+    items: [],
+    page: 1,
+    pageSize: 1,
+    totalCount: 0,
+    totalPages: 0,
+  });
 });
 
 describe("route guards and App Shell", () => {

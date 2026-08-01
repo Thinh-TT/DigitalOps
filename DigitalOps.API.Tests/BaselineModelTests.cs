@@ -2,6 +2,7 @@ using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.IncomingDocuments;
+using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public sealed class BaselineModelTests
         var documentTemplate = GetEntityType<DocumentTemplate>(model);
         var incomingDocument = GetEntityType<IncomingDocument>(model);
         var attachment = GetEntityType<Attachment>(model);
+        var reminder = GetEntityType<ReminderHistory>(model);
 
         Assert.Equal("members", member.GetTableName());
         Assert.Equal("uuid", member.FindProperty(nameof(Member.Id))!.GetColumnType());
@@ -97,6 +99,24 @@ public sealed class BaselineModelTests
             attachment.GetForeignKeys(),
             foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
         Assert.Null(attachment.FindProperty("OutgoingDocumentId"));
+
+        Assert.Equal("reminder_history", reminder.GetTableName());
+        Assert.Equal("date", reminder.FindProperty(nameof(ReminderHistory.ReminderDate))!.GetColumnType());
+        Assert.Equal("timestamptz", reminder.FindProperty(nameof(ReminderHistory.CreatedAt))!.GetColumnType());
+        Assert.Equal("timestamptz", reminder.FindProperty(nameof(ReminderHistory.ReadAt))!.GetColumnType());
+        Assert.Equal(
+            "reminder_kind IN ('BeforeDeadline', 'DueDate', 'Overdue')",
+            GetCheckConstraint(reminder, "ck_reminder_history_kind").Sql);
+        Assert.Equal(
+            "delivery_status IN ('Unread', 'Read')",
+            GetCheckConstraint(reminder, "ck_reminder_history_delivery_status").Sql);
+        Assert.Equal(3, reminder.GetCheckConstraints().Count());
+        AssertIndex(reminder, "ux_reminder_history_idempotency", isUnique: true);
+        AssertIndex(reminder, "ix_reminder_history_recipient_status", isUnique: false);
+        AssertIndex(reminder, "ix_reminder_history_incoming_document_id", isUnique: false);
+        Assert.All(
+            reminder.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
 
         Assert.Equal("asp_net_users", GetEntityType<ApplicationUser>(model).GetTableName());
         Assert.Equal("asp_net_roles", model.FindEntityType("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>")!.GetTableName());

@@ -205,3 +205,24 @@ select {
 .attachment-hint {
   display: block;
 }
+
+.reminder-filters {
+  width: 100%;
+}
+
+.reminder-status-filter {
+  min-width: 200px;
+}
+
+.reminder-recipient-filter {
+  min-width: 320px;
+}
+
+.reminder-table-card .ant-card-body {
+  padding: 0;
+}
+
+.reminder-document-link {
+  padding: 0;
+  text-align: left;
+}

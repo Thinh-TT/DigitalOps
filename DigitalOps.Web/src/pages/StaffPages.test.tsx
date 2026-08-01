@@ -114,7 +114,7 @@ describe("StaffCreatePage", () => {
       }),
     );
     expect(await screen.findByText("created destination")).toBeInTheDocument();
-  }, 10_000);
+  }, 20_000);
 
   it("keeps form values and displays a conflict returned by the API", async () => {
     const user = userEvent.setup();

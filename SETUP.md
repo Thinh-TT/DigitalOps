@@ -75,6 +75,10 @@ Mở `DigitalOps.API/.env` và thay toàn bộ placeholder. Không commit file n
 | `MemberImport__MaxExpandedWorkbookBytes` | Không | Tổng dung lượng giải nén XLSX tối đa; mặc định 100 MiB |
 | `AttachmentStorage__RootPath` | Không | Thư mục local lưu attachment ngoài web root; mặc định `App_Data/attachments` |
 | `AttachmentStorage__MaxFileSizeBytes` | Không | Dung lượng tối đa mỗi attachment; mặc định 10 MiB, tối đa cấu hình 100 MiB |
+| `ReminderWorker__Enabled` | Không | Bật Reminder Worker; mặc định `true` |
+| `ReminderWorker__RunIntervalMinutes` | Không | Chu kỳ quét reminder; mặc định 15 phút, từ 1 đến 1.440 phút |
+| `ReminderWorker__BeforeDeadlineDays` | Không | Số ngày lịch nhắc trước hạn; mặc định 3, từ 1 đến 365 |
+| `ReminderWorker__TimeZoneId` | Không | Múi giờ ngày nghiệp vụ; mặc định `Asia/Ho_Chi_Minh`, nhận IANA hoặc Windows ID |
 | `DocumentCatalogSeed__Enabled` | Không | Seed 7 loại và 7 mẫu văn bản cho local/demo; mặc định `false` |
 | `IdentityBootstrap__Enabled` | Có | Bật/tắt tạo Administrator đầu tiên |
 | `IdentityBootstrap__UserName` | Khi bootstrap | Username Administrator |
@@ -205,6 +209,26 @@ Tài khoản chạy API phải có quyền tạo/đọc/ghi/xóa trong thư mụ
 mount storage bền vững và backup riêng cùng database; không trỏ root vào
 `wwwroot`, ổ đĩa gốc hoặc thư mục tạm không được persist. T2-03 chỉ lưu file và
 đặt trạng thái `Pending`/`Unsupported`; worker trích xuất text thuộc T4-01.
+
+### Reminder Worker
+
+Reminder Worker chạy trong chính API, khởi chạy một vòng ngay khi host sẵn sàng
+và sau đó quét theo `ReminderWorker__RunIntervalMinutes`. Ngày nghiệp vụ mặc
+định theo Việt Nam; timestamp API/database vẫn là UTC. Mặc định worker tạo một
+nhắc trước hạn đúng 3 ngày lịch, nhắc vào ngày đến hạn và một nhắc quá hạn mỗi
+ngày cho đến khi tài liệu hoàn tất.
+
+```dotenv
+ReminderWorker__Enabled=true
+ReminderWorker__RunIntervalMinutes=15
+ReminderWorker__BeforeDeadlineDays=3
+ReminderWorker__TimeZoneId=Asia/Ho_Chi_Minh
+```
+
+Không có endpoint hoặc nút UI chạy worker thủ công. Worker chỉ tạo reminder cho
+incoming document đã giao Staff; incoming document chưa hoàn tất nhưng quá hạn
+vẫn được chuyển `Overdue`. Unique key database ngăn reminder trùng nếu job chạy
+lại cùng ngày. API sẽ fail-fast khi múi giờ hoặc giới hạn cấu hình không hợp lệ.
 
 Từ thư mục gốc repository:
 
