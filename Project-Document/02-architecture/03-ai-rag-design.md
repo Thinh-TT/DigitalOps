@@ -4,19 +4,22 @@
 
 | Thuộc tính                     | Giá trị                                                                                                                |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Trạng thái                     | Draft — quyết định kiến trúc đã khóa; chờ đủ evidence của evaluation gate T0-00                                       |
+| Trạng thái                     | Approved for MVP/demo — automated gates v3 đạt; Project Owner đã duyệt human review và architecture |
 | Phạm vi                        | Kiến trúc RAG/LLM local-first cho MVP/demo; không phải phê duyệt production                                           |
 | AI owner/người duyệt           | Project Owner                                                                                                         |
-| Ngày quyết định                | 2026-07-31                                                                                                            |
-| Baseline quyết định            | `T0-00-RAG-MVP-20260731-v1`                                                                                           |
-| Trạng thái quyết định          | Chỉ chuyển sang Approved for MVP/demo khi toàn bộ gate ở mục 8 đạt                                                    |
+| Ngày quyết định                | 2026-08-01                                                                                                            |
+| Baseline quyết định            | T0-00-RAG-MVP-20260801-v3-no-ram-preflight                                                                           |
+| Trạng thái quyết định          | Approved for MVP/demo theo approval của Project Owner ngày 2026-08-01; production vẫn cần review riêng             |
 | Tài liệu liên quan             | 01-project/01-ideas-and-scope.md, 03-functional/01-functional-requirements.md, 01-database-designer.md, 02-api-spec.md |
 
-Tài liệu khóa kiến trúc local-first để triển khai các task AI sau T0-00. Khi còn
-trạng thái Draft, chỉ được dựng môi trường và runner evaluation cô lập; chưa
-được triển khai provider/vector store vào application, tạo migration, thêm
-endpoint RAG hoặc cấu hình production. Approval của tài liệu chỉ mở khóa T2-04,
-T3-02 và T3-03 trong phạm vi MVP/demo.
+Tài liệu kiến trúc local-first đã được Project Owner duyệt cho phạm vi MVP/demo
+sau khi baseline T0-00-RAG-MVP-20260801-v3-no-ram-preflight đạt toàn bộ automated
+gates và được chấp thuận human review. Approval mở khóa T2-04, T3-02 và T3-03
+trong phạm vi MVP/demo; production vẫn nằm ngoài phạm vi phê duyệt này.
+
+Evaluation runner v3 giữ nguyên model/digest, fixture, public API và EF schema;
+các deterministic fallback, scaffold và policy không preflight RAM chỉ thuộc
+runner/evidence evaluation, không tự động mở rộng production contract.
 
 ## 2. Phạm vi AI trong MVP
 
@@ -181,23 +184,25 @@ thiếu hoặc mâu thuẫn bằng chứng và prompt injection.
 | Review | Rule xác định đúng 12/12; không có Passed chứa Error; AI không kết luận nội dung/pháp lý. |
 | SLO/resource | Đạt p95/timeout/RAM ở mục 6.3 trên máy Windows 16 GB CPU-first. |
 
-Evaluation ngày 2026-08-01 đã chạy đủ fixture với một model resident tại một thời
-điểm để đáp ứng giới hạn RAM. Retrieval và resource đạt, nhưng schema chỉ đạt
-72.73%, assignment đúng 37.5%, abstain đúng 75%, draft tự động đạt 0/9, review
-đạt 10/12; p95 draft 63.051 giây và review 60.016 giây vượt SLO. Vì vậy
-`MinScore = 0.320682` chỉ là provisional, chưa đủ điều kiện Approval. Xem
-[`log-20260731-t0-00.md`](../06-logs/session-log/log-20260731-t0-00.md).
+Baseline `T0-00-RAG-MVP-20260801-v3-no-ram-preflight` đã chạy đủ 45 ca trên
+`LAPTOP-A07DUJIR` với một model resident tại một thời điểm. Kết quả đạt toàn bộ
+automated gate: schema 100%, assignment 100%, draft 9/9, review 12/12,
+Recall@5/MRR@5 đều 100% và operation chậm nhất 43.897 giây. `MinScore` được chốt
+ở `0.316666`; raw result có SHA-256
+`606c893f94bd4fb9c13f5df5bff400d50ac25759788026c890a52a8a8612c104`.
+Project Owner đã duyệt human draft review tối thiểu 8/9 và architecture cho
+MVP/demo. Xem
+[log-20260801-t0-00-laptop-a07dujir-v3-no-ram-preflight.md](../06-logs/session-log/log-20260801-t0-00-laptop-a07dujir-v3-no-ram-preflight.md).
 
-Runner và fixture nằm ngoài production solution. Session log phải ghi cấu hình
-máy, Ollama/Qdrant version, model digest, `MinScore`, metric cold/warm, mức RAM,
-kết quả human review và người duyệt. Nếu bất kỳ gate nào thất bại hoặc chưa được
-chấm, tài liệu giữ Draft và T0-00 giữ `[~]`; không tự đổi model hoặc nới SLO.
+Runner v3 không còn điều kiện RAM khả dụng 9 GB ở preflight; RAM vẫn được đo để
+ghi evidence và kiểm tra resource gate trong lúc workload chạy theo mục 6.3.
+Runner và fixture nằm ngoài production solution. Session log ghi cấu hình máy,
+Ollama/Qdrant version, model digest, `MinScore`, metric cold/warm, mức RAM, kết
+quả human review và người duyệt.
 
-Mỗi lượt chính thức phải chạy đủ 45 ca trên cùng một thiết bị và cùng một runtime;
-không ghép metric giữa nhiều máy hoặc nhiều lượt. Máy dùng để ra quyết định
-Approval phải đúng profile Windows 16 GB CPU-first đã khóa. Kết quả từ profile
-khác vẫn hữu ích để chẩn đoán nhưng phải ghi `Supplemental` và không tự mở khóa
-T0-00. Log cũ là evidence bất biến; mỗi thiết bị/lượt chạy tạo session log mới.
+Mỗi lượt dùng làm evidence phải chạy đủ 45 ca trên cùng một thiết bị và cùng một
+runtime; không ghép metric giữa nhiều máy hoặc nhiều lượt. Log cũ là evidence
+bất biến; mỗi thiết bị/lượt chạy tạo session log mới.
 
 ## 9. Ngoài phạm vi approval MVP/demo
 
