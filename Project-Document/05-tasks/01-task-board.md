@@ -99,5 +99,6 @@ Task board này bám theo:
 | 2026-07-31 | T0-02 | Thiếu connection string ban đầu. | Đã cấu hình PostgreSQL local, tạo database `DigitalOps`, preflight và áp dụng `InitialBaseline` thành công. |
 | 2026-07-31 | T0-00 | Resource gate không đạt: sau cold-load hai model, RAM khả dụng giảm còn 1.108 GB (< 2 GB). | Giữ `[~]`/Draft; model đã cache. Giải phóng trên 9 GB trước khi start service rồi chạy lại cùng model/SLO, không tự đổi cấu hình quyết định. |
 | 2026-08-01 | T0-00 | Lượt chạy đủ 45 ca đạt resource nhưng không đạt schema, assignment, draft, review và SLO gate. | Giữ `[~]`/Draft; ghi `MinScore=0.320682` provisional, không tự đổi model hoặc nới SLO; cần quyết định/điều chỉnh được Project Owner phê duyệt trước lượt tiếp theo. |
+| 2026-08-01 | T0-00 | Chuyển thực thi sang thành viên/thiết bị khác; log máy cũ đã đóng. | Dùng baseline `T0-00-RAG-MVP-20260731-v1` và runbook `06-logs/ai-evaluation/t0-00-handoff.md`; mỗi máy tạo log riêng, không ghép metric hoặc sửa evidence cũ. |
 
 ## Ghi Chú Kỹ Thuật

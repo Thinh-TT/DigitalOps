@@ -24,7 +24,8 @@ Project-Document/
 ├── 06-logs/
 │   ├── ai-evaluation/
 │   │   ├── README.md
-│   │   └── t0-00-cases.json
+│   │   ├── t0-00-cases.json
+│   │   └── t0-00-handoff.md
 │   ├── dev-log.md
 │   └── session-log/
 │       └── 00-template.md
@@ -45,7 +46,8 @@ Project-Document/
 | UI | 04-ui/01-ui-sitemap-and-wireframe.md | Sitemap React, route, role navigation, wireframe và UI traceability. |
 | UI style | 04-ui/02-color-guidelines.md | Không gian dành cho guideline visual ở giai đoạn đại tu UI sau MVP. |
 | Delivery | 05-tasks/01-task-board.md | Thứ tự thực hiện, dependency và Definition of Done. |
-| Nhật ký | 06-logs/dev-log.md và 06-logs/session-log/ | Quy ước ghi nhận quyết định, issue và lesson theo session. |
+| Nhật ký | 06-logs/dev-log.md và 06-logs/session-log/ | Quy ước ghi nhận quyết định, issue và lesson theo session; log `Closed` là evidence bất biến. |
+| Handoff AI evaluation | 06-logs/ai-evaluation/t0-00-handoff.md | Setup, kiểm tra digest, chạy 45 ca và quy tắc bàn giao T0-00 trên thiết bị khác. |
 | Hướng dẫn làm việc | AGENT.md | Quy tắc cho agent/kỹ sư khi thay đổi dự án. |
 
 ## Phạm vi MVP

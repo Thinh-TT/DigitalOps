@@ -18,6 +18,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ([string]::IsNullOrWhiteSpace($QdrantApiKey)) {
+    throw 'QDRANT_API_KEY is required. The locked T0-00 baseline does not allow an unauthenticated Qdrant evaluation.'
+}
+
 if ([string]::IsNullOrWhiteSpace($FixturePath)) {
     $FixturePath = Join-Path $PSScriptRoot '..\..\Project-Document\06-logs\ai-evaluation\t0-00-cases.json'
 }

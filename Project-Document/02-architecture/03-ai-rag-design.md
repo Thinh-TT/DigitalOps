@@ -8,6 +8,7 @@
 | Phạm vi                        | Kiến trúc RAG/LLM local-first cho MVP/demo; không phải phê duyệt production                                           |
 | AI owner/người duyệt           | Project Owner                                                                                                         |
 | Ngày quyết định                | 2026-07-31                                                                                                            |
+| Baseline quyết định            | `T0-00-RAG-MVP-20260731-v1`                                                                                           |
 | Trạng thái quyết định          | Chỉ chuyển sang Approved for MVP/demo khi toàn bộ gate ở mục 8 đạt                                                    |
 | Tài liệu liên quan             | 01-project/01-ideas-and-scope.md, 03-functional/01-functional-requirements.md, 01-database-designer.md, 02-api-spec.md |
 
@@ -88,14 +89,22 @@ chung.
 
 ## 6. Quyết định kiến trúc T0-00
 
+Baseline `T0-00-RAG-MVP-20260731-v1` là bất biến trong một lượt evaluation.
+Người thực hiện được phép cài đặt, pull artifact, cấu hình runtime và chạy lại
+fixture/runner trên thiết bị khác; không được tự đổi model/digest, embedding,
+dimension, vector store, nguồn index, prompt contract, SLO, gate hoặc fixture.
+Mọi thay đổi các mục này cần quyết định bằng văn bản của Project Owner, baseline
+ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao nằm tại
+[`t0-00-handoff.md`](../06-logs/ai-evaluation/t0-00-handoff.md).
+
 ### 6.1. Provider, model và vector store
 
 | Hạng mục | Quyết định cho MVP/demo | Lý do/giới hạn |
 | --- | --- | --- |
 | Cách chạy AI | DigitalOps tự điều phối RAG; gọi Ollama HTTP API local. Không cloud và không automatic provider fallback. | Giữ dữ liệu trong máy demo và external API cost bằng 0. Lỗi trả 503 để người dùng tiếp tục thủ công. |
-| LLM | `qwen3:4b-instruct-2507-q4_K_M`; pin cả tag và model digest trong session log sau benchmark. | Model text-only quantized khoảng 2,5 GB theo [Ollama model registry](https://ollama.com/library/qwen3:4b-instruct-2507-q4_K_M), phù hợp máy Windows 16 GB CPU-first. Không tự đổi model khi gate thất bại. |
-| Embedding | `qwen3-embedding:0.6b`, 1024 chiều, cosine similarity. | Model hỗ trợ tối đa 1024 chiều theo [Qwen model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B); đổi model/dimension bắt buộc re-embed toàn bộ index. |
-| Vector store | `qdrant/qdrant:v1.18.3`, single-node, collection `digitalops_knowledge_v1`. | Chạy local bằng Docker named volume, chỉ bind `127.0.0.1`, bật API key và tắt telemetry; không dùng Windows bind mount theo [hướng dẫn cài đặt Qdrant](https://qdrant.tech/documentation/installation/) và không thêm extension/migration PostgreSQL. |
+| LLM | `qwen3:4b-instruct-2507-q4_K_M`; digest `0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0`. | Model text-only quantized khoảng 2,5 GB theo [Ollama model registry](https://ollama.com/library/qwen3:4b-instruct-2507-q4_K_M). Đây là candidate đã khóa để evaluation; lượt đầu trên máy 16 GB chưa đạt quality/SLO. Không tự đổi model khi gate thất bại. |
+| Embedding | `qwen3-embedding:0.6b`; digest `ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d`; 1024 chiều, cosine similarity. | Model hỗ trợ tối đa 1024 chiều theo [Qwen model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B); đổi model/dimension bắt buộc re-embed toàn bộ index. |
+| Vector store | `qdrant/qdrant:v1.18.3`; image digest `sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286`; single-node, collection `digitalops_knowledge_v1`. | Chạy local bằng Docker named volume, chỉ bind `127.0.0.1`, bật API key và tắt telemetry; không dùng Windows bind mount theo [hướng dẫn cài đặt Qdrant](https://qdrant.tech/documentation/installation/) và không thêm extension/migration PostgreSQL. |
 | Public search | PostgreSQL full-text search tiếp tục là contract FR-016. | Semantic retrieval chỉ là implementation detail của AI. |
 | Production | Chưa được phê duyệt. | Cần review riêng cho TLS/auth, backup/restore, HA, monitoring, concurrency và chính sách dữ liệu. |
 
@@ -183,6 +192,12 @@ Runner và fixture nằm ngoài production solution. Session log phải ghi cấ
 máy, Ollama/Qdrant version, model digest, `MinScore`, metric cold/warm, mức RAM,
 kết quả human review và người duyệt. Nếu bất kỳ gate nào thất bại hoặc chưa được
 chấm, tài liệu giữ Draft và T0-00 giữ `[~]`; không tự đổi model hoặc nới SLO.
+
+Mỗi lượt chính thức phải chạy đủ 45 ca trên cùng một thiết bị và cùng một runtime;
+không ghép metric giữa nhiều máy hoặc nhiều lượt. Máy dùng để ra quyết định
+Approval phải đúng profile Windows 16 GB CPU-first đã khóa. Kết quả từ profile
+khác vẫn hữu ích để chẩn đoán nhưng phải ghi `Supplemental` và không tự mở khóa
+T0-00. Log cũ là evidence bất biến; mỗi thiết bị/lượt chạy tạo session log mới.
 
 ## 9. Ngoài phạm vi approval MVP/demo
 

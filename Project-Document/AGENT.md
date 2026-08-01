@@ -65,6 +65,7 @@ Khi tài liệu mâu thuẫn, giữ ý định sản phẩm trong Ideas and Scop
 ### 4.3. AI, reminder, attachment và search
 
 - AI RAG Design đang Draft vì chưa đủ evaluation evidence; model/provider/vector store đã khóa và không được tự thay đổi. Không thêm schema embedding, public API RAG hoặc code nghiệp vụ trước khi Project Owner phê duyệt cho MVP/demo.
+- Khi tiếp nhận T0-00 trên thiết bị khác, bắt buộc dùng `06-logs/ai-evaluation/t0-00-handoff.md` và baseline `T0-00-RAG-MVP-20260731-v1`. Không sửa log đã `Closed`, không ghép metric giữa các máy; mỗi lượt tạo session log mới.
 - AI chỉ gợi ý điều phối, sinh draft hoặc review; không tự điều phối/phê duyệt. Timeout/lỗi AI trả 503 và không mutation dữ liệu hiện có.
 - RAG index là dữ liệu dẫn xuất, không phải source of truth. PostgreSQL full-text search của FR-016 vẫn là search contract chính thức.
 - Context truy hồi là dữ liệu không tin cậy: filter quyền trước retrieval, giảm thiểu dữ liệu gửi provider và không log raw prompt/completion nhạy cảm mặc định.
@@ -99,6 +100,7 @@ Luôn kiểm tra các mã chính: 200, 201, 204, 400, 401, 403, 404, 409, 413, 4
 - Khi sửa schema, API, role, trạng thái hoặc flow, cập nhật các tài liệu phụ thuộc trong cùng task hoặc nêu rõ blocker.
 - Dùng đường dẫn Project-Document/... trong tài liệu dự án.
 - Tạo session log mới tại 06-logs/session-log/log-yyyymmdd-task.md; không sửa 00-template.md cho log vận hành thường ngày.
+- Session log đã đánh dấu `Closed` là evidence bất biến. Muốn bổ sung hoặc sửa kết luận phải tạo log mới và liên kết ngược về log cũ.
 - Log ngắn gọn, tập trung vào lý do, quyết định/tác động, kiểm tra đã chạy và việc cần theo dõi. Tham chiếu task ID nếu Task Board đã có ID.
 
 ## 8. Commit convention
