@@ -3,6 +3,7 @@ using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
+using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 
@@ -51,6 +52,8 @@ public sealed class OutgoingDocument : IAuditableEntity
     public DateTime? ArchivedAt { get; set; }
 
     public ICollection<Attachment> Attachments { get; set; } = [];
+
+    public ICollection<ReviewHistory> ReviewHistory { get; set; } = [];
 
     public DateTime CreatedAt { get; set; }
 

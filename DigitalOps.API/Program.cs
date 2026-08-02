@@ -8,6 +8,7 @@ using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Reminders;
+using DigitalOps.API.Features.Review;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Errors;
@@ -85,6 +86,8 @@ builder.Services.AddScoped<IIncomingDocumentService, IncomingDocumentService>();
 builder.Services.AddScoped<IAssignmentSuggestionGenerator, AssignmentSuggestionGenerator>();
 builder.Services.AddScoped<IAiDraftGenerator, AiDraftGenerator>();
 builder.Services.AddScoped<IOutgoingDocumentService, OutgoingDocumentService>();
+builder.Services.AddScoped<IDocumentReviewGenerator, DocumentReviewGenerator>();
+builder.Services.AddScoped<IOutgoingDocumentReviewService, OutgoingDocumentReviewService>();
 builder.Services
     .AddOptions<ReminderWorkerOptions>()
     .Bind(builder.Configuration.GetSection(ReminderWorkerOptions.SectionName))

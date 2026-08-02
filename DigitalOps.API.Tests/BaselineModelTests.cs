@@ -4,6 +4,7 @@ using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Features.OutgoingDocuments;
+using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,7 @@ public sealed class BaselineModelTests
         var outgoingDocument = GetEntityType<OutgoingDocument>(model);
         var attachment = GetEntityType<Attachment>(model);
         var reminder = GetEntityType<ReminderHistory>(model);
+        var review = GetEntityType<ReviewHistory>(model);
 
         Assert.Equal("members", member.GetTableName());
         Assert.Equal("uuid", member.FindProperty(nameof(Member.Id))!.GetColumnType());
@@ -141,6 +143,30 @@ public sealed class BaselineModelTests
         AssertIndex(reminder, "ix_reminder_history_incoming_document_id", isUnique: false);
         Assert.All(
             reminder.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
+
+        Assert.Equal("review_history", review.GetTableName());
+        Assert.Equal("uuid", review.FindProperty(nameof(ReviewHistory.OutgoingDocumentId))!.GetColumnType());
+        Assert.Equal("uuid", review.FindProperty(nameof(ReviewHistory.ReviewedByStaffId))!.GetColumnType());
+        Assert.True(review.FindProperty(nameof(ReviewHistory.ReviewedByStaffId))!.IsNullable);
+        Assert.Equal("jsonb", review.FindProperty(nameof(ReviewHistory.ReviewIssues))!.GetColumnType());
+        Assert.Equal("timestamptz", review.FindProperty(nameof(ReviewHistory.ReviewedAt))!.GetColumnType());
+        Assert.Equal("attempt_no > 0", GetCheckConstraint(review, "ck_review_history_attempt_no").Sql);
+        Assert.Equal(
+            "review_source IN ('Rule', 'AI', 'Hybrid')",
+            GetCheckConstraint(review, "ck_review_history_source").Sql);
+        Assert.Equal(
+            "review_result IN ('Failed', 'Passed')",
+            GetCheckConstraint(review, "ck_review_history_result").Sql);
+        Assert.Equal(
+            "jsonb_typeof(review_issues) = 'array'",
+            GetCheckConstraint(review, "ck_review_history_issues_array").Sql);
+        Assert.Equal(4, review.GetCheckConstraints().Count());
+        AssertIndex(review, "ux_review_history_document_attempt", isUnique: true);
+        AssertIndex(review, "ix_review_history_document_reviewed_at", isUnique: false);
+        AssertIndex(review, "ix_review_history_reviewed_by_staff_id", isUnique: false);
+        Assert.All(
+            review.GetForeignKeys(),
             foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
 
         Assert.Equal("asp_net_users", GetEntityType<ApplicationUser>(model).GetTableName());

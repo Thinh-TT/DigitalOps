@@ -22,7 +22,8 @@ public sealed class SharedDatabasePreflightTests
         "incoming_documents",
         "attachments",
         "reminder_history",
-        "outgoing_documents"
+        "outgoing_documents",
+        "review_history"
     ];
 
     [Fact]
@@ -49,7 +50,7 @@ public sealed class SharedDatabasePreflightTests
                   'asp_net_roles', 'asp_net_users', 'asp_net_role_claims', 'asp_net_user_claims',
                   'asp_net_user_logins', 'asp_net_user_roles', 'asp_net_user_tokens', 'staff',
                   'members', 'document_types', 'document_templates', 'incoming_documents',
-                  'attachments', 'reminder_history', 'outgoing_documents'
+                  'attachments', 'reminder_history', 'outgoing_documents', 'review_history'
               ]);
             """);
 
@@ -69,7 +70,7 @@ public sealed class SharedDatabasePreflightTests
             connection,
             "SELECT migration_id FROM public.__digitalops_ef_migrations_history;");
 
-        Assert.Equal(5, migrationIds.Length);
+        Assert.Equal(6, migrationIds.Length);
         Assert.Contains(
             migrationIds,
             migrationId => migrationId.EndsWith("_InitialBaseline", StringComparison.Ordinal));
@@ -85,6 +86,9 @@ public sealed class SharedDatabasePreflightTests
         Assert.Contains(
             migrationIds,
             migrationId => migrationId.EndsWith("_AddOutgoingDocuments", StringComparison.Ordinal));
+        Assert.Contains(
+            migrationIds,
+            migrationId => migrationId.EndsWith("_AddReviewHistory", StringComparison.Ordinal));
     }
 
     private static async Task<bool> ScalarBooleanAsync(NpgsqlConnection connection, string commandText)

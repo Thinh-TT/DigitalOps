@@ -6,7 +6,7 @@ import * as catalogService from "../shared/document-catalog/document-catalog-ser
 import * as incomingService from "../shared/incoming-documents/incoming-document-service";
 import * as memberService from "../shared/members/member-service";
 import * as service from "../shared/outgoing-documents/outgoing-document-service";
-import type { OutgoingDocumentResponse } from "../shared/outgoing-documents/types";
+import type { OutgoingDocumentResponse, ReviewResponse } from "../shared/outgoing-documents/types";
 import { OutgoingDocumentCreatePage, OutgoingDocumentDetailPage, OutgoingDocumentListPage } from "./OutgoingDocumentPages";
 
 vi.mock("../shared/document-catalog/document-catalog-service");
@@ -19,6 +19,8 @@ beforeEach(() => {
   vi.mocked(incomingService.getIncomingDocuments).mockResolvedValue({ items: [], page: 1, pageSize: 100, totalCount: 0, totalPages: 0 });
   vi.mocked(memberService.getMemberLookup).mockResolvedValue({ items: [], page: 1, pageSize: 100, totalCount: 0, totalPages: 0 });
   vi.mocked(service.getOutgoingDocuments).mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+  vi.mocked(service.getOutgoingReviews).mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+  vi.mocked(service.createOutgoingReview).mockResolvedValue(reviewFixture());
   vi.mocked(service.updateOutgoingDocument).mockImplementation(async (_, request) => ({
     ...outgoingFixture(),
     title: request.title ?? outgoingFixture().title,
@@ -61,6 +63,35 @@ it("requires saving dirty editor content before opening AI draft", async () => {
   expect(await screen.findByText("Vui lòng lưu thay đổi tiêu đề và nội dung trước khi sinh nháp AI.")).toBeInTheDocument();
   expect(service.generateOutgoingAiDraft).not.toHaveBeenCalled();
   expect(content).toHaveValue("Nội dung chưa lưu");
+});
+
+it("requires saving dirty editor content before sending review", async () => {
+  vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
+  renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Drafter"));
+  const content = await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" });
+  await userEvent.clear(content);
+  await userEvent.type(content, "Nội dung chưa lưu");
+  await userEvent.click(screen.getByRole("button", { name: "Gửi thẩm định" }));
+
+  expect(await screen.findByText("Vui lòng lưu thay đổi tiêu đề và nội dung trước khi gửi thẩm định.")).toBeInTheDocument();
+  expect(service.createOutgoingReview).not.toHaveBeenCalled();
+  expect(content).toHaveValue("Nội dung chưa lưu");
+});
+
+it("submits review, applies the server status, and reloads history", async () => {
+  vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
+  vi.mocked(service.getOutgoingReviews)
+    .mockResolvedValueOnce({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 })
+    .mockResolvedValueOnce({ items: [reviewFixture()], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
+  renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Drafter"));
+  await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" });
+  await userEvent.click(screen.getByRole("button", { name: "Gửi thẩm định" }));
+
+  await waitFor(() => expect(service.createOutgoingReview).toHaveBeenCalledWith("outgoing"));
+  expect(await screen.findByText("Văn bản đã đạt thẩm định và được chuyển chờ duyệt.")).toBeInTheDocument();
+  expect(screen.getByText("Đạt")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Gửi thẩm định" })).not.toBeInTheDocument();
+  expect(service.getOutgoingReviews).toHaveBeenLastCalledWith("outgoing", { page: 1, pageSize: 20 });
 });
 
 it("submits optional instruction and shows the immutable first AI draft", async () => {
@@ -123,4 +154,8 @@ function auth(role: "Drafter" | "Leader"): AuthContextValue {
 
 function outgoingFixture(): OutgoingDocumentResponse {
   return { id: "outgoing", template: { id: "template", name: "Quyết định", documentType: { id: "type", code: "QD", name: "Quyết định" } }, relatedIncomingDocument: null, relatedMember: null, title: "Quyết định mẫu", content: "Kính gửi {{member.email}}", aiDraftContent: null, draftedByStaff: { id: "staff", fullName: "Người soạn", position: null, department: null }, status: "Editing", reviewIssues: [], approvedByStaff: null, approvedAt: null, referenceNumber: null, issuedDate: null, archivedAt: null, attachments: [], createdAt: "2026-08-01T00:00:00Z", updatedAt: "2026-08-01T00:00:00Z" };
+}
+
+function reviewFixture(): ReviewResponse {
+  return { id: "review", outgoingDocumentId: "outgoing", attemptNo: 1, reviewSource: "Hybrid", reviewedByStaff: { id: "staff", fullName: "Người soạn", position: null, department: null }, contentSnapshot: "Nội dung tại thời điểm review", reviewResult: "Passed", reviewIssues: [{ ruleCode: "style", severity: "Warning", message: "Cần kiểm tra cách trình bày.", location: "Nội dung" }], reviewedAt: "2026-08-02T00:00:00Z", documentStatus: "PendingApproval" };
 }

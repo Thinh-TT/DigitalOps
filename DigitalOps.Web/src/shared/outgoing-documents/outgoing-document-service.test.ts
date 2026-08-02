@@ -1,9 +1,11 @@
 import { writeSession } from "../auth/session-store";
 import {
   createOutgoingDocument,
+  createOutgoingReview,
   generateOutgoingAiDraft,
   getOutgoingDocument,
   getOutgoingDocuments,
+  getOutgoingReviews,
   updateOutgoingDocument,
   uploadOutgoingAttachment,
 } from "./outgoing-document-service";
@@ -48,6 +50,19 @@ describe("outgoing-document-service", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/outgoing-documents/outgoing/ai-draft");
     expect(fetchMock.mock.calls[1][1]?.method).toBe("POST");
     expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({ instruction: "Nhấn mạnh tiến độ" });
+  });
+
+  it("sends review requests and history paging", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({ items: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createOutgoingReview("outgoing");
+    await getOutgoingReviews("outgoing", { page: 2, pageSize: 50 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/outgoing-documents/outgoing/reviews");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("POST");
+    expect(fetchMock.mock.calls[0][1]?.body).toBeUndefined();
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/outgoing-documents/outgoing/reviews?page=2&pageSize=50");
   });
 });
 

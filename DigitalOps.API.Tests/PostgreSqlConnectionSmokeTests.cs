@@ -65,7 +65,8 @@ public sealed class PostgreSqlConnectionSmokeTests
             "incoming_documents",
             "attachments",
             "reminder_history",
-            "outgoing_documents"
+            "outgoing_documents",
+            "review_history"
         };
 
         var tables = await ReadStringColumnAsync(
@@ -78,7 +79,7 @@ public sealed class PostgreSqlConnectionSmokeTests
                   'asp_net_roles', 'asp_net_users', 'asp_net_role_claims', 'asp_net_user_claims',
                   'asp_net_user_logins', 'asp_net_user_roles', 'asp_net_user_tokens', 'staff',
                   'members', 'document_types', 'document_templates', 'incoming_documents',
-                  'attachments', 'reminder_history', 'outgoing_documents'
+                  'attachments', 'reminder_history', 'outgoing_documents', 'review_history'
               ]);
             """);
 
@@ -102,7 +103,7 @@ public sealed class PostgreSqlConnectionSmokeTests
             SELECT indexname
             FROM pg_indexes
             WHERE schemaname = 'public'
-              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents', 'attachments', 'reminder_history', 'outgoing_documents');
+              AND tablename IN ('members', 'staff', 'document_types', 'document_templates', 'incoming_documents', 'attachments', 'reminder_history', 'outgoing_documents', 'review_history');
             """);
 
         var expectedIndexes = new[]
@@ -139,7 +140,10 @@ public sealed class PostgreSqlConnectionSmokeTests
             "ix_outgoing_documents_drafted_by_staff_id",
             "ix_outgoing_documents_approved_by_staff_id",
             "ux_outgoing_documents_reference_number",
-            "ix_outgoing_documents_created_at"
+            "ix_outgoing_documents_created_at",
+            "ux_review_history_document_attempt",
+            "ix_review_history_document_reviewed_at",
+            "ix_review_history_reviewed_by_staff_id"
         };
 
         Assert.All(expectedIndexes, index => Assert.Contains(index, indexes));

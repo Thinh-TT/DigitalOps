@@ -3,7 +3,7 @@
 ## 1. Phạm vi
 
 Bộ tài liệu này dùng để kiểm thử thủ công/nghiệm thu các tính năng đã hoàn thành
-từ FR-001 đến FR-012. Các tính năng FR-013 đến FR-016 chưa hoàn thành nên không
+từ FR-001 đến FR-013. Các tính năng FR-014 đến FR-016 chưa hoàn thành nên không
 được đưa vào kết quả pass/fail hiện tại.
 
 | File | Phạm vi | Màn hình chính |
@@ -21,6 +21,7 @@ từ FR-001 đến FR-012. Các tính năng FR-013 đến FR-016 chưa hoàn th�
 | `fr-010-reminders.md` | Reminder worker và đánh dấu đã đọc | SCR-010 |
 | `fr-011-outgoing-documents.md` | Tạo văn bản đi theo mẫu | SCR-011, SCR-012 |
 | `fr-012-ai-draft-editor.md` | AI sinh nháp và chỉnh sửa | SCR-012 |
+| `fr-013-review-history.md` | Thẩm định thể thức và lịch sử review | SCR-013 |
 
 ## 2. Môi trường và tài khoản thử
 
@@ -52,7 +53,7 @@ Không ghi mật khẩu hoặc access token thật vào file kết quả/evidenc
 - Với thao tác mutation, luôn kiểm tra cả response và đọc lại resource/database.
 - Với AI failure/concurrency, không reload trước khi xác nhận dữ liệu local được giữ.
 - Chạy `platform-smoke.md` trước; sau đó thực hiện FR theo dependency từ FR-001
-  đến FR-012 để tái sử dụng dữ liệu synthetic đã tạo.
+  đến FR-013 để tái sử dụng dữ liệu synthetic đã tạo.
 
 ## 4. Phiếu ghi kết quả
 

@@ -6,7 +6,9 @@ using System.Text.Json.Serialization;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.OutgoingDocuments;
+using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.AI;
+using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.Data.Sqlite;
@@ -356,6 +358,140 @@ public sealed class OutgoingDocumentApiTests
             HttpStatusCode.Conflict,
             "conflict",
             $"/api/v1/outgoing-documents/{created.Id}");
+    }
+
+    [Fact]
+    public async Task Review_endpoints_enforce_workflow_and_return_newest_history_first()
+    {
+        using var factory = new StaffManagementApiFactory();
+        var templateId = await CreateTemplateAsync(factory);
+        using var drafter = factory.CreateApiClient();
+        await AuthenticateAsync(drafter, "drafter");
+        var created = await CreateOutgoingAsync(drafter, templateId);
+
+        factory.DocumentReviewGenerator.Handler = (_, _) => Task.FromResult(
+            new DocumentReviewGenerationResult(
+                ReviewSource.Rule,
+                [new ReviewIssueResponse("national_header", "Error", "Missing header.", "Document header")]));
+        using var firstRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/v1/outgoing-documents/{created.Id}/reviews");
+        var firstResponse = await drafter.SendAsync(firstRequest);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        var first = (await firstResponse.Content
+            .ReadFromJsonAsync<ReviewResponse>(JsonOptions))!;
+        Assert.Equal(1, first.AttemptNo);
+        Assert.Equal(ReviewResult.Failed, first.ReviewResult);
+        Assert.Equal(OutgoingDocumentStatus.ReviewFailed, first.DocumentStatus);
+        Assert.Equal("national_header", first.ReviewIssues.Single().RuleCode);
+
+        factory.DocumentReviewGenerator.Handler = (_, _) => Task.FromResult(
+            new DocumentReviewGenerationResult(
+                ReviewSource.Hybrid,
+                [new ReviewIssueResponse("clarity", "Warning", "Review wording.", null)]));
+        var secondResponse = await drafter.PostAsync(
+            $"/api/v1/outgoing-documents/{created.Id}/reviews",
+            content: null);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var second = (await secondResponse.Content
+            .ReadFromJsonAsync<ReviewResponse>(JsonOptions))!;
+        Assert.Equal(2, second.AttemptNo);
+        Assert.Equal(ReviewResult.Passed, second.ReviewResult);
+        Assert.Equal(OutgoingDocumentStatus.PendingApproval, second.DocumentStatus);
+        Assert.DoesNotContain(second.ReviewIssues, issue => issue.Severity == "Error");
+
+        using var administrator = factory.CreateApiClient();
+        await AuthenticateAsync(administrator, "admin");
+        var history = (await administrator.GetFromJsonAsync<PagedResponse<ReviewResponse>>(
+            $"/api/v1/outgoing-documents/{created.Id}/reviews?page=1&pageSize=1",
+            JsonOptions))!;
+        Assert.Equal(2, history.TotalCount);
+        Assert.Single(history.Items);
+        Assert.Equal(2, history.Items[0].AttemptNo);
+        Assert.Equal(created.Content, history.Items[0].ContentSnapshot);
+
+        await ProblemDetailsAssert.HasContractAsync(
+            await drafter.PostAsync($"/api/v1/outgoing-documents/{created.Id}/reviews", null),
+            HttpStatusCode.Conflict,
+            "conflict",
+            $"/api/v1/outgoing-documents/{created.Id}/reviews");
+
+        using var otherDrafter = factory.CreateApiClient();
+        await AuthenticateAsync(otherDrafter, "otherdrafter");
+        await ProblemDetailsAssert.HasContractAsync(
+            await otherDrafter.PostAsync($"/api/v1/outgoing-documents/{created.Id}/reviews", null),
+            HttpStatusCode.Forbidden,
+            "forbidden",
+            $"/api/v1/outgoing-documents/{created.Id}/reviews");
+    }
+
+    [Fact]
+    public async Task Review_provider_failure_preserves_document_and_history()
+    {
+        using var factory = new StaffManagementApiFactory();
+        var templateId = await CreateTemplateAsync(factory);
+        using var drafter = factory.CreateApiClient();
+        await AuthenticateAsync(drafter, "drafter");
+        var created = await CreateOutgoingAsync(drafter, templateId);
+        factory.DocumentReviewGenerator.Handler = (_, _) =>
+            throw new AiProviderException("provider unavailable");
+
+        await ProblemDetailsAssert.HasContractAsync(
+            await drafter.PostAsync($"/api/v1/outgoing-documents/{created.Id}/reviews", null),
+            HttpStatusCode.ServiceUnavailable,
+            "ai-service-unavailable",
+            $"/api/v1/outgoing-documents/{created.Id}/reviews");
+
+        var unchanged = await drafter.GetFromJsonAsync<OutgoingDocumentResponse>(
+            $"/api/v1/outgoing-documents/{created.Id}",
+            JsonOptions);
+        Assert.Equal(OutgoingDocumentStatus.Editing, unchanged!.Status);
+        Assert.Empty(unchanged.ReviewIssues);
+        var history = (await drafter.GetFromJsonAsync<PagedResponse<ReviewResponse>>(
+            $"/api/v1/outgoing-documents/{created.Id}/reviews",
+            JsonOptions))!;
+        Assert.Empty(history.Items);
+    }
+
+    [Fact]
+    public async Task Concurrent_review_requests_persist_only_one_attempt()
+    {
+        using var factory = new StaffManagementApiFactory();
+        var templateId = await CreateTemplateAsync(factory);
+        using var drafter = factory.CreateApiClient();
+        await AuthenticateAsync(drafter, "drafter");
+        var created = await CreateOutgoingAsync(drafter, templateId);
+        var bothStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var starts = 0;
+        factory.DocumentReviewGenerator.Handler = async (_, cancellationToken) =>
+        {
+            if (Interlocked.Increment(ref starts) == 2)
+            {
+                bothStarted.TrySetResult();
+            }
+
+            await release.Task.WaitAsync(cancellationToken);
+            return new DocumentReviewGenerationResult(
+                ReviewSource.Rule,
+                [new ReviewIssueResponse("national_header", "Error", "Missing header.", "Document header")]);
+        };
+
+        var first = drafter.PostAsync($"/api/v1/outgoing-documents/{created.Id}/reviews", null);
+        var second = drafter.PostAsync($"/api/v1/outgoing-documents/{created.Id}/reviews", null);
+        await bothStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        release.TrySetResult();
+        var responses = await Task.WhenAll(first, second);
+
+        Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
+        Assert.True(
+            responses.Count(response => response.StatusCode == HttpStatusCode.Conflict) == 1,
+            string.Join(", ", responses.Select(response => $"{(int)response.StatusCode} {response.StatusCode}")));
+        var history = (await drafter.GetFromJsonAsync<PagedResponse<ReviewResponse>>(
+            $"/api/v1/outgoing-documents/{created.Id}/reviews",
+            JsonOptions))!;
+        Assert.Single(history.Items);
+        Assert.Equal(1, history.Items[0].AttemptNo);
     }
 
     private static async Task<OutgoingDocumentResponse> CreateOutgoingAsync(

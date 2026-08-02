@@ -7,6 +7,8 @@ import type {
   OutgoingDocumentListParameters,
   OutgoingDocumentResponse,
   OutgoingDocumentUpdateRequest,
+  ReviewListParameters,
+  ReviewResponse,
 } from "./types";
 
 export function getOutgoingDocuments(parameters: OutgoingDocumentListParameters = {}) {
@@ -33,6 +35,14 @@ export function generateOutgoingAiDraft(id: string, request: AiDraftRequest) {
     method: "POST",
     body: JSON.stringify(request),
   });
+}
+
+export function createOutgoingReview(id: string) {
+  return apiRequest<ReviewResponse>(`/outgoing-documents/${id}/reviews`, { method: "POST" });
+}
+
+export function getOutgoingReviews(id: string, parameters: ReviewListParameters = {}) {
+  return apiRequest<PagedResponse<ReviewResponse>>(`/outgoing-documents/${id}/reviews${buildQuery(parameters)}`);
 }
 
 export function uploadOutgoingAttachment(documentId: string, file: File) {

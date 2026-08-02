@@ -4,6 +4,7 @@ using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Reminders;
+using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -30,6 +31,8 @@ public sealed class DigitalOpsDbContext(
     public DbSet<Attachment> Attachments => Set<Attachment>();
 
     public DbSet<ReminderHistory> ReminderHistory => Set<ReminderHistory>();
+
+    public DbSet<ReviewHistory> ReviewHistory => Set<ReviewHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

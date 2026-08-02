@@ -94,6 +94,36 @@ public sealed record TemplateKnowledgeCandidate(
     string Content,
     double Score);
 
+public sealed record FormatRuleKnowledgePoint(
+    Guid PointId,
+    Guid TemplateId,
+    string DocumentTypeCode,
+    string RuleCode,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash,
+    string Content,
+    float[] Vector,
+    DateTime IndexedAtUtc);
+
+public sealed record FormatRuleKnowledgeState(
+    Guid PointId,
+    Guid TemplateId,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash);
+
+public sealed record FormatRuleKnowledgeCandidate(
+    Guid PointId,
+    Guid TemplateId,
+    string DocumentTypeCode,
+    string RuleCode,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash,
+    string Content,
+    double Score);
+
 public interface IQdrantKnowledgeClient
 {
     Task EnsureCollectionAsync(CancellationToken cancellationToken = default);
@@ -125,6 +155,23 @@ public interface IQdrantKnowledgeClient
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TemplateKnowledgeCandidate>> SearchTemplateAsync(
+        float[] queryVector,
+        Guid templateId,
+        string documentTypeCode,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<FormatRuleKnowledgeState>> GetFormatRuleStatesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task UpsertFormatRulePointsAsync(
+        IReadOnlyList<FormatRuleKnowledgePoint> points,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteFormatRulePointsAsync(
+        IReadOnlyList<Guid> pointIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<FormatRuleKnowledgeCandidate>> SearchFormatRulesAsync(
         float[] queryVector,
         Guid templateId,
         string documentTypeCode,

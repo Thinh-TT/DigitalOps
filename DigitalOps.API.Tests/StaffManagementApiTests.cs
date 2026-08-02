@@ -7,6 +7,7 @@ using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.OutgoingDocuments;
+using DigitalOps.API.Features.Review;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
@@ -431,7 +432,7 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
 {
     private const string Password = "Valid1!Password";
     private readonly SqliteConnection _connection =
-        new("Data Source=:memory:");
+        new($"Data Source=staff-management-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
     private readonly string _attachmentRootPath = Path.Combine(
         Path.GetTempPath(),
         "digitalops-api-attachment-tests",
@@ -445,6 +446,8 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
     internal AssignmentSuggestionTestDouble AssignmentSuggestionGenerator { get; } = new();
 
     internal AiDraftGeneratorTestDouble AiDraftGenerator { get; } = new();
+
+    internal DocumentReviewGeneratorTestDouble DocumentReviewGenerator { get; } = new();
 
     public HttpClient CreateApiClient() =>
         CreateClient(new WebApplicationFactoryClientOptions
@@ -481,11 +484,13 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
                 AssignmentSuggestionGenerator);
             services.RemoveAll<IAiDraftGenerator>();
             services.AddSingleton<IAiDraftGenerator>(AiDraftGenerator);
+            services.RemoveAll<IDocumentReviewGenerator>();
+            services.AddSingleton<IDocumentReviewGenerator>(DocumentReviewGenerator);
             services.RemoveAll<DbContextOptions<DigitalOpsDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<DigitalOpsDbContext>>();
             services.AddDbContext<DigitalOpsDbContext>(
                 options => options
-                    .UseSqlite(_connection)
+                    .UseSqlite(_connection.ConnectionString)
                     .ReplaceService<IModelCustomizer, AuthenticationTestModelCustomizer>());
             services
                 .AddControllers()

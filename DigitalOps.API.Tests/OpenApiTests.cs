@@ -389,12 +389,31 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
             Assert.True(outgoingAiDraftResponses.TryGetProperty(statusCode, out _));
         }
 
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/outgoing-documents/{outgoingDocumentId}/reviews",
+            out var outgoingReviewsPath));
+        var outgoingReviewPostResponses = outgoingReviewsPath.GetProperty("post").GetProperty("responses");
+        foreach (var statusCode in new[] { "200", "401", "403", "404", "409", "503" })
+        {
+            Assert.True(outgoingReviewPostResponses.TryGetProperty(statusCode, out _));
+        }
+        var outgoingReviewGet = outgoingReviewsPath.GetProperty("get");
+        var outgoingReviewParameters = outgoingReviewGet.GetProperty("parameters")
+            .EnumerateArray().Select(parameter => parameter.GetProperty("name").GetString()).ToArray();
+        Assert.Contains("page", outgoingReviewParameters);
+        Assert.Contains("pageSize", outgoingReviewParameters);
+
         Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents/{outgoingDocumentId}/attachments", out var outgoingAttachmentPath));
         Assert.True(outgoingAttachmentPath.GetProperty("post").GetProperty("requestBody").GetProperty("content").TryGetProperty("multipart/form-data", out _));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentCreateRequest", out _));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentUpdateRequest", out _));
         Assert.True(schemas.TryGetProperty("AiDraftRequest", out _));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentResponse", out _));
+        Assert.True(schemas.TryGetProperty("ReviewResponse", out _));
+        Assert.True(schemas.TryGetProperty("ReviewSource", out var reviewSource));
+        Assert.Equal(new[] { "Rule", "AI", "Hybrid" }, ResolveEnumValues(reviewSource, schemas));
+        Assert.True(schemas.TryGetProperty("ReviewResult", out var reviewResult));
+        Assert.Equal(new[] { "Failed", "Passed" }, ResolveEnumValues(reviewResult, schemas));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentStatus", out var outgoingStatus));
         Assert.Equal(new[] { "Editing", "AiDraft", "PendingReview", "ReviewFailed", "PendingApproval", "Approved", "Archived" }, ResolveEnumValues(outgoingStatus, schemas));
     }

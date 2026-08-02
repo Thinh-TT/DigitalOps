@@ -380,6 +380,70 @@ public sealed class AiProviderTests
             body.Contains($"\"points\":[\"{pointId:D}\"]", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Qdrant_client_isolates_format_rule_sync_and_filters_exact_template()
+    {
+        var pointId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var handler = new RecordingHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/points/scroll", StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    $"{{\"result\":{{\"points\":[{{\"id\":\"{pointId:D}\",\"payload\":{{\"sourceId\":\"{templateId:D}\",\"sourceVersion\":\"format-rule-v1\",\"chunkId\":\"format-rule:1\",\"contentHash\":\"rule-hash\"}}}}],\"next_page_offset\":null}}}}");
+            }
+
+            if (path.EndsWith("/points/query", StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    $"{{\"result\":{{\"points\":[{{\"id\":\"{pointId:D}\",\"score\":0.92,\"payload\":{{\"sourceId\":\"{templateId:D}\",\"documentTypeCode\":\"PLAN\",\"ruleCode\":\"national_header\",\"sourceVersion\":\"format-rule-v1\",\"chunkId\":\"format-rule:1\",\"contentHash\":\"rule-hash\",\"content\":\"Rule content\"}}}}]}}}}");
+            }
+
+            return CreateJsonResponse("{\"result\":{\"status\":\"acknowledged\"}}");
+        });
+        var client = new QdrantKnowledgeClient(
+            new HttpClient(handler),
+            Options.Create(CreateOllamaOptions()),
+            NullLogger<QdrantKnowledgeClient>.Instance);
+
+        var states = await client.GetFormatRuleStatesAsync();
+        await client.UpsertFormatRulePointsAsync([
+            new FormatRuleKnowledgePoint(
+                pointId,
+                templateId,
+                "PLAN",
+                "national_header",
+                "format-rule-v1",
+                "format-rule:1",
+                "rule-hash",
+                "Rule content",
+                new float[1024],
+                DateTime.UtcNow)
+        ]);
+        await client.DeleteFormatRulePointsAsync([pointId]);
+        var candidates = await client.SearchFormatRulesAsync(
+            new float[1024],
+            templateId,
+            "PLAN");
+
+        Assert.Equal(pointId, Assert.Single(states).PointId);
+        var candidate = Assert.Single(candidates);
+        Assert.Equal(templateId, candidate.TemplateId);
+        Assert.Equal("national_header", candidate.RuleCode);
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"sourceType\":\"FormatRule\"", StringComparison.Ordinal)
+            && body.Contains($"\"sourceId\":\"{templateId:D}\"", StringComparison.Ordinal)
+            && body.Contains("\"documentTypeCode\":\"PLAN\"", StringComparison.Ordinal)
+            && body.Contains("\"isActive\":true", StringComparison.Ordinal)
+            && body.Contains("\"accessScope\":\"Internal\"", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"ruleCode\":\"national_header\"", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"score_threshold\":0.316666", StringComparison.Ordinal)
+            && body.Contains("\"limit\":5", StringComparison.Ordinal));
+    }
+
     private static AiProviderOptions CreateExternalOptions() => new()
     {
         Provider = AiProviderNames.External,

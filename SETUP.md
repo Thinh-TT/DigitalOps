@@ -390,6 +390,22 @@ npm.cmd run build
 npm.cmd audit --audit-level=moderate
 ```
 
+### Live smoke AI review (opt-in)
+
+Smoke này dùng provider Development, Ollama embedding, Qdrant và PostgreSQL thực.
+Nó tạo dữ liệu synthetic, xác nhận nhánh deterministic `Rule/Failed` và nhánh
+`Hybrid/Passed`, sau đó xóa đúng outgoing, review history, template/type và FormatRule
+point đã tạo. Chưa bao giờ chạy trong suite mặc định:
+
+```powershell
+$env:DIGITALOPS_RUN_AI_REVIEW_SMOKE = "1"
+dotnet test DigitalOps.API.Tests/DigitalOps.API.Tests.csproj --no-restore --filter "Category=LiveAiReview"
+Remove-Item Env:DIGITALOPS_RUN_AI_REVIEW_SMOKE
+```
+
+Chỉ chạy khi connection string Development, Qdrant API key và provider đã được cấu hình;
+không ghi prompt thô, API key hay dữ liệu cảm vào evidence.
+
 ## 11. Xử lý lỗi thường gặp
 
 ### Web hiển thị `Bad Gateway`

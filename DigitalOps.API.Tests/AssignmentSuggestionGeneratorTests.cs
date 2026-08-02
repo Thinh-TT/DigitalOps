@@ -261,6 +261,25 @@ public sealed class AssignmentSuggestionGeneratorTests
             string documentTypeCode,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TemplateKnowledgeCandidate>>([]);
+
+        public Task<IReadOnlyList<FormatRuleKnowledgeState>> GetFormatRuleStatesAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<FormatRuleKnowledgeState>>([]);
+
+        public Task UpsertFormatRulePointsAsync(
+            IReadOnlyList<FormatRuleKnowledgePoint> points,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task DeleteFormatRulePointsAsync(
+            IReadOnlyList<Guid> pointIds,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<FormatRuleKnowledgeCandidate>> SearchFormatRulesAsync(
+            float[] queryVector,
+            Guid templateId,
+            string documentTypeCode,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<FormatRuleKnowledgeCandidate>>([]);
     }
 
     private sealed class GeneratorDatabase(

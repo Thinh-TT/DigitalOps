@@ -441,6 +441,207 @@ public sealed class QdrantKnowledgeClient(
         return candidates;
     }
 
+    public async Task<IReadOnlyList<FormatRuleKnowledgeState>> GetFormatRuleStatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var states = new List<FormatRuleKnowledgeState>();
+        JsonElement? offset = null;
+
+        do
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["filter"] = new
+                {
+                    must = new[]
+                    {
+                        new
+                        {
+                            key = "sourceType",
+                            match = new { value = "FormatRule" }
+                        }
+                    }
+                },
+                ["limit"] = 100,
+                ["with_payload"] = true,
+                ["with_vector"] = false
+            };
+            if (offset is not null)
+            {
+                payload["offset"] = offset.Value;
+            }
+
+            using var response = await SendAsync(
+                HttpMethod.Post,
+                $"{CollectionPath()}/points/scroll",
+                payload,
+                cancellationToken);
+            using var document = await ReadJsonAsync(response, cancellationToken);
+            var result = GetRequiredProperty(document.RootElement, "result");
+            foreach (var point in GetRequiredProperty(result, "points").EnumerateArray())
+            {
+                var pointPayload = GetRequiredProperty(point, "payload");
+                if (!TryReadGuid(point, "id", out var pointId)
+                    || !TryReadGuid(pointPayload, "sourceId", out var templateId)
+                    || !TryReadString(pointPayload, "sourceVersion", out var sourceVersion)
+                    || !TryReadString(pointPayload, "chunkId", out var chunkId)
+                    || !TryReadString(pointPayload, "contentHash", out var contentHash))
+                {
+                    throw new AiProviderException("Qdrant returned an invalid FormatRule point.");
+                }
+
+                states.Add(new FormatRuleKnowledgeState(
+                    pointId,
+                    templateId,
+                    sourceVersion,
+                    chunkId,
+                    contentHash));
+            }
+
+            offset = result.TryGetProperty("next_page_offset", out var nextOffset)
+                && nextOffset.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
+                    ? nextOffset.Clone()
+                    : null;
+        }
+        while (offset is not null);
+
+        return states;
+    }
+
+    public async Task UpsertFormatRulePointsAsync(
+        IReadOnlyList<FormatRuleKnowledgePoint> points,
+        CancellationToken cancellationToken = default)
+    {
+        if (points.Count == 0)
+        {
+            return;
+        }
+
+        using var response = await SendAsync(
+            HttpMethod.Put,
+            $"{CollectionPath()}/points?wait=true",
+            new
+            {
+                points = points.Select(point => new
+                {
+                    id = point.PointId,
+                    vector = point.Vector,
+                    payload = new
+                    {
+                        sourceType = "FormatRule",
+                        sourceId = point.TemplateId,
+                        documentTypeCode = point.DocumentTypeCode,
+                        ruleCode = point.RuleCode,
+                        sourceVersion = point.SourceVersion,
+                        chunkId = point.ChunkId,
+                        contentHash = point.ContentHash,
+                        content = point.Content,
+                        isActive = true,
+                        accessScope = "Internal",
+                        indexedAtUtc = point.IndexedAtUtc
+                    }
+                })
+            },
+            cancellationToken);
+
+        logger.LogInformation(
+            "Qdrant FormatRule knowledge synchronized: {UpsertedCount} points upserted",
+            points.Count);
+    }
+
+    public async Task DeleteFormatRulePointsAsync(
+        IReadOnlyList<Guid> pointIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (pointIds.Count == 0)
+        {
+            return;
+        }
+
+        using var response = await SendAsync(
+            HttpMethod.Post,
+            $"{CollectionPath()}/points/delete?wait=true",
+            new { points = pointIds },
+            cancellationToken);
+
+        logger.LogInformation(
+            "Qdrant FormatRule knowledge synchronized: {DeletedCount} stale points deleted",
+            pointIds.Count);
+    }
+
+    public async Task<IReadOnlyList<FormatRuleKnowledgeCandidate>> SearchFormatRulesAsync(
+        float[] queryVector,
+        Guid templateId,
+        string documentTypeCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (queryVector.Length != VectorDimensions)
+        {
+            throw new AiProviderException(
+                $"Qdrant query vector dimension must be {VectorDimensions}.");
+        }
+
+        using var response = await SendAsync(
+            HttpMethod.Post,
+            $"{CollectionPath()}/points/query",
+            new
+            {
+                query = queryVector,
+                filter = new
+                {
+                    must = new object[]
+                    {
+                        new { key = "sourceType", match = new { value = "FormatRule" } },
+                        new { key = "sourceId", match = new { value = templateId } },
+                        new { key = "documentTypeCode", match = new { value = documentTypeCode } },
+                        new { key = "isActive", match = new { value = true } },
+                        new { key = "accessScope", match = new { value = "Internal" } }
+                    }
+                },
+                score_threshold = _options.MinScore,
+                limit = SearchLimit,
+                with_payload = true,
+                with_vector = false
+            },
+            cancellationToken);
+        using var document = await ReadJsonAsync(response, cancellationToken);
+        var points = GetRequiredProperty(
+            GetRequiredProperty(document.RootElement, "result"),
+            "points");
+        var candidates = new List<FormatRuleKnowledgeCandidate>();
+
+        foreach (var point in points.EnumerateArray())
+        {
+            var payload = GetRequiredProperty(point, "payload");
+            if (!TryReadGuid(point, "id", out var pointId)
+                || !TryReadGuid(payload, "sourceId", out var returnedTemplateId)
+                || !TryReadString(payload, "documentTypeCode", out var returnedDocumentTypeCode)
+                || !TryReadString(payload, "ruleCode", out var ruleCode)
+                || !TryReadString(payload, "sourceVersion", out var sourceVersion)
+                || !TryReadString(payload, "chunkId", out var chunkId)
+                || !TryReadString(payload, "contentHash", out var contentHash)
+                || !TryReadString(payload, "content", out var content)
+                || !point.TryGetProperty("score", out var scoreElement)
+                || !scoreElement.TryGetDouble(out var score))
+            {
+                throw new AiProviderException("Qdrant returned an invalid FormatRule point.");
+            }
+
+            candidates.Add(new FormatRuleKnowledgeCandidate(
+                pointId,
+                returnedTemplateId,
+                returnedDocumentTypeCode,
+                ruleCode,
+                sourceVersion,
+                chunkId,
+                contentHash,
+                content,
+                score));
+        }
+
+        return candidates;
+    }
+
     private async Task ValidateCollectionAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)

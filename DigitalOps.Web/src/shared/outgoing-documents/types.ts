@@ -10,6 +10,20 @@ export interface OutgoingIncomingReference { id: string; referenceNumber: string
 export interface OutgoingMemberReference { id: string; fullName: string; position: string | null; }
 export type OutgoingStaffReference = IncomingStaffReference;
 export interface ReviewIssueResponse { ruleCode: string; severity: string; message: string; location: string | null; }
+export type ReviewSource = "Rule" | "AI" | "Hybrid";
+export type ReviewResult = "Failed" | "Passed";
+export interface ReviewResponse {
+  id: string;
+  outgoingDocumentId: string;
+  attemptNo: number;
+  reviewSource: ReviewSource;
+  reviewedByStaff: OutgoingStaffReference | null;
+  contentSnapshot: string;
+  reviewResult: ReviewResult;
+  reviewIssues: ReviewIssueResponse[];
+  reviewedAt: string;
+  documentStatus: OutgoingDocumentStatus;
+}
 
 export interface OutgoingDocumentResponse {
   id: string;
@@ -46,6 +60,11 @@ export interface OutgoingDocumentUpdateRequest {
 
 export interface AiDraftRequest {
   instruction?: string;
+}
+
+export interface ReviewListParameters {
+  page?: number;
+  pageSize?: number;
 }
 
 export interface OutgoingDocumentListParameters {

@@ -3,7 +3,7 @@ import {
   ReloadOutlined, SearchOutlined, UploadOutlined,
 } from "@ant-design/icons";
 import {
-  Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Popconfirm,
+  Alert, Button, Card, Descriptions, Empty, Form, Input, List, Modal, Popconfirm,
   Select, Space, Table, Tabs, Tag, Typography, Upload,
   type FormInstance, type TableProps, type UploadProps,
 } from "antd";
@@ -20,12 +20,13 @@ import { getMemberLookup } from "../shared/members/member-service";
 import type { MemberLookupResponse } from "../shared/members/types";
 import {
   createOutgoingDocument, deleteOutgoingAttachment, downloadOutgoingAttachment,
-  generateOutgoingAiDraft, getOutgoingDocument, getOutgoingDocuments,
+  createOutgoingReview, generateOutgoingAiDraft, getOutgoingDocument, getOutgoingDocuments,
+  getOutgoingReviews,
   updateOutgoingDocument, uploadOutgoingAttachment,
 } from "../shared/outgoing-documents/outgoing-document-service";
 import type {
   OutgoingDocumentCreateRequest, OutgoingDocumentListParameters,
-  OutgoingDocumentResponse, OutgoingDocumentStatus,
+  OutgoingDocumentResponse, OutgoingDocumentStatus, ReviewResponse,
 } from "../shared/outgoing-documents/types";
 
 type OutgoingFilters = Pick<OutgoingDocumentListParameters, "q" | "templateId" | "status" | "dateFrom" | "dateTo">;
@@ -110,11 +111,19 @@ export function OutgoingDocumentDetailPage() {
   const [instruction, setInstruction] = useState("");
   const [uploading, setUploading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<PagedResponse<ReviewResponse> | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(true);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const canEdit = !!outgoing
     && isOutgoingEditable(outgoing.status)
     && outgoing.draftedByStaff.id === currentUser?.staff.id
     && (currentUser?.roles.includes("Drafter") ?? false);
-  const canEditAttachments = canEdit;
+  const canEditAttachments = canEdit && !reviewing;
+  const canReview = !!outgoing
+    && (outgoing.status === "Editing" || outgoing.status === "ReviewFailed")
+    && outgoing.draftedByStaff.id === currentUser?.staff.id
+    && (currentUser?.roles.includes("Drafter") ?? false);
 
   const applyDocument = useCallback((document: OutgoingDocumentResponse, preserveEditor = false) => {
     setOutgoing(document);
@@ -136,6 +145,19 @@ export function OutgoingDocumentDetailPage() {
       .finally(() => setLoading(false));
   }, [applyDocument, id]);
 
+  const loadReviews = useCallback(async (page = 1) => {
+    if (!id) return;
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      setReviews(await getOutgoingReviews(id, { page, pageSize: 20 }));
+    } catch (e) {
+      setReviewError(errorMessage(e, "Không thể tải lịch sử thẩm định."));
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (!id) return;
     let ignored = false;
@@ -153,6 +175,12 @@ export function OutgoingDocumentDetailPage() {
     })();
     return () => { ignored = true; };
   }, [applyDocument, id]);
+
+  useEffect(() => {
+    void (async () => {
+      await loadReviews();
+    })();
+  }, [loadReviews]);
 
   const save = async (values: OutgoingEditValues) => {
     if (!id) return;
@@ -206,6 +234,33 @@ export function OutgoingDocumentDetailPage() {
       setError(errorMessage(e, "Không thể sinh nháp AI."));
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!id) return;
+    if (form.isFieldsTouched(["title", "content"])) {
+      setError("Vui lòng lưu thay đổi tiêu đề và nội dung trước khi gửi thẩm định.");
+      return;
+    }
+
+    setReviewing(true);
+    setError(null);
+    try {
+      const review = await createOutgoingReview(id);
+      setOutgoing(current => current && {
+        ...current,
+        status: review.documentStatus,
+        reviewIssues: review.reviewIssues,
+      });
+      await loadReviews(1);
+      setSuccess(review.reviewResult === "Passed"
+        ? "Văn bản đã đạt thẩm định và được chuyển chờ duyệt."
+        : "Thẩm định chưa đạt. Vui lòng chỉnh sửa các lỗi thể thức.");
+    } catch (e) {
+      setError(errorMessage(e, "Không thể gửi thẩm định."));
+    } finally {
+      setReviewing(false);
     }
   };
 
@@ -280,14 +335,14 @@ export function OutgoingDocumentDetailPage() {
       <Card title="Soạn thảo">
         <Form<OutgoingEditValues> form={form} layout="vertical" onFinish={values => void save(values)}>
           <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, whitespace: true, message: "Vui lòng nhập tiêu đề." }, { max: 500, message: "Tiêu đề không quá 500 ký tự." }]}>
-            <Input readOnly={!canEdit} maxLength={500} />
+            <Input readOnly={!canEdit || reviewing} maxLength={500} />
           </Form.Item>
           <Tabs items={[
             {
               key: "content",
               label: "Nội dung hiện tại",
               children: <Form.Item name="content" label="Nội dung" rules={[{ required: true, whitespace: true, message: "Vui lòng nhập nội dung văn bản." }]}>
-                <Input.TextArea aria-label="Nội dung hiện tại" readOnly={!canEdit} autoSize={{ minRows: 14, maxRows: 28 }} />
+                <Input.TextArea aria-label="Nội dung hiện tại" readOnly={!canEdit || reviewing} autoSize={{ minRows: 14, maxRows: 28 }} />
               </Form.Item>,
             },
             {
@@ -299,10 +354,37 @@ export function OutgoingDocumentDetailPage() {
             },
           ]} />
           {canEdit && <Space>
-            <Button type="primary" htmlType="submit" loading={saving} disabled={generating}>Lưu</Button>
-            <Button onClick={openAiModal} loading={generating} disabled={saving}>Sinh nháp AI</Button>
+            <Button type="primary" htmlType="submit" loading={saving} disabled={generating || reviewing}>Lưu</Button>
+            <Button onClick={openAiModal} loading={generating} disabled={saving || reviewing}>Sinh nháp AI</Button>
           </Space>}
         </Form>
+      </Card>
+      <Card
+        title="Thẩm định và lịch sử review"
+        extra={canReview && <Button type="primary" loading={reviewing} disabled={saving || generating} onClick={() => void submitReview()}>Gửi thẩm định</Button>}
+      >
+        <Typography.Text strong>Kết quả gần nhất</Typography.Text>
+        {outgoing.reviewIssues.length === 0
+          ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có lỗi thể thức ở lần review gần nhất." />
+          : <List size="small" dataSource={outgoing.reviewIssues} renderItem={issue => <List.Item><Space wrap><ReviewSeverityTag severity={issue.severity} /><Typography.Text code>{issue.ruleCode}</Typography.Text><Typography.Text>{issue.message}</Typography.Text>{issue.location && <Typography.Text type="secondary">{issue.location}</Typography.Text>}</Space></List.Item>} />}
+        {reviewError && <Alert className="review-history-error" type="error" showIcon title={reviewError} action={<Button size="small" onClick={() => void loadReviews(reviews?.page ?? 1)}>Thử lại</Button>} />}
+        <Table<ReviewResponse>
+          className="review-history-table"
+          size="small"
+          rowKey="id"
+          loading={reviewLoading}
+          dataSource={reviews?.items ?? []}
+          locale={{ emptyText: <Empty description="Chưa có lượt thẩm định nào." /> }}
+          columns={[
+            { title: "Lần", dataIndex: "attemptNo", width: 70 },
+            { title: "Kết quả", dataIndex: "reviewResult", width: 120, render: (result: ReviewResponse["reviewResult"]) => <ReviewResultTag result={result} /> },
+            { title: "Nguồn", dataIndex: "reviewSource", width: 110, render: (source: ReviewResponse["reviewSource"]) => <ReviewSourceTag source={source} /> },
+            { title: "Người gửi", key: "reviewedByStaff", render: (_, review) => review.reviewedByStaff?.fullName ?? "Hệ thống" },
+            { title: "Thời điểm", dataIndex: "reviewedAt", width: 170, render: formatDateTime },
+          ]}
+          expandable={{ expandedRowRender: review => <Space className="review-history-detail" orientation="vertical" size="middle"><div><Typography.Text strong>Nội dung tại thời điểm thẩm định</Typography.Text><pre className="document-content-preview">{review.contentSnapshot}</pre></div><div><Typography.Text strong>Issues</Typography.Text>{review.reviewIssues.length === 0 ? <Typography.Text type="secondary">Không có issue.</Typography.Text> : <List size="small" dataSource={review.reviewIssues} renderItem={issue => <List.Item><Space wrap><ReviewSeverityTag severity={issue.severity} /><Typography.Text code>{issue.ruleCode}</Typography.Text><Typography.Text>{issue.message}</Typography.Text>{issue.location && <Typography.Text type="secondary">{issue.location}</Typography.Text>}</Space></List.Item>} />}</div></Space> }}
+          pagination={{ current: reviews?.page ?? 1, pageSize: reviews?.pageSize ?? 20, total: reviews?.totalCount ?? 0, showSizeChanger: false, onChange: page => void loadReviews(page) }}
+        />
       </Card>
       <Card title="File đính kèm" extra={canEditAttachments && <Upload {...uploadProps}><Button icon={<UploadOutlined />} loading={uploading}>Thêm file</Button></Upload>}>
         {outgoing.attachments.length === 0 ? <Empty description="Chưa có file đính kèm." /> : <Table<AttachmentResponse> size="small" rowKey="id" pagination={false} dataSource={outgoing.attachments} columns={[
@@ -330,6 +412,9 @@ export function OutgoingDocumentDetailPage() {
 }
 
 function OutgoingStatusTag({ status }: { status: OutgoingDocumentStatus }) { const option = statuses.find(x => x.value === status); return <Tag color={status === "Editing" ? "processing" : status === "Approved" ? "success" : "default"}>{option?.label ?? status}</Tag>; }
+function ReviewSeverityTag({ severity }: { severity: string }) { return <Tag color={severity === "Error" ? "error" : severity === "Warning" ? "warning" : "blue"}>{severity}</Tag>; }
+function ReviewResultTag({ result }: { result: ReviewResponse["reviewResult"] }) { return <Tag color={result === "Passed" ? "success" : "error"}>{result === "Passed" ? "Đạt" : "Chưa đạt"}</Tag>; }
+function ReviewSourceTag({ source }: { source: ReviewResponse["reviewSource"] }) { const labels = { Rule: "Rule", AI: "AI", Hybrid: "Hybrid" }; return <Tag>{labels[source]}</Tag>; }
 function isOutgoingEditable(status: OutgoingDocumentStatus) { return status === "AiDraft" || status === "Editing" || status === "ReviewFailed"; }
 function readFilters(params: URLSearchParams): OutgoingFilters { const status = statuses.some(x => x.value === params.get("status")) ? params.get("status") as OutgoingDocumentStatus : undefined; return { q: params.get("q") ?? "", templateId: params.get("templateId") ?? undefined, status, dateFrom: params.get("dateFrom") ?? undefined, dateTo: params.get("dateTo") ?? undefined }; }
 function toParams(filters: OutgoingFilters, page: number, pageSize: number) { const p = new URLSearchParams(); for (const [k, v] of Object.entries(filters)) if (v) p.set(k, v); if (page > 1) p.set("page", String(page)); if (pageSize !== 20) p.set("pageSize", String(pageSize)); return p; }
