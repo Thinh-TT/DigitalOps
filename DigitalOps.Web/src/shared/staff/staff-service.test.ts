@@ -1,6 +1,7 @@
 import { writeSession } from "../auth/session-store";
 import {
   createStaff,
+  getAllActiveStaff,
   getStaffList,
   replaceStaffRoles,
   resetStaffPassword,
@@ -104,6 +105,36 @@ describe("staff-service", () => {
       {
         temporaryPassword: "Temporary2!Password",
       },
+    );
+  });
+
+  it("loads every page of the active Staff directory", async () => {
+    writeValidSession();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{ ...staffResponse(), id: "staff-1" }],
+        page: 1,
+        pageSize: 100,
+        totalCount: 2,
+        totalPages: 2,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{ ...staffResponse(), id: "staff-2" }],
+        page: 2,
+        pageSize: 100,
+        totalCount: 2,
+        totalPages: 2,
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getAllActiveStaff();
+
+    expect(result.map((staff) => staff.id)).toEqual(["staff-1", "staff-2"]);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/v1/staff?activeOnly=true&page=1&pageSize=100",
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/v1/staff?activeOnly=true&page=2&pageSize=100",
     );
   });
 });

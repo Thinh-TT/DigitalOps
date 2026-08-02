@@ -198,6 +198,15 @@ select {
   margin-top: 20px;
 }
 
+.assignment-controls {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.assignment-controls .ant-select {
+  width: 100%;
+}
+
 .attachment-table {
   margin-bottom: 12px;
 }

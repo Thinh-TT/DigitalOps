@@ -82,6 +82,7 @@ builder.Services.AddScoped<IMemberImportService, MemberImportService>();
 builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
 builder.Services.AddScoped<IDocumentCatalogService, DocumentCatalogService>();
 builder.Services.AddScoped<IIncomingDocumentService, IncomingDocumentService>();
+builder.Services.AddScoped<IAssignmentSuggestionGenerator, AssignmentSuggestionGenerator>();
 builder.Services.AddScoped<IOutgoingDocumentService, OutgoingDocumentService>();
 builder.Services
     .AddOptions<ReminderWorkerOptions>()
@@ -172,13 +173,14 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 var aiOptions = app.Services.GetRequiredService<IOptions<AiProviderOptions>>().Value;
 app.Logger.LogInformation(
-    "AI provider configured: {Provider}/{Model}; embedding: {EmbeddingProvider}/{EmbeddingModel}; automatic fallback: {AutomaticFallback}",
+    "AI provider configured: {Provider}/{Model}; embedding: {EmbeddingProvider}/{EmbeddingModel}; Qdrant collection: {QdrantCollection}; automatic fallback: {AutomaticFallback}",
     aiOptions.Provider,
     string.Equals(aiOptions.Provider, AiProviderNames.External, StringComparison.OrdinalIgnoreCase)
         ? aiOptions.External.Model
         : aiOptions.Ollama.LlmModel,
     aiOptions.Embedding.Provider,
     aiOptions.Embedding.Model,
+    aiOptions.Qdrant.CollectionName,
     aiOptions.AutomaticFallback);
 
 app.UseExceptionHandler();

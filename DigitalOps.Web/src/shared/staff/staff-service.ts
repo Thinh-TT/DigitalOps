@@ -30,6 +30,25 @@ export function getStaffList(
   return apiRequest<PagedResponse<StaffResponse>>(`/staff${suffix}`);
 }
 
+export async function getAllActiveStaff(): Promise<StaffResponse[]> {
+  const staff: StaffResponse[] = [];
+  let page = 1;
+
+  while (true) {
+    const response = await getStaffList({
+      activeOnly: true,
+      page,
+      pageSize: 100,
+    });
+    staff.push(...response.items);
+    if (page >= response.totalPages) {
+      return staff;
+    }
+
+    page += 1;
+  }
+}
+
 export function getStaff(id: string): Promise<StaffResponse> {
   return apiRequest<StaffResponse>(`/staff/${id}`);
 }

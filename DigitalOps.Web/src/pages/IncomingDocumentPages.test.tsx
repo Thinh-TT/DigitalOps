@@ -12,6 +12,8 @@ import * as catalogService from "../shared/document-catalog/document-catalog-ser
 import type { DocumentTypeResponse } from "../shared/document-catalog/types";
 import * as incomingService from "../shared/incoming-documents/incoming-document-service";
 import type { IncomingDocumentResponse } from "../shared/incoming-documents/types";
+import * as staffService from "../shared/staff/staff-service";
+import type { StaffResponse } from "../shared/staff/types";
 import {
   IncomingDocumentCreatePage,
   IncomingDocumentDetailPage,
@@ -20,8 +22,10 @@ import {
 
 vi.mock("../shared/document-catalog/document-catalog-service");
 vi.mock("../shared/incoming-documents/incoming-document-service");
+vi.mock("../shared/staff/staff-service");
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(catalogService.getAllDocumentTypes).mockResolvedValue([createType()]);
   vi.mocked(incomingService.getIncomingDocuments).mockResolvedValue({
     items: [],
@@ -31,6 +35,7 @@ beforeEach(() => {
     totalPages: 0,
   });
   vi.mocked(incomingService.deleteAttachment).mockResolvedValue(undefined);
+  vi.mocked(staffService.getAllActiveStaff).mockResolvedValue([createStaff()]);
 });
 
 describe("Incoming document pages", () => {
@@ -146,6 +151,120 @@ describe("Incoming document pages", () => {
     expect(screen.getByText(/Chưa có gợi ý hoặc phân công/)).toBeInTheDocument();
     expect(screen.getByText(/Chưa có file đính kèm/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Thêm file$/ })).not.toBeInTheDocument();
+    expect(staffService.getAllActiveStaff).not.toHaveBeenCalled();
+  });
+
+  it("lets Clerk request an AI suggestion and explicitly confirm assignment", async () => {
+    const user = userEvent.setup();
+    const original = createIncoming();
+    const suggestedStaff = {
+      id: "suggested-staff",
+      fullName: "Trần Thị Tuyên",
+      position: "Cán bộ tuyên truyền",
+      department: "Ban Tuyên giáo",
+    };
+    vi.mocked(staffService.getAllActiveStaff).mockResolvedValue([
+      createStaff({
+        id: suggestedStaff.id,
+        fullName: suggestedStaff.fullName,
+        position: suggestedStaff.position,
+        department: suggestedStaff.department,
+      }),
+    ]);
+    vi.mocked(incomingService.getIncomingDocument).mockResolvedValue(original);
+    vi.mocked(incomingService.suggestIncomingDocumentAssignment).mockResolvedValue({
+      incomingDocumentId: original.id,
+      suggestedStaff,
+      reason: "Phù hợp lĩnh vực tuyên truyền.",
+      confidence: null,
+      suggestedAt: "2026-08-02T08:00:00Z",
+    });
+    vi.mocked(incomingService.confirmIncomingDocumentAssignment).mockResolvedValue({
+      ...original,
+      suggestedStaff,
+      assignmentSuggestionReason: "Phù hợp lĩnh vực tuyên truyền.",
+      assignmentSuggestedAt: "2026-08-02T08:00:00Z",
+      assignedToStaff: suggestedStaff,
+      assignmentConfirmedBy: {
+        id: "current-staff",
+        fullName: "Nguyễn Văn A",
+        position: "Chuyên viên",
+        department: "Văn phòng",
+      },
+      assignmentConfirmedAt: "2026-08-02T08:01:00Z",
+      status: "InProgress",
+    });
+    renderIncomingRoute(
+      `/incoming-documents/${original.id}`,
+      "/incoming-documents/:id",
+      <IncomingDocumentDetailPage />,
+      ["Clerk"],
+    );
+
+    await user.click(await screen.findByRole("button", { name: /AI gợi ý$/ }));
+    await waitFor(() => expect(
+      incomingService.suggestIncomingDocumentAssignment,
+    ).toHaveBeenCalledWith(original.id));
+    expect(await screen.findByText("Phù hợp lĩnh vực tuyên truyền.")).toBeInTheDocument();
+    expect(screen.getAllByText(/Trần Thị Tuyên/).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /^Xác nhận$/ }));
+    await waitFor(() => expect(
+      incomingService.confirmIncomingDocumentAssignment,
+    ).toHaveBeenCalledWith(original.id, {
+      assignedToStaffId: suggestedStaff.id,
+    }));
+    expect(await screen.findByText("Đã xác nhận điều phối.")).toBeInTheDocument();
+    expect(screen.getByText("Đang xử lý")).toBeInTheDocument();
+  });
+
+  it("keeps manual assignment available when AI returns 503", async () => {
+    const user = userEvent.setup();
+    const original = createIncoming();
+    vi.mocked(incomingService.getIncomingDocument).mockResolvedValue(original);
+    vi.mocked(incomingService.suggestIncomingDocumentAssignment).mockRejectedValue(
+      new ApiError(503, {
+        status: 503,
+        detail: "Dịch vụ AI hiện không khả dụng. Bạn vẫn có thể chọn thủ công.",
+      }),
+    );
+    renderIncomingRoute(
+      `/incoming-documents/${original.id}`,
+      "/incoming-documents/:id",
+      <IncomingDocumentDetailPage />,
+      ["Clerk"],
+    );
+
+    await user.click(await screen.findByRole("button", { name: /AI gợi ý$/ }));
+
+    expect(await screen.findByText(/Dịch vụ AI hiện không khả dụng/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Cán bộ xử lý")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Xác nhận$/ })).toBeDisabled();
+  });
+
+  it("shows insufficient evidence without blocking manual assignment", async () => {
+    const user = userEvent.setup();
+    const original = createIncoming();
+    vi.mocked(incomingService.getIncomingDocument).mockResolvedValue(original);
+    vi.mocked(incomingService.suggestIncomingDocumentAssignment).mockResolvedValue({
+      incomingDocumentId: original.id,
+      suggestedStaff: null,
+      reason: "Không có cán bộ active đạt ngưỡng bằng chứng.",
+      confidence: null,
+      suggestedAt: null,
+    });
+    renderIncomingRoute(
+      `/incoming-documents/${original.id}`,
+      "/incoming-documents/:id",
+      <IncomingDocumentDetailPage />,
+      ["Clerk"],
+    );
+
+    await user.click(await screen.findByRole("button", { name: /AI gợi ý$/ }));
+
+    expect(await screen.findByText("Chưa đủ bằng chứng để gợi ý")).toBeInTheDocument();
+    expect(screen.getByText("Không có cán bộ active đạt ngưỡng bằng chứng.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Cán bộ xử lý")).toBeInTheDocument();
   });
 
   it("lets Clerk upload and download attachments while updating metadata", async () => {
@@ -381,6 +500,24 @@ function createAttachment(
     uploadedAt: "2026-07-31T09:00:00Z",
     extractionStatus: "Pending",
     extractedAt: null,
+    ...overrides,
+  };
+}
+
+function createStaff(overrides: Partial<StaffResponse> = {}): StaffResponse {
+  return {
+    id: "active-staff",
+    identityUserId: "active-user",
+    userName: "active.staff",
+    fullName: "Cán bộ active",
+    position: "Chuyên viên",
+    department: "Văn phòng",
+    email: "active@example.local",
+    phone: null,
+    isActive: true,
+    roles: ["Drafter"],
+    createdAt: "2026-08-01T00:00:00Z",
+    updatedAt: "2026-08-01T00:00:00Z",
     ...overrides,
   };
 }

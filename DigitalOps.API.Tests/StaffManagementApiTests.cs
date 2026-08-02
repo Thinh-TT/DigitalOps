@@ -5,6 +5,7 @@ using System.Text.Json;
 using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
+using DigitalOps.API.Features.IncomingDocuments;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
@@ -440,6 +441,8 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
         _connection.Open();
     }
 
+    internal AssignmentSuggestionTestDouble AssignmentSuggestionGenerator { get; } = new();
+
     public HttpClient CreateApiClient() =>
         CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -470,6 +473,9 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
 
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<IAssignmentSuggestionGenerator>();
+            services.AddSingleton<IAssignmentSuggestionGenerator>(
+                AssignmentSuggestionGenerator);
             services.RemoveAll<DbContextOptions<DigitalOpsDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<DigitalOpsDbContext>>();
             services.AddDbContext<DigitalOpsDbContext>(

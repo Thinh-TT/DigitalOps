@@ -170,6 +170,16 @@ public sealed record IncomingStaffReference(
     string? Position,
     string? Department);
 
+public sealed record AssignmentSuggestionResponse(
+    Guid IncomingDocumentId,
+    IncomingStaffReference? SuggestedStaff,
+    string? Reason,
+    decimal? Confidence,
+    DateTime? SuggestedAt);
+
+public sealed record AssignmentConfirmRequest(
+    Guid AssignedToStaffId);
+
 public sealed record IncomingDocumentResponse(
     Guid Id,
     string ReferenceNumber,

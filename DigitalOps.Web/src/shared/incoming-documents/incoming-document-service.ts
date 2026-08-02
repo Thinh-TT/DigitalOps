@@ -10,6 +10,8 @@ import type {
   IncomingDocumentResponse,
   IncomingDocumentUpdateRequest,
   AttachmentResponse,
+  AssignmentConfirmRequest,
+  AssignmentSuggestionResponse,
 } from "./types";
 
 export function getIncomingDocuments(
@@ -51,6 +53,25 @@ export function completeIncomingDocument(
   return apiRequest<IncomingDocumentResponse>(
     `/incoming-documents/${id}/complete`,
     { method: "POST" },
+  );
+}
+
+export function suggestIncomingDocumentAssignment(
+  id: string,
+): Promise<AssignmentSuggestionResponse> {
+  return apiRequest<AssignmentSuggestionResponse>(
+    `/incoming-documents/${id}/assignment-suggestion`,
+    { method: "POST" },
+  );
+}
+
+export function confirmIncomingDocumentAssignment(
+  id: string,
+  request: AssignmentConfirmRequest,
+): Promise<IncomingDocumentResponse> {
+  return apiRequest<IncomingDocumentResponse>(
+    `/incoming-documents/${id}/assignment`,
+    { method: "POST", body: JSON.stringify(request) },
   );
 }
 

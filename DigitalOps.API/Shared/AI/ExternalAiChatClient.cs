@@ -24,13 +24,16 @@ public sealed class ExternalAiChatClient(
     {
         var stopwatch = Stopwatch.StartNew();
         var requestSettings = AiRequestSettings.Resolve(request.Operation, _options);
-        var payload = new
-        {
-            model = _options.External.Model,
-            messages = request.Messages,
-            temperature = requestSettings.Temperature,
-            max_tokens = requestSettings.MaxOutputTokens,
-            response_format = new
+        var useJsonObjectMode = string.Equals(
+            _options.External.StructuredOutputMode,
+            ExternalStructuredOutputModes.JsonObject,
+            StringComparison.OrdinalIgnoreCase);
+        var messages = useJsonObjectMode
+            ? BuildJsonObjectMessages(request)
+            : request.Messages;
+        object responseFormat = useJsonObjectMode
+            ? new { type = "json_object" }
+            : new
             {
                 type = "json_schema",
                 json_schema = new
@@ -39,8 +42,20 @@ public sealed class ExternalAiChatClient(
                     strict = true,
                     schema = request.Schema.Schema
                 }
-            }
+            };
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = _options.External.Model,
+            ["messages"] = messages,
+            ["temperature"] = requestSettings.Temperature,
+            ["max_tokens"] = requestSettings.MaxOutputTokens,
+            ["response_format"] = responseFormat
         };
+
+        if (_options.External.DisableThinking)
+        {
+            payload["thinking"] = new { type = "disabled" };
+        }
 
         using var httpRequest = new HttpRequestMessage(
             HttpMethod.Post,
@@ -111,6 +126,16 @@ public sealed class ExternalAiChatClient(
 
     private static Uri BuildUri(string baseUrl, string path) =>
         new($"{baseUrl.TrimEnd('/')}/{path.TrimStart('/')}");
+
+    private static IReadOnlyList<AiChatMessage> BuildJsonObjectMessages(
+        AiChatRequest request)
+    {
+        var instruction = $"Return exactly one JSON object for schema '{request.Schema.Name}'. "
+            + "Do not include markdown, explanations, or any text outside the JSON object. "
+            + $"The JSON object must match this schema: {request.Schema.Schema.GetRawText()}";
+
+        return [new AiChatMessage("system", instruction), .. request.Messages];
+    }
 
     private sealed record ExternalChatResponse(
         [property: JsonPropertyName("choices")] IReadOnlyList<ExternalChoice>? Choices,

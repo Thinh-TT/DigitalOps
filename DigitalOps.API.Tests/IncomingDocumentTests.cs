@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
+using DigitalOps.API.Shared.AI;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
@@ -11,6 +12,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalOps.API.Tests;
 
@@ -228,6 +230,161 @@ public sealed class IncomingDocumentServiceTests
         Assert.Equal(IncomingDocumentFailure.Conflict, locked.Failure);
     }
 
+    [Fact]
+    public async Task Suggestion_replaces_only_suggestion_and_preserves_confirmed_assignment()
+    {
+        await using var database = await IncomingDocumentDatabase.CreateAsync();
+        var type = await database.CreateDocumentTypeAsync("REPORT", isActive: true);
+        var oldSuggestion = await database.CreateStaffAsync("Old suggestion");
+        var newSuggestion = await database.CreateStaffAsync("New suggestion");
+        var assigned = await database.CreateStaffAsync("Assigned staff");
+        var confirmer = await database.CreateStaffAsync("Confirming clerk");
+        var generator = new AssignmentSuggestionTestDouble
+        {
+            Handler = (_, _) => Task.FromResult(new AssignmentSuggestionDecision(
+                AssignmentSuggestionDecisionKind.Suggested,
+                newSuggestion.Id,
+                "Phù hợp lĩnh vực báo cáo."))
+        };
+        var service = database.CreateService(generator);
+        var created = (await service.CreateAsync(CreateRequest(type.Id))).Value!;
+        var entity = await database.Context.IncomingDocuments.SingleAsync(
+            document => document.Id == created.Id);
+        entity.SuggestedStaffId = oldSuggestion.Id;
+        entity.AssignmentSuggestionReason = "Gợi ý cũ";
+        entity.AssignmentSuggestedAt = CompletionTime.AddDays(-1).UtcDateTime;
+        entity.AssignedToStaffId = assigned.Id;
+        entity.AssignmentConfirmedByStaffId = confirmer.Id;
+        entity.AssignmentConfirmedAt = CompletionTime.AddHours(-1).UtcDateTime;
+        entity.Status = IncomingDocumentStatus.InProgress;
+        await database.Context.SaveChangesAsync();
+
+        var result = await service.SuggestAssignmentAsync(created.Id);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(newSuggestion.Id, result.Value!.SuggestedStaff!.Id);
+        Assert.Equal("Phù hợp lĩnh vực báo cáo.", result.Value.Reason);
+        Assert.Null(result.Value.Confidence);
+        Assert.Equal(CompletionTime.UtcDateTime, result.Value.SuggestedAt);
+        var persisted = await database.Context.IncomingDocuments
+            .AsNoTracking()
+            .SingleAsync(document => document.Id == created.Id);
+        Assert.Equal(newSuggestion.Id, persisted.SuggestedStaffId);
+        Assert.Equal(assigned.Id, persisted.AssignedToStaffId);
+        Assert.Equal(confirmer.Id, persisted.AssignmentConfirmedByStaffId);
+        Assert.Equal(IncomingDocumentStatus.InProgress, persisted.Status);
+        Assert.Equal(1, generator.CallCount);
+        Assert.Equal("REPORT", generator.LastInput!.DocumentTypeCode);
+    }
+
+    [Fact]
+    public async Task Insufficient_evidence_clears_previous_suggestion_without_assigning()
+    {
+        await using var database = await IncomingDocumentDatabase.CreateAsync();
+        var type = await database.CreateDocumentTypeAsync("REPORT", isActive: true);
+        var oldSuggestion = await database.CreateStaffAsync("Old suggestion");
+        var service = database.CreateService();
+        var created = (await service.CreateAsync(CreateRequest(type.Id))).Value!;
+        var entity = await database.Context.IncomingDocuments.SingleAsync(
+            document => document.Id == created.Id);
+        entity.SuggestedStaffId = oldSuggestion.Id;
+        entity.AssignmentSuggestionReason = "Gợi ý cũ";
+        entity.AssignmentConfidence = 0.75m;
+        entity.AssignmentSuggestedAt = CompletionTime.AddDays(-1).UtcDateTime;
+        await database.Context.SaveChangesAsync();
+
+        var result = await service.SuggestAssignmentAsync(created.Id);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Value!.SuggestedStaff);
+        Assert.Equal("Không đủ bằng chứng.", result.Value.Reason);
+        var persisted = await database.Context.IncomingDocuments
+            .AsNoTracking()
+            .SingleAsync(document => document.Id == created.Id);
+        Assert.Null(persisted.SuggestedStaffId);
+        Assert.Null(persisted.AssignmentSuggestionReason);
+        Assert.Null(persisted.AssignmentConfidence);
+        Assert.Null(persisted.AssignmentSuggestedAt);
+        Assert.Null(persisted.AssignedToStaffId);
+        Assert.Equal(IncomingDocumentStatus.New, persisted.Status);
+    }
+
+    [Fact]
+    public async Task Ai_failure_returns_unavailable_without_mutating_workflow()
+    {
+        await using var database = await IncomingDocumentDatabase.CreateAsync();
+        var type = await database.CreateDocumentTypeAsync("REPORT", isActive: true);
+        var oldSuggestion = await database.CreateStaffAsync("Old suggestion");
+        var generator = new AssignmentSuggestionTestDouble
+        {
+            Handler = (_, _) => throw new AiProviderException("provider unavailable")
+        };
+        var service = database.CreateService(generator);
+        var created = (await service.CreateAsync(CreateRequest(type.Id))).Value!;
+        var entity = await database.Context.IncomingDocuments.SingleAsync(
+            document => document.Id == created.Id);
+        entity.SuggestedStaffId = oldSuggestion.Id;
+        entity.AssignmentSuggestionReason = "Gợi ý đang lưu";
+        entity.AssignmentSuggestedAt = CompletionTime.AddHours(-1).UtcDateTime;
+        await database.Context.SaveChangesAsync();
+        var before = await database.Context.IncomingDocuments
+            .AsNoTracking()
+            .SingleAsync(document => document.Id == created.Id);
+
+        var result = await service.SuggestAssignmentAsync(created.Id);
+
+        Assert.Equal(IncomingDocumentFailure.ServiceUnavailable, result.Failure);
+        var after = await database.Context.IncomingDocuments
+            .AsNoTracking()
+            .SingleAsync(document => document.Id == created.Id);
+        Assert.Equal(before.SuggestedStaffId, after.SuggestedStaffId);
+        Assert.Equal(before.AssignmentSuggestionReason, after.AssignmentSuggestionReason);
+        Assert.Equal(before.AssignmentSuggestedAt, after.AssignmentSuggestedAt);
+        Assert.Equal(before.AssignedToStaffId, after.AssignedToStaffId);
+        Assert.Equal(before.Status, after.Status);
+    }
+
+    [Fact]
+    public async Task Confirm_assignment_requires_active_staff_and_preserves_overdue_on_reassignment()
+    {
+        await using var database = await IncomingDocumentDatabase.CreateAsync();
+        var type = await database.CreateDocumentTypeAsync("REPORT", isActive: true);
+        var firstAssignee = await database.CreateStaffAsync("First assignee");
+        var nextAssignee = await database.CreateStaffAsync("Next assignee");
+        var inactive = await database.CreateStaffAsync("Inactive staff", isActive: false);
+        var confirmer = await database.CreateStaffAsync("Confirming clerk");
+        var service = database.CreateService();
+        var created = (await service.CreateAsync(CreateRequest(type.Id))).Value!;
+
+        var inactiveResult = await service.ConfirmAssignmentAsync(
+            created.Id,
+            new AssignmentConfirmRequest(inactive.Id),
+            confirmer.Id);
+        Assert.Equal(IncomingDocumentFailure.Validation, inactiveResult.Failure);
+
+        var first = await service.ConfirmAssignmentAsync(
+            created.Id,
+            new AssignmentConfirmRequest(firstAssignee.Id),
+            confirmer.Id);
+        Assert.True(first.Succeeded);
+        Assert.Equal(IncomingDocumentStatus.InProgress, first.Value!.Status);
+        Assert.Equal(firstAssignee.Id, first.Value.AssignedToStaff!.Id);
+        Assert.Equal(confirmer.Id, first.Value.AssignmentConfirmedBy!.Id);
+
+        var entity = await database.Context.IncomingDocuments.SingleAsync(
+            document => document.Id == created.Id);
+        entity.Status = IncomingDocumentStatus.Overdue;
+        await database.Context.SaveChangesAsync();
+        var reassigned = await service.ConfirmAssignmentAsync(
+            created.Id,
+            new AssignmentConfirmRequest(nextAssignee.Id),
+            confirmer.Id);
+        Assert.True(reassigned.Succeeded);
+        Assert.Equal(IncomingDocumentStatus.Overdue, reassigned.Value!.Status);
+        Assert.Equal(nextAssignee.Id, reassigned.Value.AssignedToStaff!.Id);
+        Assert.Equal(CompletionTime.UtcDateTime, reassigned.Value.AssignmentConfirmedAt);
+    }
+
     private static IncomingDocumentCreateRequest CreateRequest(Guid documentTypeId) =>
         new()
         {
@@ -266,8 +423,13 @@ public sealed class IncomingDocumentServiceTests
             return new IncomingDocumentDatabase(connection, context);
         }
 
-        public IncomingDocumentService CreateService() =>
-            new(Context, new FixedTimeProvider(CompletionTime));
+        public IncomingDocumentService CreateService(
+            AssignmentSuggestionTestDouble? suggestionGenerator = null) =>
+            new(
+                Context,
+                new FixedTimeProvider(CompletionTime),
+                suggestionGenerator ?? new AssignmentSuggestionTestDouble(),
+                NullLogger<IncomingDocumentService>.Instance);
 
         public async Task<DocumentType> CreateDocumentTypeAsync(
             string code,
@@ -285,7 +447,9 @@ public sealed class IncomingDocumentServiceTests
             return documentType;
         }
 
-        public async Task<Staff> CreateStaffAsync(string fullName)
+        public async Task<Staff> CreateStaffAsync(
+            string fullName,
+            bool isActive = true)
         {
             var user = new ApplicationUser
             {
@@ -300,7 +464,7 @@ public sealed class IncomingDocumentServiceTests
                 IdentityUser = user,
                 FullName = fullName,
                 Email = user.Email!,
-                IsActive = true
+                IsActive = isActive
             };
             Context.Staff.Add(staff);
             await Context.SaveChangesAsync();
@@ -476,6 +640,71 @@ public sealed class IncomingDocumentApiTests
             HttpStatusCode.Forbidden,
             "forbidden",
             $"/api/v1/incoming-documents/{second.Id}/complete");
+    }
+
+    [Fact]
+    public async Task Assignment_endpoints_enforce_clerk_and_preserve_workflow_on_ai_failure()
+    {
+        using var factory = new StaffManagementApiFactory();
+        var type = await CreateTypeAsync(factory, isActive: true);
+        var suggestedStaff = await factory.FindStaffAsync("admin");
+        factory.AssignmentSuggestionGenerator.Handler = (_, _) =>
+            Task.FromResult(new AssignmentSuggestionDecision(
+                AssignmentSuggestionDecisionKind.Suggested,
+                suggestedStaff.Id,
+                "Phù hợp nội dung báo cáo."));
+
+        using var clerk = factory.CreateApiClient();
+        await AuthenticateAsync(clerk, "clerk");
+        var create = await clerk.PostAsJsonAsync(
+            "/api/v1/incoming-documents",
+            CreatePayload(type.Id));
+        var created = (await create.Content.ReadFromJsonAsync<IncomingDocumentResponse>())!;
+
+        var suggestionResponse = await clerk.PostAsync(
+            $"/api/v1/incoming-documents/{created.Id}/assignment-suggestion",
+            content: null);
+        Assert.Equal(HttpStatusCode.OK, suggestionResponse.StatusCode);
+        var suggestion = (await suggestionResponse.Content
+            .ReadFromJsonAsync<AssignmentSuggestionResponse>())!;
+        Assert.Equal(suggestedStaff.Id, suggestion.SuggestedStaff!.Id);
+        Assert.Null(suggestion.Confidence);
+
+        var assignmentResponse = await clerk.PostAsJsonAsync(
+            $"/api/v1/incoming-documents/{created.Id}/assignment",
+            new AssignmentConfirmRequest(suggestedStaff.Id));
+        Assert.Equal(HttpStatusCode.OK, assignmentResponse.StatusCode);
+        var assigned = (await assignmentResponse.Content
+            .ReadFromJsonAsync<IncomingDocumentResponse>())!;
+        Assert.Equal(IncomingDocumentStatus.InProgress, assigned.Status);
+        Assert.Equal(suggestedStaff.Id, assigned.AssignedToStaff!.Id);
+        Assert.Equal("B Clerk", assigned.AssignmentConfirmedBy!.FullName);
+        Assert.Equal(suggestedStaff.Id, assigned.SuggestedStaff!.Id);
+
+        using var administrator = factory.CreateApiClient();
+        await AuthenticateAsync(administrator, "admin");
+        await ProblemDetailsAssert.HasContractAsync(
+            await administrator.PostAsync(
+                $"/api/v1/incoming-documents/{created.Id}/assignment-suggestion",
+                content: null),
+            HttpStatusCode.Forbidden,
+            "forbidden",
+            $"/api/v1/incoming-documents/{created.Id}/assignment-suggestion");
+
+        factory.AssignmentSuggestionGenerator.Handler = (_, _) =>
+            throw new AiProviderException("provider unavailable");
+        await ProblemDetailsAssert.HasContractAsync(
+            await clerk.PostAsync(
+                $"/api/v1/incoming-documents/{created.Id}/assignment-suggestion",
+                content: null),
+            HttpStatusCode.ServiceUnavailable,
+            "ai-service-unavailable",
+            $"/api/v1/incoming-documents/{created.Id}/assignment-suggestion");
+        var unchanged = await clerk.GetFromJsonAsync<IncomingDocumentResponse>(
+            $"/api/v1/incoming-documents/{created.Id}");
+        Assert.Equal(suggestedStaff.Id, unchanged!.SuggestedStaff!.Id);
+        Assert.Equal(suggestedStaff.Id, unchanged.AssignedToStaff!.Id);
+        Assert.Equal(IncomingDocumentStatus.InProgress, unchanged.Status);
     }
 
     private static object CreatePayload(Guid documentTypeId, string reference = "01/BC") =>

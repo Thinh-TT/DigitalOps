@@ -9,6 +9,13 @@ public static class AiProviderNames
     public const string External = "External";
 }
 
+public static class ExternalStructuredOutputModes
+{
+    public const string JsonSchema = "JsonSchema";
+
+    public const string JsonObject = "JsonObject";
+}
+
 public sealed class AiProviderOptions
 {
     public const string SectionName = "Ai";
@@ -32,6 +39,8 @@ public sealed class AiProviderOptions
     public ExternalAiOptions External { get; set; } = new();
 
     public EmbeddingAiOptions Embedding { get; set; } = new();
+
+    public QdrantAiOptions Qdrant { get; set; } = new();
 }
 
 public sealed class OllamaAiOptions
@@ -59,6 +68,10 @@ public sealed class ExternalAiOptions
     public string ApiKey { get; set; } = string.Empty;
 
     public bool SupportsStructuredOutputs { get; set; }
+
+    public string StructuredOutputMode { get; set; } = ExternalStructuredOutputModes.JsonSchema;
+
+    public bool DisableThinking { get; set; }
 }
 
 public sealed class EmbeddingAiOptions
@@ -75,6 +88,21 @@ public sealed class EmbeddingAiOptions
     public string Digest { get; set; } = ApprovedDigest;
 
     public int Dimensions { get; set; } = 1024;
+}
+
+public sealed class QdrantAiOptions
+{
+    public const string ApprovedCollectionName = "digitalops_knowledge_v1";
+
+    public const double ApprovedMinScore = 0.316666;
+
+    public string BaseUrl { get; set; } = "http://127.0.0.1:6333";
+
+    public string ApiKey { get; set; } = string.Empty;
+
+    public string CollectionName { get; set; } = ApprovedCollectionName;
+
+    public double MinScore { get; set; } = ApprovedMinScore;
 }
 
 public sealed class AiProviderOptionsValidator(
@@ -153,6 +181,7 @@ public sealed class AiProviderOptionsValidator(
         }
 
         ValidateOllama(failures, options.Ollama);
+        ValidateQdrant(failures, options.Qdrant);
 
         if (string.Equals(options.Provider, AiProviderNames.External, StringComparison.OrdinalIgnoreCase))
         {
@@ -191,6 +220,19 @@ public sealed class AiProviderOptionsValidator(
                 failures.Add(
                     "Ai:External:SupportsStructuredOutputs must be true for the approved JSON Schema contract.");
             }
+
+            if (!string.Equals(
+                    options.External.StructuredOutputMode,
+                    ExternalStructuredOutputModes.JsonSchema,
+                    StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(
+                    options.External.StructuredOutputMode,
+                    ExternalStructuredOutputModes.JsonObject,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add(
+                    "Ai:External:StructuredOutputMode must be JsonSchema or JsonObject.");
+            }
         }
 
         return failures.Count == 0
@@ -221,6 +263,39 @@ public sealed class AiProviderOptionsValidator(
         {
             failures.Add(
                 "Ai:Ollama LLM model and digest must match the approved baseline.");
+        }
+    }
+
+    private static void ValidateQdrant(
+        ICollection<string> failures,
+        QdrantAiOptions options)
+    {
+        if (!Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttp
+            || !uri.IsLoopback)
+        {
+            failures.Add(
+                "Ai:Qdrant:BaseUrl must be an HTTP loopback URL for the approved MVP/demo baseline.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        {
+            failures.Add("Ai:Qdrant:ApiKey is required.");
+        }
+
+        if (!string.Equals(
+                options.CollectionName,
+                QdrantAiOptions.ApprovedCollectionName,
+                StringComparison.Ordinal))
+        {
+            failures.Add(
+                $"Ai:Qdrant:CollectionName must remain {QdrantAiOptions.ApprovedCollectionName}.");
+        }
+
+        if (Math.Abs(options.MinScore - QdrantAiOptions.ApprovedMinScore) > 0.0000001)
+        {
+            failures.Add(
+                $"Ai:Qdrant:MinScore must remain {QdrantAiOptions.ApprovedMinScore}.");
         }
     }
 

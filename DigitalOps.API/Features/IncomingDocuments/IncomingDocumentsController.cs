@@ -84,6 +84,52 @@ public sealed class IncomingDocumentsController(
         return result.Succeeded ? Ok(result.Value) : ToActionResult(result);
     }
 
+    [HttpPost("{id:guid}/assignment-suggestion")]
+    [Authorize(Policy = AuthorizationPolicies.Clerk)]
+    [ProducesResponseType<AssignmentSuggestionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<AssignmentSuggestionResponse>> SuggestAssignment(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await incomingDocumentService.SuggestAssignmentAsync(
+            id,
+            cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : ToActionResult(result);
+    }
+
+    [HttpPost("{id:guid}/assignment")]
+    [Authorize(Policy = AuthorizationPolicies.Clerk)]
+    [ProducesResponseType<IncomingDocumentResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<IncomingDocumentResponse>> ConfirmAssignment(
+        Guid id,
+        AssignmentConfirmRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!CurrentStaffClaims.TryRead(User, out var claims))
+        {
+            return Problem(
+                detail: "Không thể xác định tài khoản nhân sự hiện tại.",
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var result = await incomingDocumentService.ConfirmAssignmentAsync(
+            id,
+            request,
+            claims.StaffId,
+            cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : ToActionResult(result);
+    }
+
     [HttpPost("{id:guid}/complete")]
     [ProducesResponseType<IncomingDocumentResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
@@ -133,8 +179,11 @@ public sealed class IncomingDocumentsController(
                 detail: result.Detail,
                 statusCode: StatusCodes.Status409Conflict),
             IncomingDocumentFailure.Forbidden => Problem(
-                detail: "Bạn không được phép hoàn tất văn bản đến này.",
+                detail: "Bạn không được phép thực hiện thao tác này trên văn bản đến.",
                 statusCode: StatusCodes.Status403Forbidden),
+            IncomingDocumentFailure.ServiceUnavailable => Problem(
+                detail: result.Detail,
+                statusCode: StatusCodes.Status503ServiceUnavailable),
             _ => throw new InvalidOperationException(
                 "The incoming document service returned an unsupported failure.")
         };

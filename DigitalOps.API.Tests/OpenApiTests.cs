@@ -291,8 +291,32 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
             Assert.True(incomingCompleteResponses.TryGetProperty(statusCode, out _));
         }
 
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/incoming-documents/{id}/assignment-suggestion",
+            out var assignmentSuggestionPath));
+        var assignmentSuggestionResponses = assignmentSuggestionPath
+            .GetProperty("post")
+            .GetProperty("responses");
+        foreach (var statusCode in new[] { "200", "401", "403", "404", "409", "503" })
+        {
+            Assert.True(assignmentSuggestionResponses.TryGetProperty(statusCode, out _));
+        }
+
+        Assert.True(paths.TryGetProperty(
+            "/api/v1/incoming-documents/{id}/assignment",
+            out var assignmentPath));
+        var assignmentOperation = assignmentPath.GetProperty("post");
+        foreach (var statusCode in new[] { "200", "400", "401", "403", "404", "409" })
+        {
+            Assert.True(assignmentOperation
+                .GetProperty("responses")
+                .TryGetProperty(statusCode, out _));
+        }
+
         Assert.True(schemas.TryGetProperty("IncomingDocumentCreateRequest", out _));
         Assert.True(schemas.TryGetProperty("IncomingDocumentUpdateRequest", out _));
+        Assert.True(schemas.TryGetProperty("AssignmentSuggestionResponse", out _));
+        Assert.True(schemas.TryGetProperty("AssignmentConfirmRequest", out _));
         Assert.True(schemas.TryGetProperty("IncomingDocumentResponse", out var incomingResponse));
         Assert.Contains("attachments", incomingResponse.GetRawText());
         Assert.True(schemas.TryGetProperty("IncomingStaffReference", out _));

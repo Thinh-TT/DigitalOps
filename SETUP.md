@@ -11,6 +11,7 @@ Cài đặt các thành phần sau:
 - [.NET SDK 10](https://dotnet.microsoft.com/download/dotnet/10.0).
 - Node.js 24 và npm.
 - PostgreSQL server đang hoạt động.
+- Docker Desktop hoặc Docker Engine để chạy Qdrant cho các chức năng AI.
 - Git.
 - EF Core CLI 10.x để áp dụng migration.
 
@@ -88,6 +89,13 @@ Mở `DigitalOps.API/.env` và thay toàn bộ placeholder. Không commit file n
 | `IdentityBootstrap__Position` | Không | Chức vụ |
 | `IdentityBootstrap__Department` | Không | Bộ phận |
 | `IdentityBootstrap__Phone` | Không | Điện thoại |
+| `Ai__Provider` | Có | `Ollama` cho demo chính thức hoặc `External` chỉ trong Development |
+| `Ai__External__StructuredOutputMode` | Khi `External` | `JsonSchema` cho provider hỗ trợ schema; `JsonObject` cho DeepSeek |
+| `Ai__External__DisableThinking` | Không | Đặt `true` cho DeepSeek JSON mode để nhận `message.content` thay vì chỉ reasoning |
+| `Ai__Qdrant__BaseUrl` | Có | Qdrant HTTP loopback; baseline dùng `http://127.0.0.1:6333` |
+| `Ai__Qdrant__ApiKey` | Có | API key riêng của Qdrant, không commit hoặc đưa vào frontend |
+| `Ai__Qdrant__CollectionName` | Có | Khóa ở `digitalops_knowledge_v1` |
+| `Ai__Qdrant__MinScore` | Có | Khóa ở `0.316666` theo baseline v3 |
 
 Ví dụ connection string:
 
@@ -229,6 +237,59 @@ Không có endpoint hoặc nút UI chạy worker thủ công. Worker chỉ tạo
 incoming document đã giao Staff; incoming document chưa hoàn tất nhưng quá hạn
 vẫn được chuyển `Overdue`. Unique key database ngăn reminder trùng nếu job chạy
 lại cùng ngày. API sẽ fail-fast khi múi giờ hoặc giới hạn cấu hình không hợp lệ.
+
+### Chuẩn bị Ollama embedding cho AI/RAG
+
+Trên Windows, cài Ollama native theo user scope từ
+`https://ollama.com/download/OllamaSetup.exe`. Ollama chạy API loopback tại
+`http://127.0.0.1:11434`; không cần tải local chat model khi `Ai__Provider=External`.
+
+Chỉ pull model embedding baseline:
+
+```powershell
+ollama pull qwen3-embedding:0.6b
+ollama list
+```
+
+Model phải có digest bắt đầu `ac6da0dfba84` và endpoint `/api/embed` phải trả
+vector 1024 chiều. `Ai__Embedding__Model`, digest và dimensions phải giữ đúng
+baseline trong `.env`.
+
+Khi dùng DeepSeek V4 Flash, đặt:
+
+```dotenv
+Ai__Provider=External
+Ai__External__StructuredOutputMode=JsonObject
+Ai__External__DisableThinking=true
+```
+
+Client sẽ gửi `response_format: { "type": "json_object" }` và tự kiểm tra
+schema/guardrail ở server. Provider khác có thể tiếp tục dùng `JsonSchema`.
+
+### Chuẩn bị Qdrant cho AI/RAG
+
+Qdrant chỉ bind loopback, dùng named volume và bắt buộc API key. Tạo một key
+ngẫu nhiên, lưu cùng giá trị vào `Ai__Qdrant__ApiKey` trong `.env`, rồi chạy:
+
+```powershell
+$env:DIGITALOPS_QDRANT_API_KEY = [Convert]::ToBase64String(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(48)
+)
+docker volume create digitalops-qdrant-storage
+docker run --name digitalops-qdrant `
+  --detach `
+  --restart unless-stopped `
+  --publish 127.0.0.1:6333:6333 `
+  --volume digitalops-qdrant-storage:/qdrant/storage `
+  --env QDRANT__SERVICE__API_KEY=$env:DIGITALOPS_QDRANT_API_KEY `
+  --env QDRANT__TELEMETRY_DISABLED=true `
+  qdrant/qdrant@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
+```
+
+API tạo collection `digitalops_knowledge_v1` ở lần gợi ý đầu tiên và đồng bộ
+lazy các Staff active. PostgreSQL vẫn là source of truth; Qdrant không cần EF
+migration và named volume không thay thế backup nghiệp vụ. Nếu Ollama/Qdrant
+không khả dụng, endpoint AI trả `503`; Clerk vẫn chọn và xác nhận Staff thủ công.
 
 Từ thư mục gốc repository:
 

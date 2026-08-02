@@ -1,5 +1,6 @@
 using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
+using DigitalOps.API.Shared.AI;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
@@ -9,7 +10,9 @@ namespace DigitalOps.API.Features.IncomingDocuments;
 
 public sealed class IncomingDocumentService(
     DigitalOpsDbContext dbContext,
-    TimeProvider timeProvider) : IIncomingDocumentService
+    TimeProvider timeProvider,
+    IAssignmentSuggestionGenerator assignmentSuggestionGenerator,
+    ILogger<IncomingDocumentService> logger) : IIncomingDocumentService
 {
     public async Task<PagedResponse<IncomingDocumentResponse>> GetListAsync(
         IncomingDocumentListQuery query,
@@ -201,6 +204,163 @@ public sealed class IncomingDocumentService(
         if (request.HasDeadline)
         {
             document.Deadline = request.Deadline!.Value;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return IncomingDocumentResult<IncomingDocumentResponse>.Success(
+            ToResponse(document));
+    }
+
+    public async Task<IncomingDocumentResult<AssignmentSuggestionResponse>> SuggestAssignmentAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await dbContext.IncomingDocuments
+            .AsNoTracking()
+            .Include(document => document.DocumentType)
+            .SingleOrDefaultAsync(document => document.Id == id, cancellationToken);
+        if (snapshot is null)
+        {
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.NotFound();
+        }
+
+        if (snapshot.Status == IncomingDocumentStatus.Completed)
+        {
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.Conflict(
+                "Văn bản đến đã hoàn tất và không thể chạy gợi ý điều phối.");
+        }
+
+        AssignmentSuggestionDecision suggestion;
+        try
+        {
+            suggestion = await assignmentSuggestionGenerator.SuggestAsync(
+                new AssignmentSuggestionInput(
+                    snapshot.Summary,
+                    snapshot.DocumentType.Code,
+                    snapshot.DocumentType.Name),
+                cancellationToken);
+        }
+        catch (AiProviderException exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Assignment suggestion failed for incoming document {IncomingDocumentId}",
+                id);
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.ServiceUnavailable(
+                "Dịch vụ AI hiện không khả dụng. Bạn vẫn có thể chọn cán bộ xử lý thủ công.");
+        }
+
+        var document = await WithReferences(dbContext.IncomingDocuments)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (document is null)
+        {
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.NotFound();
+        }
+
+        if (document.Status == IncomingDocumentStatus.Completed)
+        {
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.Conflict(
+                "Văn bản đến đã hoàn tất trong khi AI đang xử lý; gợi ý không được lưu.");
+        }
+
+        if (suggestion.Decision == AssignmentSuggestionDecisionKind.InsufficientEvidence)
+        {
+            document.SuggestedStaffId = null;
+            document.SuggestedStaff = null;
+            document.AssignmentSuggestionReason = null;
+            document.AssignmentConfidence = null;
+            document.AssignmentSuggestedAt = null;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.Success(
+                new AssignmentSuggestionResponse(
+                    document.Id,
+                    null,
+                    suggestion.Reason,
+                    null,
+                    null));
+        }
+
+        var suggestedStaff = await dbContext.Staff.SingleOrDefaultAsync(
+            staff => staff.Id == suggestion.SuggestedStaffId && staff.IsActive,
+            cancellationToken);
+        if (suggestedStaff is null)
+        {
+            return IncomingDocumentResult<AssignmentSuggestionResponse>.ServiceUnavailable(
+                "Kết quả AI không còn hợp lệ vì cán bộ được gợi ý đã thay đổi trạng thái.");
+        }
+
+        var suggestedAt = timeProvider.GetUtcNow().UtcDateTime;
+        document.SuggestedStaffId = suggestedStaff.Id;
+        document.SuggestedStaff = suggestedStaff;
+        document.AssignmentSuggestionReason = suggestion.Reason;
+        document.AssignmentConfidence = null;
+        document.AssignmentSuggestedAt = suggestedAt;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return IncomingDocumentResult<AssignmentSuggestionResponse>.Success(
+            new AssignmentSuggestionResponse(
+                document.Id,
+                ToStaffReference(suggestedStaff),
+                suggestion.Reason,
+                null,
+                suggestedAt));
+    }
+
+    public async Task<IncomingDocumentResult<IncomingDocumentResponse>> ConfirmAssignmentAsync(
+        Guid id,
+        AssignmentConfirmRequest request,
+        Guid confirmedByStaffId,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.AssignedToStaffId == Guid.Empty)
+        {
+            return IncomingDocumentResult<IncomingDocumentResponse>.Validation(
+                SingleError(
+                    "assignedToStaffId",
+                    "Vui lòng chọn cán bộ xử lý."));
+        }
+
+        var document = await WithReferences(dbContext.IncomingDocuments)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (document is null)
+        {
+            return IncomingDocumentResult<IncomingDocumentResponse>.NotFound();
+        }
+
+        if (document.Status == IncomingDocumentStatus.Completed)
+        {
+            return IncomingDocumentResult<IncomingDocumentResponse>.Conflict(
+                "Văn bản đến đã hoàn tất và không thể điều phối lại.");
+        }
+
+        var assignedStaff = await dbContext.Staff.SingleOrDefaultAsync(
+            staff => staff.Id == request.AssignedToStaffId && staff.IsActive,
+            cancellationToken);
+        if (assignedStaff is null)
+        {
+            return IncomingDocumentResult<IncomingDocumentResponse>.Validation(
+                SingleError(
+                    "assignedToStaffId",
+                    "Cán bộ xử lý không tồn tại hoặc đã ngừng hoạt động."));
+        }
+
+        var confirmingStaff = await dbContext.Staff.SingleOrDefaultAsync(
+            staff => staff.Id == confirmedByStaffId && staff.IsActive,
+            cancellationToken);
+        if (confirmingStaff is null)
+        {
+            return IncomingDocumentResult<IncomingDocumentResponse>.Forbidden();
+        }
+
+        document.AssignedToStaffId = assignedStaff.Id;
+        document.AssignedToStaff = assignedStaff;
+        document.AssignmentConfirmedByStaffId = confirmingStaff.Id;
+        document.AssignmentConfirmedByStaff = confirmingStaff;
+        document.AssignmentConfirmedAt = timeProvider.GetUtcNow().UtcDateTime;
+        if (document.Status == IncomingDocumentStatus.New)
+        {
+            document.Status = IncomingDocumentStatus.InProgress;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

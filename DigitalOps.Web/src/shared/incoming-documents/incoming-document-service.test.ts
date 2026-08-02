@@ -1,10 +1,12 @@
 import { writeSession } from "../auth/session-store";
 import {
   completeIncomingDocument,
+  confirmIncomingDocumentAssignment,
   createIncomingDocument,
   deleteAttachment,
   downloadAttachment,
   getIncomingDocuments,
+  suggestIncomingDocumentAssignment,
   uploadIncomingAttachment,
   updateIncomingDocument,
 } from "./incoming-document-service";
@@ -105,6 +107,37 @@ describe("incoming-document-service", () => {
       "/api/v1/attachments/attachment-id",
     );
     expect(fetchMock.mock.calls[2][1]?.method).toBe("DELETE");
+  });
+
+  it("sends assignment suggestion and human confirmation separately", async () => {
+    writeValidSession();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        incomingDocumentId: "incoming-id",
+        suggestedStaff: { id: "staff-id", fullName: "Cán bộ A" },
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: "incoming-id",
+        status: "InProgress",
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await suggestIncomingDocumentAssignment("incoming-id");
+    await confirmIncomingDocumentAssignment("incoming-id", {
+      assignedToStaffId: "staff-id",
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/v1/incoming-documents/incoming-id/assignment-suggestion",
+    );
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("POST");
+    expectRequest(
+      fetchMock,
+      1,
+      "/api/v1/incoming-documents/incoming-id/assignment",
+      "POST",
+      { assignedToStaffId: "staff-id" },
+    );
   });
 });
 

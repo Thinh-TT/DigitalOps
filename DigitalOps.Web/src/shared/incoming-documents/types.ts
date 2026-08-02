@@ -69,6 +69,18 @@ export interface IncomingDocumentUpdateRequest {
   documentTypeId?: string;
 }
 
+export interface AssignmentSuggestionResponse {
+  incomingDocumentId: string;
+  suggestedStaff: IncomingStaffReference | null;
+  reason: string | null;
+  confidence: number | null;
+  suggestedAt: string | null;
+}
+
+export interface AssignmentConfirmRequest {
+  assignedToStaffId: string;
+}
+
 export interface IncomingDocumentListParameters {
   q?: string;
   documentTypeId?: string;

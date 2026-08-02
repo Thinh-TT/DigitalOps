@@ -16,7 +16,7 @@ public sealed class AiProviderTests
     [Fact]
     public void Ollama_development_options_are_valid()
     {
-        var result = Validate(new AiProviderOptions(), Environments.Development);
+        var result = Validate(CreateOllamaOptions(), Environments.Development);
 
         Assert.True(result.Succeeded, result.FailureMessage);
     }
@@ -40,12 +40,10 @@ public sealed class AiProviderTests
     [Fact]
     public void Unsafe_fallback_and_contract_changes_are_rejected()
     {
-        var options = new AiProviderOptions
-        {
-            AutomaticFallback = true,
-            ContextTokens = 4096,
-            DraftMaxOutputTokens = 192
-        };
+        var options = CreateOllamaOptions();
+        options.AutomaticFallback = true;
+        options.ContextTokens = 4096;
+        options.DraftMaxOutputTokens = 192;
 
         var result = Validate(options, Environments.Development);
 
@@ -58,7 +56,7 @@ public sealed class AiProviderTests
     [Fact]
     public void Approved_local_model_and_embedding_baseline_cannot_drift()
     {
-        var options = new AiProviderOptions();
+        var options = CreateOllamaOptions();
         options.Ollama.LlmModel = "another-model";
         options.Ollama.LlmDigest = new string('a', 64);
         options.Embedding.Model = "another-embedding";
@@ -69,6 +67,24 @@ public sealed class AiProviderTests
         Assert.False(result.Succeeded);
         Assert.Contains("Ollama LLM model and digest", result.FailureMessage, StringComparison.Ordinal);
         Assert.Contains("Embedding model and digest", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Qdrant_requires_loopback_key_and_locked_collection_score()
+    {
+        var options = CreateOllamaOptions();
+        options.Qdrant.BaseUrl = "https://qdrant.example";
+        options.Qdrant.ApiKey = string.Empty;
+        options.Qdrant.CollectionName = "other_collection";
+        options.Qdrant.MinScore = 0.1;
+
+        var result = Validate(options, Environments.Development);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Qdrant:BaseUrl", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("Qdrant:ApiKey", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("Qdrant:CollectionName", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("Qdrant:MinScore", result.FailureMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -88,6 +104,18 @@ public sealed class AiProviderTests
     }
 
     [Fact]
+    public void External_provider_rejects_unknown_structured_output_mode()
+    {
+        var options = CreateExternalOptions();
+        options.External.StructuredOutputMode = "Xml";
+
+        var result = Validate(options, Environments.Development);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("StructuredOutputMode", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Dependency_injection_selects_external_chat_and_keeps_embedding_local()
     {
         var configuration = new ConfigurationBuilder()
@@ -98,7 +126,8 @@ public sealed class AiProviderTests
                 ["Ai:External:ChatCompletionsPath"] = "/chat/completions",
                 ["Ai:External:Model"] = "external-dev-model",
                 ["Ai:External:ApiKey"] = "external-secret",
-                ["Ai:External:SupportsStructuredOutputs"] = "true"
+                ["Ai:External:SupportsStructuredOutputs"] = "true",
+                ["Ai:Qdrant:ApiKey"] = "test-qdrant-key"
             })
             .Build();
         var services = new ServiceCollection();
@@ -143,13 +172,37 @@ public sealed class AiProviderTests
     }
 
     [Fact]
+    public async Task External_client_sends_json_object_mode_with_schema_instruction()
+    {
+        var handler = new RecordingHandler(_ => CreateJsonResponse(
+            "{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"ok\\\"}\"}}]}"));
+        var options = CreateExternalOptions();
+        options.External.StructuredOutputMode = ExternalStructuredOutputModes.JsonObject;
+        options.External.DisableThinking = true;
+        var client = new ExternalAiChatClient(
+            new HttpClient(handler),
+            Options.Create(options),
+            NullLogger<ExternalAiChatClient>.Instance);
+
+        await client.CompleteAsync(CreateChatRequest());
+
+        var body = handler.LastBody;
+        Assert.Contains("\"type\":\"json_object\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("json_schema", body, StringComparison.Ordinal);
+        Assert.Contains("Return exactly one JSON object", body, StringComparison.Ordinal);
+        Assert.Contains("test_schema", body, StringComparison.Ordinal);
+        Assert.Contains("additionalProperties", body, StringComparison.Ordinal);
+        Assert.Contains("\"thinking\":{\"type\":\"disabled\"}", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Ollama_client_sends_locked_context_and_schema_format()
     {
         var handler = new RecordingHandler(_ => CreateJsonResponse(
             "{\"message\":{\"content\":\"{\\\"answer\\\":\\\"ok\\\"}\"},\"prompt_eval_count\":8,\"eval_count\":3}"));
         var client = new OllamaAiChatClient(
             new HttpClient(handler),
-            Options.Create(new AiProviderOptions()),
+            Options.Create(CreateOllamaOptions()),
             NullLogger<OllamaAiChatClient>.Instance);
 
         var result = await client.CompleteAsync(CreateChatRequest());
@@ -173,6 +226,7 @@ public sealed class AiProviderTests
             new HttpClient(handler),
             Options.Create(new AiProviderOptions
             {
+                Qdrant = new QdrantAiOptions { ApiKey = "test-qdrant-key" },
                 Embedding = new EmbeddingAiOptions
                 {
                     Dimensions = 3
@@ -196,13 +250,75 @@ public sealed class AiProviderTests
             "{\"embeddings\":[[0.1,0.2]]}"));
         var client = new OllamaEmbeddingClient(
             new HttpClient(handler),
-            Options.Create(new AiProviderOptions()),
+            Options.Create(CreateOllamaOptions()),
             NullLogger<OllamaEmbeddingClient>.Instance);
 
         var exception = await Assert.ThrowsAsync<AiProviderException>(() =>
             client.EmbedAsync(["hello"]));
 
         Assert.Contains("dimension is not 1024", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Qdrant_client_uses_locked_collection_sync_filters_and_score()
+    {
+        var staffId = Guid.NewGuid();
+        var handler = new RecordingHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.Method == HttpMethod.Get && path.EndsWith(
+                    "/collections/digitalops_knowledge_v1",
+                    StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    "{\"result\":{\"config\":{\"params\":{\"vectors\":{\"size\":1024,\"distance\":\"Cosine\"}}}}}");
+            }
+
+            if (path.EndsWith("/points/scroll", StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    $"{{\"result\":{{\"points\":[{{\"id\":\"{staffId:D}\",\"payload\":{{\"sourceId\":\"{staffId:D}\",\"contentHash\":\"hash-1\"}}}}],\"next_page_offset\":null}}}}");
+            }
+
+            if (path.EndsWith("/points/query", StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    $"{{\"result\":{{\"points\":[{{\"id\":\"{staffId:D}\",\"score\":0.91,\"payload\":{{\"sourceId\":\"{staffId:D}\",\"contentHash\":\"hash-1\",\"content\":\"Staff content\"}}}}]}}}}");
+            }
+
+            return CreateJsonResponse("{\"result\":{\"status\":\"acknowledged\"}}");
+        });
+        var client = new QdrantKnowledgeClient(
+            new HttpClient(handler),
+            Options.Create(CreateOllamaOptions()),
+            NullLogger<QdrantKnowledgeClient>.Instance);
+
+        await client.EnsureCollectionAsync();
+        var hashes = await client.GetStaffContentHashesAsync();
+        await client.UpsertStaffPointsAsync([
+            new StaffKnowledgePoint(
+                staffId,
+                "staff-v1:hash-1",
+                $"staff:{staffId:D}:1",
+                "hash-1",
+                "Staff content",
+                new float[1024],
+                DateTime.UtcNow)
+        ]);
+        await client.DeleteStaffPointsAsync([staffId]);
+        var candidates = await client.SearchStaffAsync(new float[1024]);
+
+        Assert.Equal("hash-1", hashes[staffId]);
+        Assert.Equal(staffId, Assert.Single(candidates).StaffId);
+        Assert.All(handler.QdrantApiKeys, key => Assert.Equal("test-qdrant-key", key));
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"sourceType\"", StringComparison.Ordinal)
+            && body.Contains("\"isActive\"", StringComparison.Ordinal)
+            && body.Contains("\"accessScope\"", StringComparison.Ordinal)
+            && body.Contains("\"score_threshold\":0.316666", StringComparison.Ordinal)
+            && body.Contains("\"limit\":5", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"contentHash\":\"hash-1\"", StringComparison.Ordinal));
     }
 
     private static AiProviderOptions CreateExternalOptions() => new()
@@ -214,8 +330,15 @@ public sealed class AiProviderTests
             ChatCompletionsPath = "/chat/completions",
             Model = "external-dev-model",
             ApiKey = "external-secret",
-            SupportsStructuredOutputs = true
-        }
+            SupportsStructuredOutputs = true,
+            StructuredOutputMode = ExternalStructuredOutputModes.JsonSchema
+        },
+        Qdrant = new QdrantAiOptions { ApiKey = "test-qdrant-key" }
+    };
+
+    private static AiProviderOptions CreateOllamaOptions() => new()
+    {
+        Qdrant = new QdrantAiOptions { ApiKey = "test-qdrant-key" }
     };
 
     private static AiChatRequest CreateChatRequest()
@@ -253,6 +376,10 @@ public sealed class AiProviderTests
 
         public string LastBody { get; private set; } = string.Empty;
 
+        public List<string> Bodies { get; } = [];
+
+        public List<string?> QdrantApiKeys { get; } = [];
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -263,6 +390,11 @@ public sealed class AiProviderTests
             LastBody = request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);
+            Bodies.Add(LastBody);
+            QdrantApiKeys.Add(
+                request.Headers.TryGetValues("api-key", out var values)
+                    ? values.SingleOrDefault()
+                    : null);
             return responseFactory(request);
         }
     }

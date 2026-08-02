@@ -51,6 +51,60 @@ public interface IEmbeddingClient
         CancellationToken cancellationToken = default);
 }
 
+public sealed record StaffKnowledgePoint(
+    Guid StaffId,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash,
+    string Content,
+    float[] Vector,
+    DateTime IndexedAtUtc);
+
+public sealed record StaffKnowledgeCandidate(
+    Guid StaffId,
+    string ContentHash,
+    string Content,
+    double Score);
+
+public interface IQdrantKnowledgeClient
+{
+    Task EnsureCollectionAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<Guid, string>> GetStaffContentHashesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task UpsertStaffPointsAsync(
+        IReadOnlyList<StaffKnowledgePoint> points,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteStaffPointsAsync(
+        IReadOnlyList<Guid> staffIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StaffKnowledgeCandidate>> SearchStaffAsync(
+        float[] queryVector,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IAiOperationGate
+{
+    Task WaitAsync(CancellationToken cancellationToken = default);
+
+    void Release();
+}
+
+public sealed class AiOperationGate : IAiOperationGate, IDisposable
+{
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    public Task WaitAsync(CancellationToken cancellationToken = default) =>
+        _semaphore.WaitAsync(cancellationToken);
+
+    public void Release() => _semaphore.Release();
+
+    public void Dispose() => _semaphore.Dispose();
+}
+
 public sealed class AiProviderException(
     string message,
     int? statusCode = null,

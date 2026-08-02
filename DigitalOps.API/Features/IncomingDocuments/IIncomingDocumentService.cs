@@ -21,6 +21,16 @@ public interface IIncomingDocumentService
         IncomingDocumentUpdateRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<IncomingDocumentResult<AssignmentSuggestionResponse>> SuggestAssignmentAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<IncomingDocumentResult<IncomingDocumentResponse>> ConfirmAssignmentAsync(
+        Guid id,
+        AssignmentConfirmRequest request,
+        Guid confirmedByStaffId,
+        CancellationToken cancellationToken = default);
+
     Task<IncomingDocumentResult<IncomingDocumentResponse>> CompleteAsync(
         Guid id,
         Guid callerStaffId,
@@ -34,7 +44,8 @@ public enum IncomingDocumentFailure
     NotFound,
     Validation,
     Conflict,
-    Forbidden
+    Forbidden,
+    ServiceUnavailable
 }
 
 public sealed record IncomingDocumentResult<T>(
@@ -60,6 +71,13 @@ public sealed record IncomingDocumentResult<T>(
 
     public static IncomingDocumentResult<T> Forbidden() =>
         new(default, IncomingDocumentFailure.Forbidden, EmptyErrors, null);
+
+    public static IncomingDocumentResult<T> ServiceUnavailable(string detail) =>
+        new(
+            default,
+            IncomingDocumentFailure.ServiceUnavailable,
+            EmptyErrors,
+            detail);
 
     private static readonly IReadOnlyDictionary<string, string[]> EmptyErrors =
         new Dictionary<string, string[]>(StringComparer.Ordinal);

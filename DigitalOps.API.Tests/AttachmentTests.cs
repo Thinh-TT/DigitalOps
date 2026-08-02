@@ -14,8 +14,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalOps.API.Tests;
 
@@ -67,7 +67,9 @@ public sealed class AttachmentServiceTests
 
         var incomingService = new IncomingDocumentService(
             database.Context,
-            TimeProvider.System);
+            TimeProvider.System,
+            new AssignmentSuggestionTestDouble(),
+            NullLogger<IncomingDocumentService>.Instance);
         var response = await incomingService.GetByIdAsync(data.Document.Id);
         Assert.Equal(2, response!.Attachments.Count);
         Assert.Equal("B Test Clerk", response.Attachments[0].UploadedBy.FullName);

@@ -29,6 +29,10 @@ public static class AiServiceCollectionExtensions
         {
             client.Timeout = TimeSpan.FromSeconds(60);
         });
+        services.AddHttpClient<IQdrantKnowledgeClient, QdrantKnowledgeClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
 
         services.AddScoped<IAiChatClient>(serviceProvider =>
         {
@@ -45,6 +49,7 @@ public static class AiServiceCollectionExtensions
         });
         services.AddScoped<IEmbeddingClient>(serviceProvider =>
             serviceProvider.GetRequiredService<OllamaEmbeddingClient>());
+        services.TryAddSingleton<IAiOperationGate, AiOperationGate>();
 
         return services;
     }

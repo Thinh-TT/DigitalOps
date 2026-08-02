@@ -140,7 +140,9 @@ public class DigitalOpsApiFactory : WebApplicationFactory<Program>
                 new KeyValuePair<string, string?>(
                     "ConnectionStrings:DigitalOps",
                     "Host=localhost;Port=5432;Database=digitalops_test;Username=test;Password=test"),
-                new KeyValuePair<string, string?>("Jwt:SigningKey", TestSigningKey)
+                new KeyValuePair<string, string?>("Jwt:SigningKey", TestSigningKey),
+                new KeyValuePair<string, string?>("Ai:Provider", AiProviderNames.Ollama),
+                new KeyValuePair<string, string?>("Ai:Qdrant:ApiKey", "test-qdrant-key")
             ]);
         });
         builder.ConfigureServices(services =>

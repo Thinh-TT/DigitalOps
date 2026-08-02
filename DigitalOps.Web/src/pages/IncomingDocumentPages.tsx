@@ -1,5 +1,6 @@
 import {
   ArrowLeftOutlined,
+  BulbOutlined,
   CheckCircleOutlined,
   DeleteOutlined,
   DownloadOutlined,
@@ -43,11 +44,13 @@ import { getAllDocumentTypes } from "../shared/document-catalog/document-catalog
 import type { DocumentTypeResponse } from "../shared/document-catalog/types";
 import {
   completeIncomingDocument,
+  confirmIncomingDocumentAssignment,
   createIncomingDocument,
   deleteAttachment,
   downloadAttachment,
   getIncomingDocument,
   getIncomingDocuments,
+  suggestIncomingDocumentAssignment,
   uploadIncomingAttachment,
   updateIncomingDocument,
 } from "../shared/incoming-documents/incoming-document-service";
@@ -59,6 +62,8 @@ import type {
   IncomingDocumentUpdateRequest,
   IncomingStaffReference,
 } from "../shared/incoming-documents/types";
+import { getAllActiveStaff } from "../shared/staff/staff-service";
+import type { StaffResponse } from "../shared/staff/types";
 import { getOutgoingDocuments } from "../shared/outgoing-documents/outgoing-document-service";
 import type { OutgoingDocumentResponse } from "../shared/outgoing-documents/types";
 
@@ -434,6 +439,11 @@ export function IncomingDocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [staffOptions, setStaffOptions] = useState<StaffResponse[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>();
+  const [suggestionNotice, setSuggestionNotice] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -453,13 +463,18 @@ export function IncomingDocumentDetailPage() {
       setNotFound(false);
       setErrorMessage(null);
       try {
-        const [response, types] = await Promise.all([
+        const [response, types, activeStaff] = await Promise.all([
           getIncomingDocument(id),
           getAllDocumentTypes(),
+          isClerk ? getAllActiveStaff() : Promise.resolve([]),
         ]);
         if (!ignored) {
           setDocument(response);
           setDocumentTypes(types);
+          setStaffOptions(activeStaff);
+          setSelectedStaffId(
+            response.assignedToStaff?.id ?? response.suggestedStaff?.id,
+          );
           setFormValues(response, form);
         }
       } catch (error) {
@@ -479,7 +494,7 @@ export function IncomingDocumentDetailPage() {
     return () => {
       ignored = true;
     };
-  }, [form, id, reloadVersion]);
+  }, [form, id, isClerk, reloadVersion]);
 
   useEffect(() => {
     let ignored = false;
@@ -544,6 +559,104 @@ export function IncomingDocumentDetailPage() {
       setErrorMessage(getErrorMessage(error, "Không thể hoàn tất văn bản đến."));
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const refreshWorkflowResource = async () => {
+    try {
+      const latest = await getIncomingDocument(id);
+      setDocument(latest);
+      setFormValues(latest, form);
+      setSelectedStaffId(
+        latest.assignedToStaff?.id ?? latest.suggestedStaff?.id,
+      );
+    } catch {
+      // Keep the original workflow error visible; the page retry remains available.
+    }
+  };
+
+  const handleSuggestion = async () => {
+    if (document === null) {
+      return;
+    }
+
+    setSuggesting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setSuggestionNotice(null);
+    try {
+      const suggestion = await suggestIncomingDocumentAssignment(document.id);
+      setDocument((current) => current === null
+        ? current
+        : {
+            ...current,
+            suggestedStaff: suggestion.suggestedStaff,
+            assignmentSuggestionReason: suggestion.suggestedStaff === null
+              ? null
+              : suggestion.reason,
+            assignmentConfidence: suggestion.confidence,
+            assignmentSuggestedAt: suggestion.suggestedAt,
+          });
+      if (suggestion.suggestedStaff === null) {
+        setSuggestionNotice(
+          suggestion.reason
+            ?? "AI không tìm thấy cán bộ đủ bằng chứng; vui lòng chọn thủ công.",
+        );
+      } else {
+        if (document.assignedToStaff === null) {
+          setSelectedStaffId(suggestion.suggestedStaff.id);
+        }
+        setSuccessMessage("Đã cập nhật gợi ý điều phối.");
+      }
+    } catch (error) {
+      setErrorMessage(getErrorMessage(
+        error,
+        "Không thể chạy AI gợi ý. Bạn vẫn có thể chọn cán bộ thủ công.",
+      ));
+      if (error instanceof ApiError && error.status === 409) {
+        await refreshWorkflowResource();
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const handleAssignment = async () => {
+    if (document === null || selectedStaffId === undefined) {
+      return;
+    }
+
+    setAssigning(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const updated = await confirmIncomingDocumentAssignment(document.id, {
+        assignedToStaffId: selectedStaffId,
+      });
+      setDocument(updated);
+      setSelectedStaffId(updated.assignedToStaff?.id);
+      setSuccessMessage(
+        document.assignedToStaff === null
+          ? "Đã xác nhận điều phối."
+          : "Đã giao lại cán bộ xử lý.",
+      );
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, "Không thể xác nhận điều phối."));
+      if (error instanceof ApiError && error.status === 400) {
+        try {
+          const activeStaff = await getAllActiveStaff();
+          setStaffOptions(activeStaff);
+          if (!activeStaff.some((staff) => staff.id === selectedStaffId)) {
+            setSelectedStaffId(undefined);
+          }
+        } catch {
+          // Preserve the assignment error if refreshing the directory also fails.
+        }
+      } else if (error instanceof ApiError && error.status === 409) {
+        await refreshWorkflowResource();
+      }
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -702,6 +815,26 @@ export function IncomingDocumentDetailPage() {
         <>
         <div className="incoming-detail-grid">
           <Card title="Điều phối xử lý">
+            {editable && (
+              <Space className="page-stack" orientation="vertical" size="middle">
+                <Button
+                  icon={<BulbOutlined />}
+                  loading={suggesting}
+                  disabled={assigning}
+                  onClick={() => void handleSuggestion()}
+                >
+                  AI gợi ý
+                </Button>
+                {suggestionNotice !== null && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    title="Chưa đủ bằng chứng để gợi ý"
+                    description={suggestionNotice}
+                  />
+                )}
+              </Space>
+            )}
             {document.assignedToStaff === null && document.suggestedStaff === null ? (
               <Empty description="Chưa có gợi ý hoặc phân công xử lý." />
             ) : (
@@ -711,6 +844,14 @@ export function IncomingDocumentDetailPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Lý do gợi ý">
                   {document.assignmentSuggestionReason ?? "—"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Độ tin cậy">
+                  {document.assignmentConfidence === null
+                    ? "—"
+                    : `${Math.round(document.assignmentConfidence * 100)}%`}
+                </Descriptions.Item>
+                <Descriptions.Item label="Thời điểm gợi ý">
+                  {formatDateTime(document.assignmentSuggestedAt)}
                 </Descriptions.Item>
                 <Descriptions.Item label="Nhân sự xử lý chính">
                   {formatStaff(document.assignedToStaff)}
@@ -722,6 +863,31 @@ export function IncomingDocumentDetailPage() {
                   {formatDateTime(document.assignmentConfirmedAt)}
                 </Descriptions.Item>
               </Descriptions>
+            )}
+            {editable && (
+              <Space className="assignment-controls" orientation="vertical" size="small">
+                <Select
+                  aria-label="Cán bộ xử lý"
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Chọn cán bộ xử lý"
+                  value={selectedStaffId}
+                  options={staffOptions.map((staff) => ({
+                    value: staff.id,
+                    label: formatStaff(staff),
+                  }))}
+                  disabled={suggesting || assigning}
+                  onChange={setSelectedStaffId}
+                />
+                <Button
+                  type="primary"
+                  loading={assigning}
+                  disabled={selectedStaffId === undefined || suggesting}
+                  onClick={() => void handleAssignment()}
+                >
+                  {document.assignedToStaff === null ? "Xác nhận" : "Giao lại"}
+                </Button>
+              </Space>
             )}
             {canComplete && (
               <Popconfirm
