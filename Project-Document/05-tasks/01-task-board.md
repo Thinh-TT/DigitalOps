@@ -67,7 +67,7 @@ Task board này bám theo:
 | T3-01 | Tạo văn bản đi theo mẫu (API + UI SCR-011, SCR-012)     | FR-011   | `[x]`  | P0       | T2-01        | Placeholder template thay bằng dữ liệu hội viên/incoming liên quan; liên kết incoming/member là optional; bổ sung attachment outgoing; test template/member inactive bị từ chối. |
 | T3-02 | AI sinh nháp và chỉnh sửa (API + UI SCR-012)            | FR-012   | `[x]`  | P0       | T0-00, T3-01 | `AiDraftContent` chỉ ghi ở lần sinh đầu tiên, không bị ghi đè; lỗi/timeout AI không mất `Content` đã lưu; test theo tiêu chí nghiệm thu FR-012.     |
 | T3-03 | Thẩm định thể thức và lịch sử review (API + UI SCR-013) | FR-013   | `[x]`  | P0       | T0-00, T3-02 | Mỗi lần review tạo đúng một dòng `ReviewHistory`, `AttemptNo` tăng tuần tự trong transaction; `Passed` không chứa issue `severity = Error`.         |
-| T3-04 | Phê duyệt hoặc trả lại văn bản (API + UI SCR-014)       | FR-014   | `[ ]`  | P0       | T3-03        | Chỉ role Leader duyệt/trả; `Return` đưa về `Editing` và bắt buộc review lại trước khi trình duyệt lại.                                              |
+| T3-04 | Phê duyệt hoặc trả lại văn bản (API + UI SCR-014)       | FR-014   | `[x]`  | P0       | T3-03        | Chỉ role Leader duyệt/trả; `Return` đưa về `Editing` và bắt buộc review lại trước khi trình duyệt lại.                                              |
 | T3-05 | Cấp số, phát hành và lưu trữ (API + UI SCR-015)         | FR-015   | `[ ]`  | P0       | T3-04        | `ReferenceNumber` và `IssuedDate` luôn cùng có/cùng không có; `Archived` là trạng thái cuối, khóa `Content` và attachment.                          |
 
 ## 8. Phase 4 — Tìm Kiếm Toàn Văn

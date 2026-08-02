@@ -2,6 +2,7 @@ import { apiDownload, apiRequest } from "../api/api-client";
 import type { PagedResponse } from "../api/types";
 import type { AttachmentResponse } from "../incoming-documents/types";
 import type {
+  ApprovalDecisionRequest,
   AiDraftRequest,
   OutgoingDocumentCreateRequest,
   OutgoingDocumentListParameters,
@@ -43,6 +44,13 @@ export function createOutgoingReview(id: string) {
 
 export function getOutgoingReviews(id: string, parameters: ReviewListParameters = {}) {
   return apiRequest<PagedResponse<ReviewResponse>>(`/outgoing-documents/${id}/reviews${buildQuery(parameters)}`);
+}
+
+export function decideOutgoingDocumentApproval(id: string, request: ApprovalDecisionRequest) {
+  return apiRequest<OutgoingDocumentResponse>(`/outgoing-documents/${id}/approval`, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
 }
 
 export function uploadOutgoingAttachment(documentId: string, file: File) {

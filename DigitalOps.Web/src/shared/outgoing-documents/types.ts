@@ -12,6 +12,7 @@ export type OutgoingStaffReference = IncomingStaffReference;
 export interface ReviewIssueResponse { ruleCode: string; severity: string; message: string; location: string | null; }
 export type ReviewSource = "Rule" | "AI" | "Hybrid";
 export type ReviewResult = "Failed" | "Passed";
+export type ApprovalDecision = "Approve" | "Return";
 export interface ReviewResponse {
   id: string;
   outgoingDocumentId: string;
@@ -60,6 +61,10 @@ export interface OutgoingDocumentUpdateRequest {
 
 export interface AiDraftRequest {
   instruction?: string;
+}
+
+export interface ApprovalDecisionRequest {
+  decision: ApprovalDecision;
 }
 
 export interface ReviewListParameters {

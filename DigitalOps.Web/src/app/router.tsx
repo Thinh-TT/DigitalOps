@@ -41,6 +41,7 @@ import {
   IncomingDocumentListPage,
 } from "../pages/IncomingDocumentPages";
 import { ReminderPage } from "../pages/ReminderPage";
+import { ApprovalQueuePage } from "../pages/ApprovalQueuePage";
 import {
   OutgoingDocumentCreatePage,
   OutgoingDocumentDetailPage,
@@ -163,12 +164,7 @@ export const appRoutes: RouteObject[] = [
                   {
                     element: <RoleRoute allowedRoles={["Leader"]} />,
                     children: [
-                      placeholder(
-                        "approval-queue",
-                        "SCR-014",
-                        "Hàng chờ duyệt",
-                        "Duyệt hoặc trả lại văn bản.",
-                      ),
+                      { path: "approval-queue", element: <ApprovalQueuePage /> },
                     ],
                   },
                   {

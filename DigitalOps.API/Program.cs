@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalOps.API.Features.Attachments;
+using DigitalOps.API.Features.Approval;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
@@ -88,6 +89,7 @@ builder.Services.AddScoped<IAiDraftGenerator, AiDraftGenerator>();
 builder.Services.AddScoped<IOutgoingDocumentService, OutgoingDocumentService>();
 builder.Services.AddScoped<IDocumentReviewGenerator, DocumentReviewGenerator>();
 builder.Services.AddScoped<IOutgoingDocumentReviewService, OutgoingDocumentReviewService>();
+builder.Services.AddScoped<IOutgoingDocumentApprovalService, OutgoingDocumentApprovalService>();
 builder.Services
     .AddOptions<ReminderWorkerOptions>()
     .Bind(builder.Configuration.GetSection(ReminderWorkerOptions.SectionName))

@@ -200,6 +200,17 @@ describe("route guards and App Shell", () => {
     renderRoute("/outgoing-documents/new", createAuthValue("authenticated", ["Drafter"], false));
     expect(await screen.findByRole("heading", { name: "Tạo văn bản đi" })).toBeInTheDocument();
   });
+
+  it("renders SCR-014 only for Leader", async () => {
+    renderRoute("/approval-queue", createAuthValue("authenticated", ["Leader"], false));
+    expect(await screen.findByRole("heading", { name: "Hàng chờ duyệt" })).toBeInTheDocument();
+    expect(outgoingService.getOutgoingDocuments).toHaveBeenCalledWith({
+      status: "PendingApproval", page: 1, pageSize: 20,
+    });
+
+    renderRoute("/approval-queue", createAuthValue("authenticated", ["Clerk"], false));
+    expect(await screen.findByText("Không có quyền truy cập")).toBeInTheDocument();
+  });
 });
 
 function renderRoute(path: string, authValue: AuthContextValue) {

@@ -3,7 +3,7 @@
 ## 1. Phạm vi
 
 Bộ tài liệu này dùng để kiểm thử thủ công/nghiệm thu các tính năng đã hoàn thành
-từ FR-001 đến FR-013. Các tính năng FR-014 đến FR-016 chưa hoàn thành nên không
+từ FR-001 đến FR-014. Các tính năng FR-015 đến FR-016 chưa hoàn thành nên không
 được đưa vào kết quả pass/fail hiện tại.
 
 | File | Phạm vi | Màn hình chính |
@@ -22,6 +22,7 @@ từ FR-001 đến FR-013. Các tính năng FR-014 đến FR-016 chưa hoàn th�
 | `fr-011-outgoing-documents.md` | Tạo văn bản đi theo mẫu | SCR-011, SCR-012 |
 | `fr-012-ai-draft-editor.md` | AI sinh nháp và chỉnh sửa | SCR-012 |
 | `fr-013-review-history.md` | Thẩm định thể thức và lịch sử review | SCR-013 |
+| `fr-014-approval.md` | Phê duyệt hoặc trả lại văn bản | SCR-014 |
 
 ## 2. Môi trường và tài khoản thử
 
@@ -37,6 +38,7 @@ từ FR-001 đến FR-013. Các tính năng FR-014 đến FR-016 chưa hoàn th�
 | `CLERK-A` | Clerk, active | Hội viên, văn bản đến, điều phối |
 | `DRAFTER-A` | Drafter, active | Owner văn bản đi |
 | `DRAFTER-B` | Drafter, active | Kiểm tra non-owner |
+| `LEADER-A` | Leader, active | Duyệt hoặc trả lại văn bản đi |
 | `STAFF-A` | một role BusinessAccess, active | Người nhận điều phối/reminder |
 | `TEMP-A` | active, `mustChangePassword=true` | Luồng đổi mật khẩu bắt buộc |
 | `INACTIVE-A` | inactive | Kiểm tra chặn đăng nhập/lookup |
@@ -53,7 +55,7 @@ Không ghi mật khẩu hoặc access token thật vào file kết quả/evidenc
 - Với thao tác mutation, luôn kiểm tra cả response và đọc lại resource/database.
 - Với AI failure/concurrency, không reload trước khi xác nhận dữ liệu local được giữ.
 - Chạy `platform-smoke.md` trước; sau đó thực hiện FR theo dependency từ FR-001
-  đến FR-013 để tái sử dụng dữ liệu synthetic đã tạo.
+  đến FR-014 để tái sử dụng dữ liệu synthetic đã tạo.
 
 ## 4. Phiếu ghi kết quả
 

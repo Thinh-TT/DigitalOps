@@ -42,7 +42,7 @@ public sealed class StaffManagementApiTests
             "/api/v1/staff?page=1&pageSize=2");
 
         Assert.NotNull(firstPage);
-        Assert.Equal(7, firstPage.TotalCount);
+        Assert.Equal(8, firstPage.TotalCount);
         Assert.Equal(4, firstPage.TotalPages);
         Assert.Equal(
             firstPage.Items.OrderBy(item => item.FullName).Select(item => item.Id),
@@ -587,9 +587,18 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
         await CreateUserAsync(
             userManager,
             dbContext,
+            "leader",
+            "leader@digitalops.local",
+            "F Leader",
+            isActive: true,
+            mustChangePassword: false,
+            roles: [SystemRoles.Leader]);
+        await CreateUserAsync(
+            userManager,
+            dbContext,
             "inactive",
             "inactive@digitalops.local",
-            "F Inactive",
+            "G Inactive",
             isActive: false,
             mustChangePassword: false,
             roles: [SystemRoles.Drafter]);
@@ -598,7 +607,7 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
             dbContext,
             "forcedadmin",
             "forcedadmin@digitalops.local",
-            "G Forced Administrator",
+            "H Forced Administrator",
             isActive: true,
             mustChangePassword: true,
             roles: [SystemRoles.Clerk]);
