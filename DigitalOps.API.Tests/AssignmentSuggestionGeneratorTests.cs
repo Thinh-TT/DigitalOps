@@ -242,6 +242,25 @@ public sealed class AssignmentSuggestionGeneratorTests
                 .ToArray();
             return Task.FromResult<IReadOnlyList<StaffKnowledgeCandidate>>(candidates);
         }
+
+        public Task<IReadOnlyList<TemplateKnowledgeState>> GetTemplateStatesAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TemplateKnowledgeState>>([]);
+
+        public Task UpsertTemplatePointsAsync(
+            IReadOnlyList<TemplateKnowledgePoint> points,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task DeleteTemplatePointsAsync(
+            IReadOnlyList<Guid> pointIds,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<TemplateKnowledgeCandidate>> SearchTemplateAsync(
+            float[] queryVector,
+            Guid templateId,
+            string documentTypeCode,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TemplateKnowledgeCandidate>>([]);
     }
 
     private sealed class GeneratorDatabase(

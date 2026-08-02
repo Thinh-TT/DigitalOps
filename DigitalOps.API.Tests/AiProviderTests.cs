@@ -321,6 +321,65 @@ public sealed class AiProviderTests
             body.Contains("\"contentHash\":\"hash-1\"", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Qdrant_client_isolates_template_sync_and_filters_exact_template()
+    {
+        var pointId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var handler = new RecordingHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/points/scroll", StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    $"{{\"result\":{{\"points\":[{{\"id\":\"{pointId:D}\",\"payload\":{{\"sourceId\":\"{templateId:D}\",\"sourceVersion\":\"template-v1\",\"chunkId\":\"template:1\",\"contentHash\":\"template-hash\"}}}}],\"next_page_offset\":null}}}}");
+            }
+
+            if (path.EndsWith("/points/query", StringComparison.Ordinal))
+            {
+                return CreateJsonResponse(
+                    $"{{\"result\":{{\"points\":[{{\"id\":\"{pointId:D}\",\"score\":0.92,\"payload\":{{\"sourceId\":\"{templateId:D}\",\"documentTypeCode\":\"PLAN\",\"sourceVersion\":\"template-v1\",\"chunkId\":\"template:1\",\"contentHash\":\"template-hash\",\"content\":\"Template content\"}}}}]}}}}");
+            }
+
+            return CreateJsonResponse("{\"result\":{\"status\":\"acknowledged\"}}");
+        });
+        var client = new QdrantKnowledgeClient(
+            new HttpClient(handler),
+            Options.Create(CreateOllamaOptions()),
+            NullLogger<QdrantKnowledgeClient>.Instance);
+
+        var states = await client.GetTemplateStatesAsync();
+        await client.UpsertTemplatePointsAsync([
+            new TemplateKnowledgePoint(
+                pointId,
+                templateId,
+                "PLAN",
+                "template-v1",
+                "template:1",
+                "template-hash",
+                "Template content",
+                new float[1024],
+                DateTime.UtcNow)
+        ]);
+        await client.DeleteTemplatePointsAsync([pointId]);
+        var candidates = await client.SearchTemplateAsync(
+            new float[1024],
+            templateId,
+            "PLAN");
+
+        Assert.Equal(pointId, Assert.Single(states).PointId);
+        Assert.Equal(templateId, Assert.Single(candidates).TemplateId);
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"sourceType\":\"Template\"", StringComparison.Ordinal)
+            && body.Contains($"\"sourceId\":\"{templateId:D}\"", StringComparison.Ordinal)
+            && body.Contains("\"documentTypeCode\":\"PLAN\"", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains("\"score_threshold\":0.316666", StringComparison.Ordinal)
+            && body.Contains("\"accessScope\"", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body =>
+            body.Contains($"\"points\":[\"{pointId:D}\"]", StringComparison.Ordinal));
+    }
+
     private static AiProviderOptions CreateExternalOptions() => new()
     {
         Provider = AiProviderNames.External,

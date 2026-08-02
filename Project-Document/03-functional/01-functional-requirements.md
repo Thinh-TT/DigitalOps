@@ -428,20 +428,22 @@ Một `Staff` có thể được gán nhiều role. Không có role `Reviewer` r
 **Luồng chính**
 
 1. Người soạn gửi context của template, Member và incoming document liên quan cho AI.
-2. AI trả bản nháp để người dùng xem trước.
-3. Khi người dùng chấp nhận bản AI đầu tiên, hệ thống ghi cùng nội dung vào `AiDraftContent` và `Content`, chuyển trạng thái `AiDraft`.
+2. Người dùng nhập instruction tùy chọn trong modal; thao tác xác nhận modal đồng thời gọi endpoint AI và chấp nhận lưu ngay kết quả, không có bước preview/API riêng.
+3. Với bản AI đầu tiên, hệ thống ghi cùng nội dung vào `AiDraftContent` và `Content`, chuyển trạng thái `AiDraft`.
 4. Khi bắt đầu chỉnh sửa, trạng thái chuyển `Editing`; các lần lưu sau chỉ cập nhật `Content`.
 5. Người dùng có thể chạy AI lại; kết quả mới chỉ cập nhật Content khi được chấp nhận và không được ghi đè AiDraftContent.
 
 **Ngoại lệ**
 
 - AI lỗi/timeout: không thay đổi Content, AiDraftContent hay status; thông báo cho người dùng thử lại hoặc sửa thủ công.
+- Title hoặc Content đang có thay đổi chưa lưu: UI yêu cầu lưu trước khi gọi AI. Lỗi concurrent update trả `409` và không ghi đè dữ liệu mới hơn.
 - Văn bản PendingReview/PendingApproval/Approved/Archived: không cho sinh AI hoặc chỉnh Content.
 
 **Tiêu chí nghiệm thu**
 
 - So sánh giữa AiDraftContent và Content luôn hiển thị được sau nhiều lần chỉnh sửa.
 - Lỗi AI không làm mất nội dung chưa lưu của người dùng trên UI hoặc nội dung đã lưu trong database.
+- Instruction được giữ trong modal khi gặp `409/503` để người dùng có thể thử lại hoặc tiếp tục sửa thủ công.
 
 ### FR-013 — Thẩm định thể thức và xem lịch sử review
 

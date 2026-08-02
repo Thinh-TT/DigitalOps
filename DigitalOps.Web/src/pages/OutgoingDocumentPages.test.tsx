@@ -19,6 +19,17 @@ beforeEach(() => {
   vi.mocked(incomingService.getIncomingDocuments).mockResolvedValue({ items: [], page: 1, pageSize: 100, totalCount: 0, totalPages: 0 });
   vi.mocked(memberService.getMemberLookup).mockResolvedValue({ items: [], page: 1, pageSize: 100, totalCount: 0, totalPages: 0 });
   vi.mocked(service.getOutgoingDocuments).mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+  vi.mocked(service.updateOutgoingDocument).mockImplementation(async (_, request) => ({
+    ...outgoingFixture(),
+    title: request.title ?? outgoingFixture().title,
+    content: request.content ?? outgoingFixture().content,
+  }));
+  vi.mocked(service.generateOutgoingAiDraft).mockResolvedValue({
+    ...outgoingFixture(),
+    content: "Bản AI đã sinh",
+    aiDraftContent: "Bản AI đã sinh",
+    status: "AiDraft",
+  });
 });
 
 it("keeps list filters in the URL and shows create only to Drafter", async () => {
@@ -30,12 +41,66 @@ it("keeps list filters in the URL and shows create only to Drafter", async () =>
   expect(screen.getByRole("button", { name: /Tạo văn bản đi/ })).toBeInTheDocument();
 });
 
-it("renders content read-only and permits attachment changes only for the owner", async () => {
+it("renders editable content and attachment actions for the owner", async () => {
   vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
   renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Drafter"));
-  expect(await screen.findByText("Kính gửi {{member.email}}")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Lưu/ })).not.toBeInTheDocument();
+  expect(await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" })).toHaveValue("Kính gửi {{member.email}}");
+  expect(screen.getByRole("button", { name: "Lưu" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Sinh nháp AI" })).toBeInTheDocument();
   expect(screen.getByText("Thêm file")).toBeInTheDocument();
+});
+
+it("requires saving dirty editor content before opening AI draft", async () => {
+  vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
+  renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Drafter"));
+  const content = await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" });
+  await userEvent.clear(content);
+  await userEvent.type(content, "Nội dung chưa lưu");
+  await userEvent.click(screen.getByRole("button", { name: "Sinh nháp AI" }));
+
+  expect(await screen.findByText("Vui lòng lưu thay đổi tiêu đề và nội dung trước khi sinh nháp AI.")).toBeInTheDocument();
+  expect(service.generateOutgoingAiDraft).not.toHaveBeenCalled();
+  expect(content).toHaveValue("Nội dung chưa lưu");
+});
+
+it("submits optional instruction and shows the immutable first AI draft", async () => {
+  vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
+  renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Drafter"));
+  await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" });
+  await userEvent.click(screen.getByRole("button", { name: "Sinh nháp AI" }));
+  await userEvent.type(screen.getByLabelText("Hướng dẫn bổ sung cho AI"), "Nhấn mạnh tiến độ");
+  await userEvent.click(screen.getByRole("button", { name: "Sinh và lưu nháp" }));
+
+  await waitFor(() => expect(service.generateOutgoingAiDraft).toHaveBeenCalledWith("outgoing", { instruction: "Nhấn mạnh tiến độ" }));
+  expect(screen.getByLabelText("Nội dung hiện tại", { selector: "textarea" })).toHaveValue("Bản AI đã sinh");
+  await userEvent.click(screen.getByRole("tab", { name: "Bản AI đầu tiên" }));
+  expect(await screen.findByText("Bản AI đã sinh", { selector: "pre" })).toBeInTheDocument();
+});
+
+it("keeps editor and instruction when AI returns 503", async () => {
+  const error = Object.assign(new Error("unavailable"), { status: 503, problem: { detail: "Dịch vụ AI hiện không khả dụng." } });
+  Object.setPrototypeOf(error, (await import("../shared/api/api-client")).ApiError.prototype);
+  vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
+  vi.mocked(service.generateOutgoingAiDraft).mockRejectedValue(error);
+  renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Drafter"));
+  await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" });
+  await userEvent.click(screen.getByRole("button", { name: "Sinh nháp AI" }));
+  const instruction = screen.getByLabelText("Hướng dẫn bổ sung cho AI");
+  await userEvent.type(instruction, "Giữ dữ liệu này");
+  await userEvent.click(screen.getByRole("button", { name: "Sinh và lưu nháp" }));
+
+  expect(await screen.findByText("Dịch vụ AI hiện không khả dụng.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Nội dung hiện tại", { selector: "textarea" })).toHaveValue("Kính gửi {{member.email}}");
+  expect(instruction).toHaveValue("Giữ dữ liệu này");
+});
+
+it("keeps the editor read-only for non-Drafter viewers", async () => {
+  vi.mocked(service.getOutgoingDocument).mockResolvedValue(outgoingFixture());
+  renderPage(<Routes><Route path="/outgoing-documents/:id" element={<OutgoingDocumentDetailPage />} /></Routes>, ["/outgoing-documents/outgoing"], auth("Leader"));
+  expect(await screen.findByLabelText("Nội dung hiện tại", { selector: "textarea" })).toHaveAttribute("readonly");
+  expect(screen.queryByRole("button", { name: "Lưu" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Sinh nháp AI" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Thêm file")).not.toBeInTheDocument();
 });
 
 it("maps server validation errors to create fields and keeps the form", async () => {

@@ -286,10 +286,12 @@ docker run --name digitalops-qdrant `
   qdrant/qdrant@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
 ```
 
-API tạo collection `digitalops_knowledge_v1` ở lần gợi ý đầu tiên và đồng bộ
-lazy các Staff active. PostgreSQL vẫn là source of truth; Qdrant không cần EF
+API tạo collection `digitalops_knowledge_v1` ở lần gọi AI đầu tiên và đồng bộ
+lazy các Staff active cho gợi ý điều phối, cùng các Template active cho sinh nháp.
+Mỗi nguồn được đồng bộ/xóa stale độc lập; thao tác Template không ảnh hưởng point
+Staff hoặc FormatRule. PostgreSQL vẫn là source of truth; Qdrant không cần EF
 migration và named volume không thay thế backup nghiệp vụ. Nếu Ollama/Qdrant
-không khả dụng, endpoint AI trả `503`; Clerk vẫn chọn và xác nhận Staff thủ công.
+không khả dụng, endpoint AI trả `503`; dữ liệu nghiệp vụ hiện có không bị thay đổi.
 
 Từ thư mục gốc repository:
 

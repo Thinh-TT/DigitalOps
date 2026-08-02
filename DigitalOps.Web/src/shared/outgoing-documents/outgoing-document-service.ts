@@ -2,9 +2,11 @@ import { apiDownload, apiRequest } from "../api/api-client";
 import type { PagedResponse } from "../api/types";
 import type { AttachmentResponse } from "../incoming-documents/types";
 import type {
+  AiDraftRequest,
   OutgoingDocumentCreateRequest,
   OutgoingDocumentListParameters,
   OutgoingDocumentResponse,
+  OutgoingDocumentUpdateRequest,
 } from "./types";
 
 export function getOutgoingDocuments(parameters: OutgoingDocumentListParameters = {}) {
@@ -17,6 +19,20 @@ export function getOutgoingDocument(id: string) {
 
 export function createOutgoingDocument(request: OutgoingDocumentCreateRequest) {
   return apiRequest<OutgoingDocumentResponse>("/outgoing-documents", { method: "POST", body: JSON.stringify(request) });
+}
+
+export function updateOutgoingDocument(id: string, request: OutgoingDocumentUpdateRequest) {
+  return apiRequest<OutgoingDocumentResponse>(`/outgoing-documents/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(request),
+  });
+}
+
+export function generateOutgoingAiDraft(id: string, request: AiDraftRequest) {
+  return apiRequest<OutgoingDocumentResponse>(`/outgoing-documents/${id}/ai-draft`, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
 }
 
 export function uploadOutgoingAttachment(documentId: string, file: File) {

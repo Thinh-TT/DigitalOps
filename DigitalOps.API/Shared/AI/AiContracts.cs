@@ -66,6 +66,34 @@ public sealed record StaffKnowledgeCandidate(
     string Content,
     double Score);
 
+public sealed record TemplateKnowledgePoint(
+    Guid PointId,
+    Guid TemplateId,
+    string DocumentTypeCode,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash,
+    string Content,
+    float[] Vector,
+    DateTime IndexedAtUtc);
+
+public sealed record TemplateKnowledgeState(
+    Guid PointId,
+    Guid TemplateId,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash);
+
+public sealed record TemplateKnowledgeCandidate(
+    Guid PointId,
+    Guid TemplateId,
+    string DocumentTypeCode,
+    string SourceVersion,
+    string ChunkId,
+    string ContentHash,
+    string Content,
+    double Score);
+
 public interface IQdrantKnowledgeClient
 {
     Task EnsureCollectionAsync(CancellationToken cancellationToken = default);
@@ -83,6 +111,23 @@ public interface IQdrantKnowledgeClient
 
     Task<IReadOnlyList<StaffKnowledgeCandidate>> SearchStaffAsync(
         float[] queryVector,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TemplateKnowledgeState>> GetTemplateStatesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task UpsertTemplatePointsAsync(
+        IReadOnlyList<TemplateKnowledgePoint> points,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteTemplatePointsAsync(
+        IReadOnlyList<Guid> pointIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TemplateKnowledgeCandidate>> SearchTemplateAsync(
+        float[] queryVector,
+        Guid templateId,
+        string documentTypeCode,
         CancellationToken cancellationToken = default);
 }
 

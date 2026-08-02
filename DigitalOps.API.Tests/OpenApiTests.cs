@@ -376,9 +376,24 @@ public sealed class OpenApiTests(OpenApiApiFactory factory)
         Assert.True(outgoingPath.GetProperty("post").GetProperty("responses").TryGetProperty("201", out _));
         Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents/{id}", out var outgoingDetailPath));
         Assert.True(outgoingDetailPath.GetProperty("get").GetProperty("responses").TryGetProperty("404", out _));
+        var outgoingPatchResponses = outgoingDetailPath.GetProperty("patch").GetProperty("responses");
+        foreach (var statusCode in new[] { "200", "400", "401", "403", "404", "409" })
+        {
+            Assert.True(outgoingPatchResponses.TryGetProperty(statusCode, out _));
+        }
+
+        Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents/{id}/ai-draft", out var outgoingAiDraftPath));
+        var outgoingAiDraftResponses = outgoingAiDraftPath.GetProperty("post").GetProperty("responses");
+        foreach (var statusCode in new[] { "200", "400", "401", "403", "404", "409", "503" })
+        {
+            Assert.True(outgoingAiDraftResponses.TryGetProperty(statusCode, out _));
+        }
+
         Assert.True(paths.TryGetProperty("/api/v1/outgoing-documents/{outgoingDocumentId}/attachments", out var outgoingAttachmentPath));
         Assert.True(outgoingAttachmentPath.GetProperty("post").GetProperty("requestBody").GetProperty("content").TryGetProperty("multipart/form-data", out _));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentCreateRequest", out _));
+        Assert.True(schemas.TryGetProperty("OutgoingDocumentUpdateRequest", out _));
+        Assert.True(schemas.TryGetProperty("AiDraftRequest", out _));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentResponse", out _));
         Assert.True(schemas.TryGetProperty("OutgoingDocumentStatus", out var outgoingStatus));
         Assert.Equal(new[] { "Editing", "AiDraft", "PendingReview", "ReviewFailed", "PendingApproval", "Approved", "Archived" }, ResolveEnumValues(outgoingStatus, schemas));

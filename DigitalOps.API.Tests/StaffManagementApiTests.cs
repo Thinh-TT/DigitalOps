@@ -6,6 +6,7 @@ using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Authentication;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
+using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
@@ -40,8 +41,8 @@ public sealed class StaffManagementApiTests
             "/api/v1/staff?page=1&pageSize=2");
 
         Assert.NotNull(firstPage);
-        Assert.Equal(5, firstPage.TotalCount);
-        Assert.Equal(3, firstPage.TotalPages);
+        Assert.Equal(7, firstPage.TotalCount);
+        Assert.Equal(4, firstPage.TotalPages);
         Assert.Equal(
             firstPage.Items.OrderBy(item => item.FullName).Select(item => item.Id),
             firstPage.Items.Select(item => item.Id));
@@ -443,6 +444,8 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
 
     internal AssignmentSuggestionTestDouble AssignmentSuggestionGenerator { get; } = new();
 
+    internal AiDraftGeneratorTestDouble AiDraftGenerator { get; } = new();
+
     public HttpClient CreateApiClient() =>
         CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -476,6 +479,8 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
             services.RemoveAll<IAssignmentSuggestionGenerator>();
             services.AddSingleton<IAssignmentSuggestionGenerator>(
                 AssignmentSuggestionGenerator);
+            services.RemoveAll<IAiDraftGenerator>();
+            services.AddSingleton<IAiDraftGenerator>(AiDraftGenerator);
             services.RemoveAll<DbContextOptions<DigitalOpsDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<DigitalOpsDbContext>>();
             services.AddDbContext<DigitalOpsDbContext>(
@@ -559,9 +564,27 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
         await CreateUserAsync(
             userManager,
             dbContext,
+            "drafter",
+            "drafter@digitalops.local",
+            "D Drafter",
+            isActive: true,
+            mustChangePassword: false,
+            roles: [SystemRoles.Drafter]);
+        await CreateUserAsync(
+            userManager,
+            dbContext,
+            "otherdrafter",
+            "otherdrafter@digitalops.local",
+            "E Other Drafter",
+            isActive: true,
+            mustChangePassword: false,
+            roles: [SystemRoles.Drafter]);
+        await CreateUserAsync(
+            userManager,
+            dbContext,
             "inactive",
             "inactive@digitalops.local",
-            "D Inactive",
+            "F Inactive",
             isActive: false,
             mustChangePassword: false,
             roles: [SystemRoles.Drafter]);
@@ -570,7 +593,7 @@ public sealed class StaffManagementApiFactory : DigitalOpsApiFactory
             dbContext,
             "forcedadmin",
             "forcedadmin@digitalops.local",
-            "E Forced Administrator",
+            "G Forced Administrator",
             isActive: true,
             mustChangePassword: true,
             roles: [SystemRoles.Clerk]);

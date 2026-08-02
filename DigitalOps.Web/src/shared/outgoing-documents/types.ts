@@ -8,7 +8,7 @@ export type OutgoingDocumentStatus =
 export interface OutgoingTemplateReference { id: string; name: string; documentType: DocumentTypeReference; }
 export interface OutgoingIncomingReference { id: string; referenceNumber: string; summary: string; }
 export interface OutgoingMemberReference { id: string; fullName: string; position: string | null; }
-export interface OutgoingStaffReference extends IncomingStaffReference {}
+export type OutgoingStaffReference = IncomingStaffReference;
 export interface ReviewIssueResponse { ruleCode: string; severity: string; message: string; location: string | null; }
 
 export interface OutgoingDocumentResponse {
@@ -39,6 +39,15 @@ export interface OutgoingDocumentCreateRequest {
   relatedMemberId?: string;
 }
 
+export interface OutgoingDocumentUpdateRequest {
+  title?: string;
+  content?: string;
+}
+
+export interface AiDraftRequest {
+  instruction?: string;
+}
+
 export interface OutgoingDocumentListParameters {
   q?: string;
   templateId?: string;
@@ -52,4 +61,4 @@ export interface OutgoingDocumentListParameters {
   pageSize?: number;
 }
 
-export interface OutgoingTemplateOption extends DocumentTemplateResponse {}
+export type OutgoingTemplateOption = DocumentTemplateResponse;

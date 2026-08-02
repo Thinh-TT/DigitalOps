@@ -16,4 +16,16 @@ public interface IOutgoingDocumentService
         OutgoingDocumentCreateRequest request,
         Guid draftedByStaffId,
         CancellationToken cancellationToken = default);
+
+    Task<OutgoingDocumentResult<OutgoingDocumentResponse>> UpdateAsync(
+        Guid id,
+        OutgoingDocumentUpdateRequest request,
+        Guid callerStaffId,
+        CancellationToken cancellationToken = default);
+
+    Task<OutgoingDocumentResult<OutgoingDocumentResponse>> GenerateAiDraftAsync(
+        Guid id,
+        AiDraftRequest request,
+        Guid callerStaffId,
+        CancellationToken cancellationToken = default);
 }

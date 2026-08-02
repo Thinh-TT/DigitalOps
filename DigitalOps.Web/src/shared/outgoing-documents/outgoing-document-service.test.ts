@@ -1,8 +1,10 @@
 import { writeSession } from "../auth/session-store";
 import {
   createOutgoingDocument,
+  generateOutgoingAiDraft,
   getOutgoingDocument,
   getOutgoingDocuments,
+  updateOutgoingDocument,
   uploadOutgoingAttachment,
 } from "./outgoing-document-service";
 
@@ -31,6 +33,21 @@ describe("outgoing-document-service", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/outgoing-documents/outgoing/attachments");
     expect(fetchMock.mock.calls[1][1]?.body).toBeInstanceOf(FormData);
     expect((fetchMock.mock.calls[1][1]?.body as FormData).get("file")).toBeInstanceOf(File);
+  });
+
+  it("sends partial update and AI draft JSON", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({ id: "outgoing" })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateOutgoingDocument("outgoing", { title: "Tiêu đề mới", content: "Nội dung mới" });
+    await generateOutgoingAiDraft("outgoing", { instruction: "Nhấn mạnh tiến độ" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/outgoing-documents/outgoing");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("PATCH");
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({ title: "Tiêu đề mới", content: "Nội dung mới" });
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/outgoing-documents/outgoing/ai-draft");
+    expect(fetchMock.mock.calls[1][1]?.method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({ instruction: "Nhấn mạnh tiến độ" });
   });
 });
 

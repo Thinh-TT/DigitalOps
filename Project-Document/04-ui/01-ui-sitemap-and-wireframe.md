@@ -333,7 +333,7 @@ Boundary UI T2-03:
 ```
 
 - Tạo mới bắt buộc chọn template Active và nhập title; member lookup chỉ trả hội viên Active. Related incoming document và related member là optional theo API.
-- [Sinh nháp AI] có thể gửi instruction optional. Khi thành công, tải lại response và hiển thị aiDraftContent read-only; các lần sửa sau chỉ thay Content. Khi 503, giữ textarea và dữ liệu đã có.
+- [Sinh nháp AI] mở modal nhập instruction optional. Xác nhận modal là bước chấp nhận và lưu ngay kết quả qua một endpoint, không có preview riêng; nếu title/Content đang dirty thì yêu cầu [Lưu] trước. Khi thành công, dùng response server làm state mới và hiển thị aiDraftContent read-only; các lần sinh sau chỉ thay Content. Khi `409/503`, không reload resource, giữ form và instruction để thử lại hoặc sửa thủ công.
 - [Lưu] gọi PATCH khi document editable và Drafter là draftedByStaff. Nút [Gửi thẩm định] chỉ hiện khi trạng thái/ownership hợp lệ; trong lúc review disable nút để không tạo attempt trùng.
 - Tab review hiển thị attemptNo, reviewedAt, reviewSource, reviewResult, reviewIssues và ContentSnapshot. Kết quả Failed hiển thị lỗi tại panel và trạng thái ReviewFailed; kết quả Passed chuyển PendingApproval.
 - Khi resource PendingApproval, Approved hoặc Archived, editor read-only. Nếu Leader trả document, API trả Editing và owner có thể sửa, rồi gửi review vòng mới.

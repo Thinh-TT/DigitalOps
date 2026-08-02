@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using DigitalOps.API.Features.Attachments;
 using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.IncomingDocuments;
@@ -16,6 +17,47 @@ public sealed class OutgoingDocumentCreateRequest
     public Guid? RelatedIncomingDocumentId { get; init; }
 
     public Guid? RelatedMemberId { get; init; }
+}
+
+public sealed class OutgoingDocumentUpdateRequest
+{
+    private string? _title;
+    private string? _content;
+
+    [StringLength(500)]
+    public string? Title
+    {
+        get => _title;
+        set
+        {
+            _title = value;
+            HasTitle = true;
+        }
+    }
+
+    public string? Content
+    {
+        get => _content;
+        set
+        {
+            _content = value;
+            HasContent = true;
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasTitle { get; private set; }
+
+    [JsonIgnore]
+    public bool HasContent { get; private set; }
+
+    [JsonIgnore]
+    public bool HasAnyField => HasTitle || HasContent;
+}
+
+public sealed class AiDraftRequest
+{
+    public string? Instruction { get; init; }
 }
 
 public sealed class OutgoingDocumentListQuery : IValidatableObject
@@ -117,7 +159,8 @@ public enum OutgoingDocumentFailure
     Validation,
     NotFound,
     Conflict,
-    Forbidden
+    Forbidden,
+    ServiceUnavailable
 }
 
 public sealed record OutgoingDocumentResult<T>(
@@ -143,6 +186,9 @@ public sealed record OutgoingDocumentResult<T>(
 
     public static OutgoingDocumentResult<T> Forbidden(string detail) =>
         new(default, OutgoingDocumentFailure.Forbidden, detail, EmptyErrors());
+
+    public static OutgoingDocumentResult<T> ServiceUnavailable(string detail) =>
+        new(default, OutgoingDocumentFailure.ServiceUnavailable, detail, EmptyErrors());
 
     private static IReadOnlyDictionary<string, string[]> EmptyErrors() =>
         new Dictionary<string, string[]>();

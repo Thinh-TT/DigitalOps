@@ -83,6 +83,7 @@ builder.Services.AddScoped<IMemberManagementService, MemberManagementService>();
 builder.Services.AddScoped<IDocumentCatalogService, DocumentCatalogService>();
 builder.Services.AddScoped<IIncomingDocumentService, IncomingDocumentService>();
 builder.Services.AddScoped<IAssignmentSuggestionGenerator, AssignmentSuggestionGenerator>();
+builder.Services.AddScoped<IAiDraftGenerator, AiDraftGenerator>();
 builder.Services.AddScoped<IOutgoingDocumentService, OutgoingDocumentService>();
 builder.Services
     .AddOptions<ReminderWorkerOptions>()
