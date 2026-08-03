@@ -3,6 +3,7 @@ using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.AI;
+using DigitalOps.API.Shared.AI.Retrieval;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.Data.Sqlite;
@@ -98,6 +99,51 @@ public sealed class DocumentReviewGeneratorTests
         Assert.Empty(result.Issues);
     }
 
+    [Fact]
+    public async Task Legal_source_ref_returns_minimal_review_citation()
+    {
+        var chunkId = Guid.NewGuid();
+        var chat = new RecordingChatClient
+        {
+            Response = $$"""{"issues":[{"ruleCode":"legal_reference","severity":"Info","message":"Cần đối chiếu nguồn đã dẫn.","location":null}],"sourceRefs":["{{chunkId:D}}"]}"""
+        };
+        var retrieval = new StaticRagRetrievalService(
+            new RetrievalResult(
+                chunkId,
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "Nội dung nguồn",
+                "Điều 1",
+                0.91,
+                "gov:test:15",
+                "Nghị định 15/2023/NĐ-CP",
+                "vanban_chinhphu",
+                "https://vanban.chinhphu.vn/example",
+                "official",
+                "sha256:test",
+                "current",
+                new DateOnly(2023, 5, 1),
+                null,
+                "15/2023/NĐ-CP",
+                "Nghị định",
+                "Chính phủ",
+                false));
+        await using var database = await GeneratorDatabase.CreateAsync(
+            chat,
+            retrieval);
+        using var rules = JsonDocument.Parse("{\"version\":1,\"rules\":[]}");
+
+        var result = await database.Generator.ReviewAsync(
+            CreateInput("clean document", rules.RootElement));
+
+        var citation = Assert.Single(result.Citations!);
+        Assert.Equal(chunkId, citation.ChunkId);
+        Assert.Equal("15/2023/NĐ-CP", citation.DocumentNumber);
+        Assert.Equal("official", citation.SourceTrustTier);
+        Assert.DoesNotContain("Nội dung nguồn", JsonSerializer.Serialize(citation));
+        Assert.Contains("Nội dung nguồn", chat.LastRequest!.Messages[1].Content);
+    }
+
     private static DocumentReviewInput CreateInput(
         string content,
         JsonElement? formatRules = null)
@@ -134,6 +180,8 @@ public sealed class DocumentReviewGeneratorTests
 
         public int CallCount { get; private set; }
 
+        public AiChatRequest? LastRequest { get; private set; }
+
         public string Response { get; init; } = """{"issues":[],"sourceRefs":[]}""";
 
         public Task<AiChatResult> CompleteAsync(
@@ -141,8 +189,24 @@ public sealed class DocumentReviewGeneratorTests
             CancellationToken cancellationToken = default)
         {
             CallCount++;
+            LastRequest = request;
             return Task.FromResult(new AiChatResult(Response, "Test", "test", null, null));
         }
+    }
+
+    private sealed class StaticRagRetrievalService(
+        params RetrievalResult[] results) : IRAGRetrievalService
+    {
+        public Task<IReadOnlyList<RetrievalResult>> RetrieveAsync(
+            float[] queryVector,
+            string userRole = "public",
+            int topK = 5,
+            double minScore = 0.316666,
+            DateOnly? asOf = null,
+            bool includeHistorical = false,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RetrievalResult>>(
+                results.Take(topK).ToArray());
     }
 
     private sealed class EmptyQdrantClient : IQdrantKnowledgeClient
@@ -170,7 +234,8 @@ public sealed class DocumentReviewGeneratorTests
         private GeneratorDatabase(
             SqliteConnection connection,
             DigitalOpsDbContext context,
-            RecordingChatClient chat)
+            RecordingChatClient chat,
+            IRAGRetrievalService? ragRetrievalService)
         {
             this.connection = connection;
             this.context = context;
@@ -178,6 +243,10 @@ public sealed class DocumentReviewGeneratorTests
                 context,
                 new EmptyEmbeddingClient(),
                 new EmptyQdrantClient(),
+                ragRetrievalService ?? new RAGRetrievalService(
+                    context,
+                    new EmptyQdrantClient(),
+                    NullLogger<RAGRetrievalService>.Instance),
                 chat,
                 new AiOperationGate(),
                 Options.Create(new AiProviderOptions()),
@@ -187,7 +256,8 @@ public sealed class DocumentReviewGeneratorTests
         public DocumentReviewGenerator Generator { get; }
 
         public static async Task<GeneratorDatabase> CreateAsync(
-            RecordingChatClient? chat = null)
+            RecordingChatClient? chat = null,
+            IRAGRetrievalService? ragRetrievalService = null)
         {
             var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -197,7 +267,11 @@ public sealed class DocumentReviewGeneratorTests
                 .Options;
             var context = new DigitalOpsDbContext(options);
             await context.Database.EnsureCreatedAsync();
-            return new GeneratorDatabase(connection, context, chat ?? new RecordingChatClient());
+            return new GeneratorDatabase(
+                connection,
+                context,
+                chat ?? new RecordingChatClient(),
+                ragRetrievalService);
         }
 
         public async ValueTask DisposeAsync()
@@ -220,7 +294,24 @@ public sealed class OutgoingDocumentReviewServiceTests
         {
             Handler = (_, _) => Task.FromResult(new DocumentReviewGenerationResult(
                 ReviewSource.Rule,
-                [new ReviewIssueResponse("national_header", "Error", "Thiếu quốc hiệu.", "Đầu văn bản")]))
+                [new ReviewIssueResponse("national_header", "Error", "Thiếu quốc hiệu.", "Đầu văn bản")],
+                [new ReviewCitationResponse(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    "Nghị định mẫu",
+                    "15/2023/NĐ-CP",
+                    "Nghị định",
+                    "Chính phủ",
+                    "https://vanban.chinhphu.vn/example",
+                    "official",
+                    "sha256:test",
+                    "current",
+                    new DateOnly(2023, 5, 1),
+                    null,
+                    false,
+                    0.91)],
+                "truy vấn pháp lý mẫu"))
         };
         var service = database.CreateService(generator);
 
@@ -233,6 +324,7 @@ public sealed class OutgoingDocumentReviewServiceTests
         Assert.Equal(2, second.Value!.AttemptNo);
         Assert.Equal(ReviewResult.Failed, first.Value.ReviewResult);
         Assert.Equal(OutgoingDocumentStatus.ReviewFailed, second.Value.DocumentStatus);
+        Assert.Equal("15/2023/NĐ-CP", Assert.Single(first.Value.Citations).DocumentNumber);
 
         var persisted = await database.Context.OutgoingDocuments
             .AsNoTracking()
@@ -246,6 +338,20 @@ public sealed class OutgoingDocumentReviewServiceTests
             .ToArrayAsync();
         Assert.Equal([1, 2], history.Select(item => item.AttemptNo).ToArray());
         Assert.All(history, item => Assert.Equal(document.Content, item.ContentSnapshot));
+        var snapshots = await database.Context.RagCitationSnapshots
+            .AsNoTracking()
+            .OrderBy(item => item.CreatedAt)
+            .ToArrayAsync();
+        Assert.Equal(2, snapshots.Length);
+        Assert.All(snapshots, snapshot =>
+            Assert.Equal("truy vấn pháp lý mẫu", snapshot.QueryText));
+
+        var listed = await service.GetListAsync(
+            document.Id,
+            new ReviewListQuery());
+        Assert.True(listed.Succeeded);
+        Assert.All(listed.Value!.Items, item =>
+            Assert.Equal("15/2023/NĐ-CP", Assert.Single(item.Citations).DocumentNumber));
     }
 
     [Fact]
@@ -291,7 +397,13 @@ public sealed class OutgoingDocumentReviewServiceTests
 
         public OutgoingDocumentReviewService CreateService(
             DocumentReviewGeneratorTestDouble generator) =>
-            new(Context, generator, NullLogger<OutgoingDocumentReviewService>.Instance);
+            new(
+                Context,
+                generator,
+                new CitationSnapshotService(
+                    Context,
+                    NullLogger<CitationSnapshotService>.Instance),
+                NullLogger<OutgoingDocumentReviewService>.Instance);
 
         public async Task<Staff> CreateStaffAsync(string fullName)
         {

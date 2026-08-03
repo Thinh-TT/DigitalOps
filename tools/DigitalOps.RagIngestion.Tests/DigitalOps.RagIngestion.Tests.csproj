@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DxOs.Workers\DxOs.Workers.csproj" />
+    <ProjectReference Include="..\DigitalOps.RagIngestion\DigitalOps.RagIngestion.csproj" />
   </ItemGroup>
 
 </Project>

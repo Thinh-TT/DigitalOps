@@ -62,7 +62,7 @@ EXPORT_FORMATS: dict[RagExportFormat, ExportFormatDescriptor] = {
     RagExportFormat.STAGING_ZIP: ExportFormatDescriptor(
         RagExportFormat.STAGING_ZIP,
         "Staging ZIP",
-        "Self-contained lossless package for DxOs.Workers.",
+        "Self-contained lossless package for DigitalOps.RagIngestion.",
         "application/zip",
         "-staging.zip",
     ),

@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
-using DxOs.Workers.Models;
+using DigitalOps.RagIngestion.Models;
 
-namespace DxOs.Workers.Services;
+namespace DigitalOps.RagIngestion.Services;
 
 internal static class StagingPackageIntegrityValidator
 {
@@ -32,6 +32,86 @@ internal static class StagingPackageIntegrityValidator
         {
             errors.Add("manifest.json did not contain a valid manifest object.");
             return;
+        }
+
+        if (manifest.SchemaVersion is not null
+            && !string.Equals(
+                manifest.SchemaVersion,
+                "1.0",
+                StringComparison.Ordinal))
+        {
+            errors.Add(
+                $"Unsupported staging schema_version '{manifest.SchemaVersion}'; supported version is 1.0.");
+        }
+        if (manifest.CorpusType is not ("general" or "legal_reference"))
+        {
+            errors.Add(
+                $"Unsupported corpus_type '{manifest.CorpusType}'.");
+        }
+        if (manifest.SchemaVersion == "1.0")
+        {
+            if (manifest.Files is null
+                || manifest.Files.ObservationsFile != "document-observations.jsonl"
+                || manifest.Files.ChunkSetsFile != "chunk-sets.jsonl"
+                || manifest.Files.ChunksFile != "chunks.jsonl"
+                || manifest.Files.ErrorsFile != "crawler-errors.jsonl")
+            {
+                errors.Add(
+                    "Schema 1.0 manifest files must use the canonical staging filenames.");
+            }
+            if (manifest.SourceRegistryEntryIds is null)
+            {
+                errors.Add(
+                    "Schema 1.0 manifest is missing source_registry_entry_ids.");
+            }
+            else
+            {
+                var declaredEntryIds = manifest.SourceRegistryEntryIds
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+                var actualEntryIds = observations
+                    .Select(observation =>
+                        observation.SourceProvenance?.RegistryEntryId)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+                if (declaredEntryIds.Length
+                        != manifest.SourceRegistryEntryIds.Count
+                    || declaredEntryIds.Distinct(
+                            StringComparer.Ordinal).Count()
+                        != declaredEntryIds.Length)
+                {
+                    errors.Add(
+                        "Schema 1.0 source_registry_entry_ids must be non-empty and unique.");
+                }
+                if (!declaredEntryIds.SequenceEqual(
+                        actualEntryIds,
+                        StringComparer.Ordinal))
+                {
+                    errors.Add(
+                        "Manifest source_registry_entry_ids do not match observation provenance.");
+                }
+            }
+            if (manifest.CorpusType == "legal_reference"
+                && string.IsNullOrWhiteSpace(
+                    manifest.SourceRegistryVersion))
+            {
+                errors.Add(
+                    "Legal schema 1.0 manifest requires source_registry_version.");
+            }
+            if (observations.Any(observation =>
+                    observation.SourceProvenance?.RegistryVersion is not null
+                    && !string.Equals(
+                        observation.SourceProvenance.RegistryVersion,
+                        manifest.SourceRegistryVersion,
+                        StringComparison.Ordinal)))
+            {
+                errors.Add(
+                    "Observation registry_version does not match the manifest.");
+            }
         }
 
         if (observations.Count == 0 || chunkSets.Count == 0 || chunks.Count == 0)
@@ -66,10 +146,17 @@ internal static class StagingPackageIntegrityValidator
             "chunk_set_id",
             errors);
         UniqueBy(chunks, chunk => chunk.ChunkId, "chunk_id", errors);
+        var canonicalKeys = new HashSet<string>(StringComparer.Ordinal);
 
         var normalizedTexts = new Dictionary<Guid, string>();
         foreach (var observation in observations)
         {
+            if (string.IsNullOrWhiteSpace(observation.CanonicalDocumentKey)
+                || !canonicalKeys.Add(observation.CanonicalDocumentKey))
+            {
+                errors.Add(
+                    $"Observation {observation.ObservationId} has an empty or duplicate canonical_document_key.");
+            }
             if (!string.Equals(
                     observation.JobId,
                     manifest.JobId,
@@ -154,6 +241,18 @@ internal static class StagingPackageIntegrityValidator
             {
                 errors.Add(
                     $"Chunk set {chunkSet.ChunkSetId} belongs to a different job.");
+            }
+            var softMax = chunkSet.SoftMaxTokens ?? chunkSet.TargetTokens;
+            var hardMax = chunkSet.MaxTokens ?? Math.Max(
+                softMax,
+                chunkSet.TargetTokens);
+            if (!(chunkSet.OverlapTokens < chunkSet.TargetTokens
+                && chunkSet.TargetTokens <= softMax
+                && softMax <= hardMax
+                && hardMax <= 512))
+            {
+                errors.Add(
+                    $"Chunk set {chunkSet.ChunkSetId} has invalid token limits.");
             }
 
             var setChunks = chunks

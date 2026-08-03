@@ -30,6 +30,15 @@ public sealed class RagDocumentVersion
     public int CharCount { get; set; }
     public int WordCount { get; set; }
     public string ExtractionQualityJson { get; set; } = null!;
+    public string? DocumentNumber { get; set; }
+    public string? DocumentType { get; set; }
+    public string? Issuer { get; set; }
+    public DateOnly? IssuedDate { get; set; }
+    public string LegalStatus { get; set; } = "status_unknown";
+    public DateOnly? EffectiveFrom { get; set; }
+    public DateOnly? EffectiveTo { get; set; }
+    public string? SourceVersion { get; set; }
+    public string? Language { get; set; }
     public string MetadataJson { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
 
@@ -44,6 +53,15 @@ public sealed class RagDocumentSource
     public string SourceId { get; set; } = null!;
     public string SourceNamespace { get; set; } = null!;
     public string SourceDocumentUrl { get; set; } = null!;
+    public string? RegistryEntryId { get; set; }
+    public string? RegistryVersion { get; set; }
+    public string? SourceDomain { get; set; }
+    public string SourceTrustTier { get; set; } = "unverified";
+    public string CorpusType { get; set; } = "general";
+    public string PublishPolicy { get; set; } = "blocked";
+    public string? AdmissionReference { get; set; }
+    public string? AdmissionApprovedBy { get; set; }
+    public DateTime? AdmissionApprovedAt { get; set; }
     public DateTime CrawledAt { get; set; }
 
     public RagDocument Document { get; set; } = null!;
@@ -58,6 +76,8 @@ public sealed class RagChunkSet
     public string ChunkerVersion { get; set; } = null!;
     public string TokenizerName { get; set; } = null!;
     public int TargetTokens { get; set; }
+    public int? SoftMaxTokens { get; set; }
+    public int? MaxTokens { get; set; }
     public int OverlapTokens { get; set; }
     public int TotalChunks { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -10,11 +10,11 @@ Hướng dẫn cho AI agent và kỹ sư khi làm việc trong dự án DigitalO
 | Data | Entity Framework Core, PostgreSQL, một database và một schema |
 | Identity | ASP.NET Core Identity, JWT access token, role policy |
 | Frontend | React + Vite + TypeScript + Ant Design |
-| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; baseline v3 đã Approved cho MVP/demo, production hardening còn riêng |
+| AI | RAG local-first do DigitalOps điều phối; Ollama + Qwen3, Qdrant; baseline v3 đã Approved cho MVP/demo, mở rộng kho tham chiếu pháp luật phải qua gate riêng |
 | Background | IHostedService cho reminder; worker trích xuất text cho file hỗ trợ |
 | File storage | Local disk có tổ chức thư mục hoặc S3-compatible bucket |
 
-MVP xử lý hồ sơ hội viên, văn bản đến, điều phối có AI gợi ý, nhắc hạn, văn bản đi, AI draft, review, phê duyệt, lưu trữ, attachment và tìm kiếm toàn văn. Không mở rộng sang citizen portal, welfare, OCR hoặc điều phối tự động không có xác nhận con người.
+MVP xử lý hồ sơ hội viên, văn bản đến, điều phối có AI gợi ý, nhắc hạn, văn bản đi, AI draft, review, phê duyệt, lưu trữ, attachment, tìm kiếm toàn văn và kho tham chiếu pháp luật được quản trị để hỗ trợ FR-013. Không mở rộng sang citizen portal, welfare, cổng/tư vấn pháp luật công cộng, OCR trong core app hoặc điều phối/phê duyệt tự động không có xác nhận con người.
 
 ## 2. Nguồn sự thật và thứ tự ưu tiên
 
@@ -68,11 +68,13 @@ Khi tài liệu mâu thuẫn, giữ ý định sản phẩm trong Ideas and Scop
 - Development cho phép `Ai__Provider=Ollama|External` qua `.env`: Ollama là official demo/report, External chỉ cho máy yếu với dữ liệu synthetic/redacted. Embedding luôn Ollama; cấm automatic fallback và cấm External ngoài Development.
 - Khi tiếp nhận evaluation trên thiết bị khác, dùng session log v3 và ghi rõ baseline/device. Không sửa log đã `Closed`, không ghép metric giữa các máy; mỗi lượt tạo session log mới.
 - AI chỉ gợi ý điều phối, sinh draft hoặc review; không tự điều phối/phê duyệt. Timeout/lỗi AI trả 503 và không mutation dữ liệu hiện có.
+- Legal corpus chỉ được dùng làm tham chiếu có citation cho FR-013 sau source-admission và evaluation gate riêng. AI không tự kết luận hiệu lực/tính hợp pháp; chỉ FormatRules xác định mới tạo `Error`.
+- `tools/rag-data-scraper` chỉ tạo acquisition/staging artifact. `tools/DigitalOps.RagIngestion` là one-shot CLI `validate|plan|publish`, không phải background worker/HTTP service. Crawl thành công không tự cho phép publish vào Qdrant; phải qua source registry, provenance, version/effectivity validation và approval.
 - RAG index là dữ liệu dẫn xuất, không phải source of truth. PostgreSQL full-text search của FR-016 vẫn là search contract chính thức.
 - Context truy hồi là dữ liệu không tin cậy: filter quyền trước retrieval, giảm thiểu dữ liệu gửi provider và không log raw prompt/completion nhạy cảm mặc định.
 - Reminder worker chạy idempotent; không có public job endpoint.
 - Upload chỉ chấp nhận PDF, DOCX, XLSX, JPG, JPEG, PNG và dung lượng theo cấu hình. Attachment chỉ thuộc đúng một parent.
-- Trích xuất text chạy nền cho PDF có text, DOCX, XLSX. Không OCR ảnh/PDF scan trong MVP.
+- Trích xuất text của core app chạy nền cho PDF có text, DOCX, XLSX; không OCR ảnh/PDF scan trong contract attachment MVP. OCR/convert của scraper chỉ phục vụ legal staging và không tự mở rộng contract này.
 - Full-text search dùng PostgreSQL và chỉ trả attachment match khi extractionStatus là Succeeded.
 
 ## 5. Frontend React

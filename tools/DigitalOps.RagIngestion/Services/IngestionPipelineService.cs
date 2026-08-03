@@ -3,10 +3,10 @@ using System.Text;
 using System.Text.Json;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Data.Entities;
-using DxOs.Workers.Models;
+using DigitalOps.RagIngestion.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace DxOs.Workers.Services;
+namespace DigitalOps.RagIngestion.Services;
 
 public sealed class IngestionPipelineService
 {
@@ -43,6 +43,7 @@ public sealed class IngestionPipelineService
         bool isDryRun = false,
         bool isResume = false,
         string? stagingDirectory = null,
+        AdmissionReceipt? admissionReceipt = null,
         CancellationToken cancellationToken = default)
     {
         if (!report.IsValid || report.Manifest is null)
@@ -91,6 +92,7 @@ public sealed class IngestionPipelineService
                     observation,
                     report,
                     generation,
+                    admissionReceipt,
                     cancellationToken);
                 processedObservations++;
                 job.ProcessedObservations = processedObservations;
@@ -236,6 +238,7 @@ public sealed class IngestionPipelineService
         DocumentObservationDto observation,
         ValidationReport report,
         RagIndexGeneration generation,
+        AdmissionReceipt? admissionReceipt,
         CancellationToken cancellationToken)
     {
         var document = await _dbContext.RagDocuments.SingleOrDefaultAsync(
@@ -284,21 +287,49 @@ public sealed class IngestionPipelineService
                 WordCount = observation.WordCount,
                 ExtractionQualityJson = JsonSerializer.Serialize(
                     observation.ExtractionQuality),
-                MetadataJson = "{}",
+                DocumentNumber = observation.LegalMetadata?.DocumentNumber,
+                DocumentType = observation.LegalMetadata?.DocumentType,
+                Issuer = observation.LegalMetadata?.Issuer,
+                IssuedDate = observation.LegalMetadata?.IssuedDate,
+                LegalStatus = observation.LegalMetadata?.LegalStatus
+                    ?? "status_unknown",
+                EffectiveFrom = observation.LegalMetadata?.EffectiveFrom,
+                EffectiveTo = observation.LegalMetadata?.EffectiveTo,
+                SourceVersion = observation.SourceProvenance?.SourceVersion,
+                Language = observation.SourceProvenance?.Language,
+                MetadataJson = SerializeMetadata(
+                    observation,
+                    admissionReceipt),
                 CreatedAt = DateTime.UtcNow
             };
             _dbContext.RagDocumentVersions.Add(version);
         }
+        else
+        {
+            version.MetadataJson = SerializeMetadata(
+                observation,
+                admissionReceipt);
+            version.DocumentNumber = observation.LegalMetadata?.DocumentNumber;
+            version.DocumentType = observation.LegalMetadata?.DocumentType;
+            version.Issuer = observation.LegalMetadata?.Issuer;
+            version.IssuedDate = observation.LegalMetadata?.IssuedDate;
+            version.LegalStatus = observation.LegalMetadata?.LegalStatus
+                ?? "status_unknown";
+            version.EffectiveFrom = observation.LegalMetadata?.EffectiveFrom;
+            version.EffectiveTo = observation.LegalMetadata?.EffectiveTo;
+            version.SourceVersion = observation.SourceProvenance?.SourceVersion;
+            version.Language = observation.SourceProvenance?.Language;
+        }
 
-        var sourceExists = await _dbContext.RagDocumentSources.AnyAsync(
+        var source = await _dbContext.RagDocumentSources.SingleOrDefaultAsync(
             source => source.VersionId == version.Id
                 && source.SourceId == observation.SourceId
                 && source.SourceDocumentUrl
                     == observation.SourceDocumentUrl,
             cancellationToken);
-        if (!sourceExists)
+        if (source is null)
         {
-            _dbContext.RagDocumentSources.Add(new RagDocumentSource
+            source = new RagDocumentSource
             {
                 Id = Guid.NewGuid(),
                 DocumentId = document.Id,
@@ -306,8 +337,36 @@ public sealed class IngestionPipelineService
                 SourceId = observation.SourceId,
                 SourceNamespace = observation.SourceNamespace,
                 SourceDocumentUrl = observation.SourceDocumentUrl,
+                RegistryEntryId = observation.SourceProvenance?.RegistryEntryId,
+                RegistryVersion = observation.SourceProvenance?.RegistryVersion,
+                SourceDomain = observation.SourceProvenance?.SourceDomain,
+                SourceTrustTier = observation.SourceProvenance?.SourceTrustTier
+                    ?? "unverified",
+                CorpusType = observation.SourceProvenance?.CorpusType
+                    ?? "general",
+                PublishPolicy = observation.SourceProvenance?.PublishPolicy
+                    ?? "blocked",
+                AdmissionReference = admissionReceipt?.ApprovalReference,
+                AdmissionApprovedBy = admissionReceipt?.ApprovedBy,
+                AdmissionApprovedAt = admissionReceipt?.ApprovedAt,
                 CrawledAt = observation.CrawledAt
-            });
+            };
+            _dbContext.RagDocumentSources.Add(source);
+        }
+        else
+        {
+            source.RegistryEntryId = observation.SourceProvenance?.RegistryEntryId;
+            source.RegistryVersion = observation.SourceProvenance?.RegistryVersion;
+            source.SourceDomain = observation.SourceProvenance?.SourceDomain;
+            source.SourceTrustTier = observation.SourceProvenance?.SourceTrustTier
+                ?? "unverified";
+            source.CorpusType = observation.SourceProvenance?.CorpusType
+                ?? "general";
+            source.PublishPolicy = observation.SourceProvenance?.PublishPolicy
+                ?? "blocked";
+            source.AdmissionReference = admissionReceipt?.ApprovalReference;
+            source.AdmissionApprovedBy = admissionReceipt?.ApprovedBy;
+            source.AdmissionApprovedAt = admissionReceipt?.ApprovedAt;
         }
 
         var chunkSetDto = report.ChunkSets.Single(
@@ -327,6 +386,8 @@ public sealed class IngestionPipelineService
                 ChunkerVersion = chunkSetDto.ChunkerVersion,
                 TokenizerName = chunkSetDto.TokenizerName,
                 TargetTokens = chunkSetDto.TargetTokens,
+                SoftMaxTokens = chunkSetDto.SoftMaxTokens,
+                MaxTokens = chunkSetDto.MaxTokens,
                 OverlapTokens = chunkSetDto.OverlapTokens,
                 TotalChunks = chunkSetDto.TotalChunks,
                 CreatedAt = chunkSetDto.CreatedAt
@@ -395,6 +456,17 @@ public sealed class IngestionPipelineService
                             version.Id,
                             document.Id,
                             document.CanonicalDocumentKey,
+                            observation.SourceId,
+                            observation.SourceDocumentUrl,
+                            source.SourceTrustTier,
+                            source.CorpusType,
+                            observation.SourceProvenance?.SourceVersion
+                                ?? string.Empty,
+                            version.LegalStatus,
+                            version.EffectiveFrom,
+                            version.EffectiveTo,
+                            version.DocumentNumber,
+                            version.Issuer,
                             chunkDto.ChunkAcl.SecurityClassification,
                             chunkDto.ChunkAcl.AllowedRoles,
                             chunkDto.ChunkAcl.DeniedRoles,
@@ -442,13 +514,35 @@ public sealed class IngestionPipelineService
         ContentSha256 = chunk.ContentSha256,
         HeadingPath = chunk.HeadingPath,
         PageNumbers = chunk.PageNumbers.ToArray(),
-        StructureMetadataJson = "{}",
+        StructureMetadataJson = JsonSerializer.Serialize(
+            chunk.StructureMetadata ?? []),
         AllowedRoles = chunk.ChunkAcl.AllowedRoles.ToArray(),
         DeniedRoles = chunk.ChunkAcl.DeniedRoles.ToArray(),
         SecurityClassification =
             chunk.ChunkAcl.SecurityClassification,
         CreatedAt = DateTime.UtcNow
     };
+
+    private static string SerializeMetadata(
+        DocumentObservationDto observation,
+        AdmissionReceipt? admissionReceipt) =>
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["document_metadata"] = observation.DocumentMetadata ?? [],
+            ["source_provenance"] = observation.SourceProvenance,
+            ["legal_metadata"] = observation.LegalMetadata,
+            ["admission"] = admissionReceipt is null
+                ? null
+                : new
+                {
+                    status = admissionReceipt.Status,
+                    reference = admissionReceipt.ApprovalReference,
+                    approvedBy = admissionReceipt.ApprovedBy,
+                    approvedAt = admissionReceipt.ApprovedAt,
+                    registryVersion = admissionReceipt.RegistryVersion,
+                    packageDigest = admissionReceipt.PackageDigest
+                }
+        });
 
     private static Guid ComputeStableGuid(string value)
     {

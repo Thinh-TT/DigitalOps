@@ -1,7 +1,7 @@
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
 
-namespace DxOs.Workers.Services;
+namespace DigitalOps.RagIngestion.Services;
 
 public sealed record QdrantIngestionPoint(
     Guid PointId,
@@ -10,6 +10,16 @@ public sealed record QdrantIngestionPoint(
     Guid VersionId,
     Guid DocumentId,
     string CanonicalDocumentKey,
+    string SourceId,
+    string SourceDocumentUrl,
+    string SourceTrustTier,
+    string CorpusType,
+    string SourceVersion,
+    string LegalStatus,
+    DateOnly? EffectiveFrom,
+    DateOnly? EffectiveTo,
+    string? DocumentNumber,
+    string? Issuer,
     string SecurityClassification,
     IReadOnlyList<string> AllowedRoles,
     IReadOnlyList<string> DeniedRoles,
@@ -88,6 +98,31 @@ public sealed class QdrantIngestionClient(
             value.Payload["document_id"] = point.DocumentId.ToString("D");
             value.Payload["canonical_document_key"] =
                 point.CanonicalDocumentKey;
+            value.Payload["source_id"] = point.SourceId;
+            value.Payload["source_url"] = point.SourceDocumentUrl;
+            value.Payload["source_trust_tier"] = point.SourceTrustTier;
+            value.Payload["corpus_type"] = point.CorpusType;
+            value.Payload["source_version"] = point.SourceVersion;
+            value.Payload["legal_status"] = point.LegalStatus;
+            value.Payload["admission_status"] = "approved";
+            if (point.EffectiveFrom is not null)
+            {
+                value.Payload["effective_from"] =
+                    point.EffectiveFrom.Value.ToString("yyyy-MM-dd");
+            }
+            if (point.EffectiveTo is not null)
+            {
+                value.Payload["effective_to"] =
+                    point.EffectiveTo.Value.ToString("yyyy-MM-dd");
+            }
+            if (!string.IsNullOrWhiteSpace(point.DocumentNumber))
+            {
+                value.Payload["document_number"] = point.DocumentNumber;
+            }
+            if (!string.IsNullOrWhiteSpace(point.Issuer))
+            {
+                value.Payload["issuer"] = point.Issuer;
+            }
             value.Payload["security_classification"] =
                 point.SecurityClassification;
             value.Payload["allowed_roles"] = new Value

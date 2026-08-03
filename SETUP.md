@@ -370,9 +370,11 @@ Set-Location DigitalOps.Web
 npm.cmd run dev
 ```
 
-## 10. Multi-source RAG Data Crawler & Ingestion Worker
+## 10. Multi-source RAG Data Crawler & Ingestion CLI
 
-Hệ thống RAG Pipeline bao gồm 2 thành phần: Python Scraper (cào & trích xuất dữ liệu) và .NET 10 Ingestion Worker (nạp dữ liệu vào PostgreSQL & Qdrant).
+Hệ thống RAG Pipeline bao gồm Python Scraper (cào, trích xuất và tạo staging
+package) và .NET 10 Ingestion CLI (validate/plan hoặc nạp có kiểm soát vào
+derived ingestion catalog và Qdrant). Crawl thành công không tự phê duyệt nguồn.
 
 ### 10.1. Cài đặt Python Data Scraper
 
@@ -427,12 +429,15 @@ chỉ bind loopback và chỉ nhận URL HTTPS thuộc đúng phạm vi của ad
 
 Dữ liệu cào & chunking được xuất thành package tự chứa tại
 `tools/rag-data-scraper/storage/staging/<job_id>/` (gồm artifact và `preview.html`).
+Với trang danh sách được hỗ trợ, `limit` là số văn bản chính đầu ra; trang phân
+trang và lượt tải attachment được theo dõi bằng metrics riêng. File `.doc` cũ
+được chuyển đổi bằng LibreOffice headless có timeout/size cap trước khi chunk.
 
 Preview mới là **RAG Inspector** tự chứa: có tab Tổng quan/Văn bản/Chunks/
 Vấn đề/Kỹ thuật, phân trang 50 dòng, bộ lọc và drawer chi tiết. RAG Health phát
 hiện sai lệch manifest, quan hệ mồ côi, token budget, offset, ACL, extraction,
 duplicate và crawler error; đây là cảnh báo review trước ingestion, không thay
-thế bước validate của `DxOs.Workers`.
+thế bước validate của `DigitalOps.RagIngestion`.
 
 #### Xuất định dạng phục vụ RAG từ Dashboard
 
@@ -440,7 +445,7 @@ Sau khi job hoàn tất, tại cột **Hành động**, chọn định dạng v�
 
 - `chunks_jsonl` (khuyên dùng): một chunk mỗi dòng, giữ nguyên `text`, source,
   hash, offset và ACL để nạp vector pipeline;
-- `staging_zip`: package lossless dùng trực tiếp với `DxOs.Workers`;
+- `staging_zip`: package lossless dùng trực tiếp với `DigitalOps.RagIngestion`;
 - dữ liệu có cấu trúc: `chunks_json`, `chunks_csv`, `chunks_xlsx` và
   `documents_xml`;
 - tài liệu: `documents_html`, `documents_pdf`, `documents_docx`,
@@ -461,9 +466,18 @@ thiếu trả `503` mà không lộ chi tiết dependency. Xem bảng contract c
 trong `tools/rag-data-scraper/SETUP.md`.
 
 
-### 10.3. Nạp dữ liệu vào PostgreSQL & Qdrant (Ingestion CLI Worker)
+### 10.3. Kiểm tra và nạp có kiểm soát vào PostgreSQL & Qdrant (Ingestion CLI)
 
-Thư mục gốc: `DxOs.Workers`
+Legal corpus phải đi qua source-admission và evaluation gate T4-03 trong
+`Project-Document/02-architecture/03-ai-rag-design.md`. CLI đã cưỡng chế receipt
+admission gắn với digest package; T4-03 vẫn `[~]` đến khi 45 ca regression cộng
+legal fixture đạt gate, vì vậy command thành công không phải tuyên bố
+production-ready.
+
+Project độc lập: `tools/DigitalOps.RagIngestion`. Đây là CLI chạy một lần rồi
+thoát, không phải background worker hay public HTTP service. Tiến trình ngoài có
+thể gọi bốn command ổn định `validate`, `plan`, `admit`, `publish` và kiểm tra exit code.
+Contract đầy đủ nằm tại `tools/DigitalOps.RagIngestion/README.md`.
 
 1. **Áp dụng EF migration RAG trên PostgreSQL**:
    ```powershell
@@ -475,7 +489,7 @@ Thư mục gốc: `DxOs.Workers`
    EF migration là nguồn schema chính thức; không chạy thêm
    `tools/rag-data-scraper/sql/001_init_rag_schema.sql` trên cùng database.
 
-2. **Cấu hình worker ngoài source control**:
+2. **Cấu hình ingestion CLI ngoài source control**:
    ```powershell
    $env:ConnectionStrings__DigitalOps = "<PostgreSQL connection string>"
    $env:Ai__Ollama__BaseUrl = "http://127.0.0.1:11434"
@@ -486,25 +500,40 @@ Thư mục gốc: `DxOs.Workers`
 
 3. **Kiểm tra toàn vẹn package, không gọi mạng/không ghi DB**:
    ```powershell
-   dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id> --validate-only
+   dotnet run --project tools/DigitalOps.RagIngestion -- validate --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
    ```
 
 4. **Mô phỏng deterministic ID, không gọi mạng/không ghi DB**:
    ```powershell
-   dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id> --dry-run
+   dotnet run --project tools/DigitalOps.RagIngestion -- plan --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
    ```
 
-5. **Nạp dữ liệu vào PostgreSQL và Qdrant**:
+5. **Duyệt admission sau khi kiểm tra RAG Inspector/validation**:
    ```powershell
-   dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
+   $registry = "tools/rag-data-scraper/config/source-registry.json"
+   $staging = "tools/rag-data-scraper/storage/staging/<job_id>"
+   dotnet run --project tools/DigitalOps.RagIngestion -- admit --staging-dir $staging --source-registry $registry --approved-by "<data steward>" --approval-reference "<approval id>"
    ```
 
-   Nếu lần chạy trước bị gián đoạn, chạy lại với `--resume`. Worker kiểm tra hash,
+   Lệnh tạo `admission.json`; observation từ nguồn tổng hợp/cross-check hoặc thiếu
+   metadata bắt buộc được quarantine. Nếu core staging file thay đổi, receipt
+   mất hiệu lực và phải admit lại.
+
+6. **Nạp phần đã duyệt vào PostgreSQL và Qdrant**:
+   ```powershell
+   dotnet run --project tools/DigitalOps.RagIngestion -- publish --staging-dir $staging --source-registry $registry
+   ```
+
+   Nếu lần chạy trước bị gián đoạn, chạy lại với `--resume`. CLI kiểm tra hash,
    offset, ACL, kích thước embedding 1024 và cấu hình collection trước khi kích
    hoạt version/chunk-set mới:
    ```powershell
-   dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id> --resume
+   dotnet run --project tools/DigitalOps.RagIngestion -- publish --staging-dir $staging --source-registry $registry --resume
    ```
+
+   Các flag cũ `--validate-only`/`--dry-run` và cách gọi không có command vẫn
+   được giữ tạm thời như compatibility alias, nhưng command mới là interface
+   chính thức cho script/orchestrator bên ngoài.
 
 ## 11. Kiểm tra hệ thống
 

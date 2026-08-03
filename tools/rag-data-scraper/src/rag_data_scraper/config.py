@@ -10,6 +10,12 @@ class StorageSettings(BaseModel):
     state_db_path: Path = Field(default=Path("storage/state/crawler.db"))
 
 
+class GovernanceSettings(BaseModel):
+    source_registry_path: Path = Field(
+        default=Path("config/source-registry.json")
+    )
+
+
 class ChunkerSettings(BaseModel):
     target_tokens: int = Field(default=448, gt=0, le=512)
     soft_max_tokens: int = Field(default=480, gt=0, le=512)
@@ -42,12 +48,22 @@ class OCRSettings(BaseModel):
     page_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
 
 
+class LegacyDocSettings(BaseModel):
+    soffice_cmd: Optional[str] = None
+    timeout_seconds: float = Field(default=60.0, gt=0, le=300)
+    max_output_bytes: int = Field(
+        default=64 * 1024 * 1024,
+        ge=1024,
+        le=256 * 1024 * 1024,
+    )
+
+
 class CrawlerSettings(BaseModel):
     max_concurrent_requests: int = Field(default=5, ge=1, le=32)
     request_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     user_agent: str = "DigitalOps-RAG-Crawler/1.0 (+http://digitalops.internal)"
     max_response_bytes: int = Field(default=25 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
-    max_total_resources: int = Field(default=500, ge=1, le=10000)
+    max_total_resources: int = Field(default=2000, ge=1, le=10000)
     max_depth: int = Field(default=1, ge=0, le=5)
     max_pagination_pages: int = Field(default=25, ge=1, le=500)
     retry_attempts: int = Field(default=3, ge=1, le=8)
@@ -66,8 +82,10 @@ class CrawlerSettings(BaseModel):
 class Settings(BaseModel):
     version: str = "1.0"
     storage: StorageSettings = Field(default_factory=StorageSettings)
+    governance: GovernanceSettings = Field(default_factory=GovernanceSettings)
     chunker: ChunkerSettings = Field(default_factory=ChunkerSettings)
     ocr: OCRSettings = Field(default_factory=OCRSettings)
+    legacy_doc: LegacyDocSettings = Field(default_factory=LegacyDocSettings)
     crawler: CrawlerSettings = Field(default_factory=CrawlerSettings)
 
     @classmethod

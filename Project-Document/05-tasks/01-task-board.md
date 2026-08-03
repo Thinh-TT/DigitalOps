@@ -70,12 +70,13 @@ Task board này bám theo:
 | T3-04 | Phê duyệt hoặc trả lại văn bản (API + UI SCR-014)       | FR-014   | `[x]`  | P0       | T3-03        | Chỉ role Leader duyệt/trả; `Return` đưa về `Editing` và bắt buộc review lại trước khi trình duyệt lại.                                              |
 | T3-05 | Cấp số, phát hành và lưu trữ (API + UI SCR-015)         | FR-015   | `[ ]`  | P0       | T3-04        | `ReferenceNumber` và `IssuedDate` luôn cùng có/cùng không có; `Archived` là trạng thái cuối, khóa `Content` và attachment.                          |
 
-## 8. Phase 4 — Tìm Kiếm Toàn Văn
+## 8. Phase 4 — Tìm Kiếm Toàn Văn Và Kho Tham Chiếu Pháp Luật
 
 | ID    | Task                                                     | Use Case       | Status | Priority | Dependency          | Definition of Done                                                                                                                                         |
 | ----- | -------------------------------------------------------- | -------------- | ------ | -------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | T4-01 | Text Extraction Worker cho PDF có text layer, DOCX, XLSX | FR-008, FR-016 | `[ ]`  | P0       | T2-03               | `ExtractionStatus` chuyển đúng `Pending → Succeeded/Failed/Unsupported`; worker idempotent, có scope/`IDbContextFactory` riêng, không chặn upload khi lỗi. |
 | T4-02 | Tìm kiếm toàn văn: GIN index + API + UI (SCR-016)        | FR-016         | `[ ]`  | P0       | T4-01, T2-02, T3-01 | Từ khóa tối thiểu 2 ký tự; `matchSource` đúng nguồn khớp; chỉ attachment `Succeeded` tham gia kết quả; test filter/paging/score.                           |
+| T4-03 | Kho tham chiếu pháp luật có quản trị và retrieval hỗ trợ review | FR-013 | `[~]` | P0 | T0-00, T3-03 | Crawler chỉ ghi staging; `DigitalOps.RagIngestion publish` từ chối legal package chưa có admission approval; source registry/allowlist, provenance, legal metadata, version/effectivity, dedup/quarantine và rollback hoạt động; baseline mới chạy lại 45 ca regression cùng legal fixture và đạt citation/safety gate; trước khi expose citation phải đồng bộ API Specification/UI Sitemap. |
 
 ## 9. Phase 5 — Kiểm Thử Tổng Hợp Và Chuẩn Bị Demo
 
@@ -109,9 +110,16 @@ hiện tại là dòng 2026-08-01 về baseline v3 và approval của Project Ow
 | 2026-08-01 | T0-00 | SupplementalDiagnostic v2 đã đạt automated gates: schema 100%, assignment 100%, draft 9/9, review 12/12, SLO max 45.010 s; preflight chỉ 7.103 GB nên có override. | Ghi raw hash e5bdf3f2...; giữ [~]/Draft; cần Official run không override ở host >= 9 GB và human review, không chuyển [x]. |
 | 2026-08-01 | T0-00 | V3 chạy bình thường không còn preflight RAM 9 GB, automated gates đạt: schema 100%, assignment 100%, draft 9/9, review 12/12, max 43.897 s; raw hash 606c893f... | Giữ PendingProjectOwnerDraftReview và [~]/Draft; Project Owner cần human review tối thiểu 8/9 trước khi chuyển [x], không tự phê duyệt kiến trúc. |
 | 2026-08-01 | T0-00 | Project Owner đã duyệt kết quả v3, human draft review tối thiểu 8/9 và architecture cho phạm vi MVP/demo. | Chuyển T0-00 sang [x] và AI RAG Design sang Approved for MVP/demo; production hardening/review vẫn là phạm vi riêng. |
+| 2026-08-03 | T4-03 | Project Owner chốt hướng mở rộng RAG thành kho tham chiếu pháp luật hỗ trợ FR-013; crawler staging đã có nhưng baseline v3 chưa đánh giá legal corpus. | Chấp thuận ở mức phạm vi/kiến trúc; giữ T4-03 `[~]` cho đến khi source-admission, contract citation và baseline legal mới hoàn tất. Không coi crawler output là corpus đã publish. |
+| 2026-08-03 | T4-03 | Đã triển khai staging schema 1.0, source registry, admission/quarantine receipt, legal/effectivity columns, governed retrieval và immutable review citation snapshot/UI. | Giữ T4-03 `[~]`: unit/integration contract đã qua nhưng còn phải chạy lại đủ 45 ca regression cùng legal fixture, chốt baseline ID mới và có Project Owner approval trước khi coi corpus sẵn sàng. |
 
 ## Ghi Chú Kỹ Thuật
 
 - Development AI provider được chọn qua `.env`: Ollama cho máy AI/demo và
   External OpenAI-compatible cho máy yếu. Không automatic fallback; embedding
-  luôn Ollama/Qdrant local; public API và EF schema không đổi.
+  luôn Ollama/Qdrant local. Khẳng định “public API và EF schema không đổi” chỉ
+  áp dụng baseline T0-00; T4-03 đã thay đổi có kiểm soát review citation contract
+  và derived RAG schema, được ghi ở API Specification/Database Designer.
+- Legal corpus là nguồn dẫn xuất có quản trị phục vụ FR-013, không phải crawler
+  web tổng quát. Mọi user-facing citation/search contract phải được cập nhật ở
+  API Specification và UI Sitemap trước khi code tích hợp được coi là Done.

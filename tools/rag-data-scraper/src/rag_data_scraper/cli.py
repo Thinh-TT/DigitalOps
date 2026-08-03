@@ -15,6 +15,7 @@ from .crawler.policy import CrawlPolicy
 from .exporters.preview_generator import PreviewGenerator
 from .exporters.rag_exporter import RagExportFormat, RagExportService
 from .adapters.generic import GenericWebAdapter
+from .source_registry import SourceRegistry
 
 from .chunkers.structure_chunker import StructureChunker
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -74,6 +75,10 @@ def main():
 
     elif args.command == "crawl":
         settings = Settings.load_from_yaml(Path(args.config))
+        source_registry = SourceRegistry.load(
+            settings.governance.source_registry_path
+        )
+        source_profile = source_registry.resolve(args.source, args.urls)
         
         adapter_options = {
             "timeout_seconds": settings.crawler.request_timeout_seconds,
@@ -86,13 +91,56 @@ def main():
             "per_host_max_concurrent": settings.crawler.per_host_max_concurrent,
         }
         if args.source == "gov_portal":
-            adapter = GovPortalAdapter(**adapter_options)
+            if source_profile is None:
+                parser.error("seed URL is not registered for gov_portal")
+            adapter = GovPortalAdapter(
+                source_id=source_profile.source_id,
+                source_namespace=source_profile.source_namespace,
+                authority_namespace=source_profile.authority_namespace,
+                **adapter_options,
+            )
         elif args.source == "legal_aggregator":
-            adapter = LegalAggregatorAdapter(**adapter_options)
+            if source_profile is None:
+                parser.error(
+                    "seed URL is not registered for legal_aggregator"
+                )
+            adapter = LegalAggregatorAdapter(
+                source_id=source_profile.source_id,
+                source_namespace=source_profile.source_namespace,
+                authority_namespace=source_profile.authority_namespace,
+                **adapter_options,
+            )
         else:
             from urllib.parse import urlsplit
-            allowed_hosts = {urlsplit(url).hostname for url in args.urls if urlsplit(url).hostname}
-            adapter = GenericWebAdapter(allowed_hosts=allowed_hosts, **adapter_options)
+            allowed_hosts = (
+                source_profile.allowed_hosts
+                if source_profile is not None
+                else {
+                    urlsplit(url).hostname
+                    for url in args.urls
+                    if urlsplit(url).hostname
+                }
+            )
+            adapter = GenericWebAdapter(
+                source_id=(
+                    source_profile.source_id
+                    if source_profile is not None
+                    else "generic_web"
+                ),
+                source_namespace=(
+                    source_profile.source_namespace
+                    if source_profile is not None
+                    else "custom.web"
+                ),
+                authority_namespace=(
+                    source_profile.authority_namespace
+                    if source_profile is not None
+                    else None
+                ),
+                allowed_hosts=allowed_hosts,
+                **adapter_options,
+            )
+        adapter.attach_source_profile(source_profile)
 
         engine = CrawlEngine(
             adapter=adapter,
@@ -123,6 +171,9 @@ def main():
             max_ocr_pages=settings.ocr.max_pages,
             max_ocr_image_pixels=settings.ocr.max_image_pixels,
             ocr_page_timeout_seconds=settings.ocr.page_timeout_seconds,
+            legacy_doc_soffice_cmd=settings.legacy_doc.soffice_cmd,
+            legacy_doc_timeout_seconds=settings.legacy_doc.timeout_seconds,
+            legacy_doc_max_output_bytes=settings.legacy_doc.max_output_bytes,
         )
 
         logger.info(f"Starting crawl job '{args.job_id}' using adapter '{args.source}'")

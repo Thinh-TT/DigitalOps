@@ -4,6 +4,10 @@ from typing import Iterable, Optional
 from urllib.parse import urlsplit
 
 from .http_source import HttpSourceAdapter
+from .mattran_guidance import (
+    is_mattran_guidance_listing,
+    parse_mattran_guidance_records,
+)
 
 
 class GenericWebAdapter(HttpSourceAdapter):
@@ -54,3 +58,17 @@ class GenericWebAdapter(HttpSourceAdapter):
             "source_url": final_url,
             "domain": urlsplit(final_url).hostname or self.source_namespace,
         }
+
+    def _embedded_documents_for_html(self, soup, final_url: str):
+        return parse_mattran_guidance_records(
+            soup,
+            final_url,
+            normalize_link=self._normalize_discovered_url,
+            source_id=self.source_id,
+            source_namespace=self._effective_source_namespace(final_url),
+            authority_namespace=self.authority_namespace,
+            identity_strategy=self.default_identity_strategy,
+        )
+
+    def _is_discovery_only_html(self, soup, final_url: str) -> bool:
+        return is_mattran_guidance_listing(final_url)

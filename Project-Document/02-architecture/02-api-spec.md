@@ -415,7 +415,8 @@ queue in-memory.
 | `OutgoingDocumentResponse` | `id`, `template`, `relatedIncomingDocument?`, `relatedMember?`, `title`, `content`, `aiDraftContent?`, `draftedByStaff`, `status`, `reviewIssues`, `approvedByStaff?`, `approvedAt?`, `referenceNumber?`, `issuedDate?`, `archivedAt?`, `attachments`, `createdAt`, `updatedAt` |
 | `AiDraftRequest` | `instruction?` — hướng dẫn bổ sung cho AI, không thay thế dữ liệu template/hồ sơ |
 | `ReviewIssueResponse` | `ruleCode`, `severity`, `message`, `location?` |
-| `ReviewResponse` | `id`, `outgoingDocumentId`, `attemptNo`, `reviewSource`, `reviewedByStaff?`, `contentSnapshot`, `reviewResult`, `reviewIssues`, `reviewedAt`, `documentStatus` |
+| `ReviewCitationResponse` | `chunkId`, `documentId`, `versionId`, `title`, `documentNumber?`, `documentType?`, `issuer?`, `sourceUrl`, `sourceTrustTier`, `sourceVersion`, `legalStatus`, `effectiveFrom?`, `effectiveTo?`, `isEffectivityUnknown`, `score` |
+| `ReviewResponse` | `id`, `outgoingDocumentId`, `attemptNo`, `reviewSource`, `reviewedByStaff?`, `contentSnapshot`, `reviewResult`, `reviewIssues`, `citations`, `reviewedAt`, `documentStatus` |
 
 Khi tạo văn bản đi, server render `TemplateContent` theo allow-list token case-sensitive: `{{member.fullName}}`, `dateOfBirth`, `gender`, `address`, `phone`, `email`, `position`, `joinDate`, `{{incoming.referenceNumber}}`, `senderOrg`, `summary`, `receivedDate`, `deadline`.
 Ngày render theo `dd/MM/yyyy`; giới tính map `Nam`, `Nữ`, `Khác`. Token không biết, thiếu liên kết hoặc field null được giữ nguyên để người soạn hoàn thiện thủ công.
@@ -433,6 +434,14 @@ Ngày render theo `dd/MM/yyyy`; giới tính map `Nam`, `Nữ`, `Khác`. Token k
 | `GET` | `/outgoing-documents/{id}/reviews` | BusinessAccess | paging | `200 PagedResponse<ReviewResponse>` | `404` |
 
 AI draft và review chạy đồng bộ với timeout cấu hình. Nếu AI timeout/error, API trả `503` và không ghi đè `content`, `aiDraftContent`, `status`, `reviewIssues` hoặc `review_history`.
+
+`citations` chỉ chứa nguồn legal đã admission, không trả raw prompt/vector hoặc
+toàn bộ chunk text. Khi tạo review, server lưu immutable citation snapshot gắn
+với `ReviewHistory.Id`; endpoint GET đọc lại snapshot đó thay vì chạy retrieval
+lại, nên lịch sử không đổi khi corpus được refresh. Mặc định retrieval loại văn
+bản `expired`, `repealed`, `superseded` hoặc nằm ngoài khoảng hiệu lực. Nếu nguồn
+thiếu `effectiveFrom`/status xác định, response đặt `isEffectivityUnknown=true`
+để UI cảnh báo người duyệt kiểm tra bản gốc.
 
 ## 12. API Approval, Archive Và Full-Text Search
 

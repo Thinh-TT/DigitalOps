@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional
+
+from ..source_registry import ResolvedSourceProfile
 
 @dataclass
 class CrawlResult:
@@ -20,6 +22,8 @@ class CrawlResult:
     response_headers: Mapping[str, str] | None = None
     attempt_count: int = 1
     elapsed_ms: int = 0
+    embedded_documents: List["CrawlResult"] = field(default_factory=list)
+    discovery_only: bool = False
 
 
 @dataclass
@@ -31,6 +35,16 @@ class NotModifiedResult:
     elapsed_ms: int = 0
 
 class BaseAdapter(ABC):
+    @property
+    def source_profile(self) -> Optional[ResolvedSourceProfile]:
+        return getattr(self, "_source_profile", None)
+
+    def attach_source_profile(
+        self,
+        profile: Optional[ResolvedSourceProfile],
+    ) -> None:
+        self._source_profile = profile
+
     @property
     @abstractmethod
     def source_id(self) -> str:
@@ -67,3 +81,7 @@ class BaseAdapter(ABC):
     async def aclose(self) -> None:
         """Release adapter-owned resources after a crawl job."""
         return None
+
+    def rehydrate_cached_result(self, result: CrawlResult) -> CrawlResult:
+        """Rebuild derived parse output that is not stored in the HTTP cache."""
+        return result

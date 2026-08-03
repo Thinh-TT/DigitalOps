@@ -223,6 +223,11 @@ select {
   line-height: 1.65;
 }
 
+.review-citations,
+.review-citation {
+  width: 100%;
+}
+
 .reminder-filters {
   width: 100%;
 }

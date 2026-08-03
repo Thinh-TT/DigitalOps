@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
@@ -25,6 +25,30 @@ class ExtractionQuality(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
 
 
+class SourceProvenance(BaseModel):
+    registry_entry_id: Optional[str] = None
+    registry_version: Optional[str] = None
+    corpus_type: str = "general"
+    source_trust_tier: str = "unverified"
+    source_domain: str
+    source_version: str
+    publish_policy: str = "blocked"
+    language: str = "vi"
+
+
+class LegalDocumentMetadata(BaseModel):
+    document_number: Optional[str] = None
+    document_type: Optional[str] = None
+    issuer: Optional[str] = None
+    issued_date: Optional[date] = None
+    legal_status: str = "status_unknown"
+    effective_from: Optional[date] = None
+    effective_to: Optional[date] = None
+    amends: list[str] = Field(default_factory=list)
+    replaces: list[str] = Field(default_factory=list)
+    replaced_by: list[str] = Field(default_factory=list)
+
+
 class DocumentObservation(BaseModel):
     observation_id: UUID = Field(default_factory=uuid4)
     job_id: str
@@ -43,5 +67,7 @@ class DocumentObservation(BaseModel):
     char_count: int = Field(ge=0)
     word_count: int = Field(ge=0)
     extraction_quality: ExtractionQuality
+    source_provenance: Optional[SourceProvenance] = None
+    legal_metadata: Optional[LegalDocumentMetadata] = None
     document_metadata: Dict[str, Any] = Field(default_factory=dict)
     crawled_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

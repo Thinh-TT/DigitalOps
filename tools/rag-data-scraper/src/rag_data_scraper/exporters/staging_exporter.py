@@ -3,7 +3,7 @@ import json
 import logging
 from pathlib import Path
 import shutil
-from typing import List, Tuple
+from typing import List, Literal, Optional, Tuple
 from ..models.observation import DocumentObservation
 from ..models.chunk import ChunkSet, Chunk
 from ..models.manifest import StagingManifest
@@ -24,7 +24,10 @@ class StagingExporter:
         completed_at: datetime,
         observations: List[DocumentObservation],
         chunk_tuples: List[Tuple[ChunkSet, List[Chunk]]],
-        errors: List[CrawlerError]
+        errors: List[CrawlerError],
+        corpus_type: Literal["general", "legal_reference"] = "general",
+        source_registry_version: Optional[str] = None,
+        source_registry_entry_ids: Optional[List[str]] = None,
     ) -> Path:
         job_dir = resolve_job_dir(self.staging_base_dir, job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -86,6 +89,9 @@ class StagingExporter:
 
         # 4. Write Manifest
         manifest = StagingManifest(
+            corpus_type=corpus_type,
+            source_registry_version=source_registry_version,
+            source_registry_entry_ids=source_registry_entry_ids or [],
             job_id=job_id,
             started_at=started_at,
             completed_at=completed_at,

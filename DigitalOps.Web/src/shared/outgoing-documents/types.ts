@@ -10,6 +10,23 @@ export interface OutgoingIncomingReference { id: string; referenceNumber: string
 export interface OutgoingMemberReference { id: string; fullName: string; position: string | null; }
 export type OutgoingStaffReference = IncomingStaffReference;
 export interface ReviewIssueResponse { ruleCode: string; severity: string; message: string; location: string | null; }
+export interface ReviewCitationResponse {
+  chunkId: string;
+  documentId: string;
+  versionId: string;
+  title: string;
+  documentNumber: string | null;
+  documentType: string | null;
+  issuer: string | null;
+  sourceUrl: string;
+  sourceTrustTier: string;
+  sourceVersion: string;
+  legalStatus: string;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  isEffectivityUnknown: boolean;
+  score: number;
+}
 export type ReviewSource = "Rule" | "AI" | "Hybrid";
 export type ReviewResult = "Failed" | "Passed";
 export type ApprovalDecision = "Approve" | "Return";
@@ -22,6 +39,7 @@ export interface ReviewResponse {
   contentSnapshot: string;
   reviewResult: ReviewResult;
   reviewIssues: ReviewIssueResponse[];
+  citations: ReviewCitationResponse[];
   reviewedAt: string;
   documentStatus: OutgoingDocumentStatus;
 }

@@ -2,6 +2,7 @@ using System.Data;
 using System.Text.Json;
 using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Shared.AI;
+using DigitalOps.API.Shared.AI.Retrieval;
 using DigitalOps.API.Shared.Api;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Identity;
@@ -12,6 +13,7 @@ namespace DigitalOps.API.Features.Review;
 public sealed class OutgoingDocumentReviewService(
     DigitalOpsDbContext dbContext,
     IDocumentReviewGenerator reviewGenerator,
+    ICitationSnapshotService citationSnapshotService,
     ILogger<OutgoingDocumentReviewService> logger)
     : IOutgoingDocumentReviewService
 {
@@ -65,6 +67,7 @@ public sealed class OutgoingDocumentReviewService(
         var reviewIssues = JsonSerializer.SerializeToElement(
             generated.Issues,
             JsonSerializerOptions.Web);
+        var citations = generated.Citations ?? [];
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
@@ -110,6 +113,16 @@ public sealed class OutgoingDocumentReviewService(
                 ReviewedAt = reviewedAt
             };
             dbContext.ReviewHistory.Add(history);
+            if (citations.Count > 0)
+            {
+                await citationSnapshotService.SaveCitationSnapshotAsync(
+                    "ReviewHistory",
+                    history.Id,
+                    generated.CitationQuery ?? string.Empty,
+                    citations.Select(citation => citation.ChunkId).ToArray(),
+                    citations,
+                    cancellationToken);
+            }
 
             var finalUpdatedAt = DateTime.UtcNow;
             var finalized = await dbContext.OutgoingDocuments
@@ -141,6 +154,7 @@ public sealed class OutgoingDocumentReviewService(
                 history.ContentSnapshot,
                 history.ReviewResult,
                 generated.Issues,
+                citations,
                 history.ReviewedAt,
                 finalStatus));
         }
@@ -180,8 +194,24 @@ public sealed class OutgoingDocumentReviewService(
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToArrayAsync(cancellationToken);
+        var reviewIds = items.Select(review => review.Id).ToArray();
+        var citationPayloads = await dbContext.RagCitationSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.BusinessEntityType == "ReviewHistory"
+                && reviewIds.Contains(snapshot.BusinessEntityId))
+            .OrderByDescending(snapshot => snapshot.CreatedAt)
+            .ToArrayAsync(cancellationToken);
+        var citationsByReviewId = citationPayloads
+            .GroupBy(snapshot => snapshot.BusinessEntityId)
+            .ToDictionary(
+                group => group.Key,
+                group => DeserializeCitations(
+                    group.First().CitationPayloadJson));
         var responses = items
-            .Select(review => ToResponse(review, documentStatus: null))
+            .Select(review => ToResponse(
+                review,
+                documentStatus: null,
+                citationsByReviewId.GetValueOrDefault(review.Id) ?? []))
             .ToArray();
         return ReviewOperationResult<PagedResponse<ReviewResponse>>.Success(
             new PagedResponse<ReviewResponse>(
@@ -248,7 +278,8 @@ public sealed class OutgoingDocumentReviewService(
 
     private static ReviewResponse ToResponse(
         ReviewHistory review,
-        OutgoingDocumentStatus? documentStatus) =>
+        OutgoingDocumentStatus? documentStatus,
+        IReadOnlyList<ReviewCitationResponse> citations) =>
         new(
             review.Id,
             review.OutgoingDocumentId,
@@ -258,6 +289,7 @@ public sealed class OutgoingDocumentReviewService(
             review.ContentSnapshot,
             review.ReviewResult,
             DeserializeReviewIssues(review.ReviewIssues),
+            citations,
             review.ReviewedAt,
             documentStatus ?? (review.ReviewResult == ReviewResult.Failed
                 ? OutgoingDocumentStatus.ReviewFailed
@@ -273,6 +305,21 @@ public sealed class OutgoingDocumentReviewService(
         {
             return JsonSerializer.Deserialize<List<ReviewIssueResponse>>(
                 reviewIssues.GetRawText()) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static IReadOnlyList<ReviewCitationResponse> DeserializeCitations(
+        string payload)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<ReviewCitationResponse>>(
+                payload,
+                JsonSerializerOptions.Web) ?? [];
         }
         catch (JsonException)
         {

@@ -29,6 +29,7 @@ from ..exporters.rag_exporter import (
 )
 from ..paths import resolve_job_dir, validate_job_id
 from ..config import Settings
+from ..source_registry import SourceRegistry
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -93,14 +94,22 @@ class CreateJobRequest(BaseModel):
     job_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     source: Literal["gov_portal", "legal_aggregator", "generic_web"]
     urls: List[str] = Field(..., min_length=1, max_length=100)
-    limit: int = Field(default=50, ge=1, le=10000, description="Max crawl limit")
+    limit: int = Field(
+        default=50,
+        ge=1,
+        le=10000,
+        description="Maximum number of primary documents emitted",
+    )
     max_pagination_pages: int = Field(
         default=25,
         ge=1,
         le=500,
-        description="Maximum pagination URLs followed within the total crawl limit",
+        description="Maximum listing/pagination URLs followed",
     )
-    download_attachments: bool = Field(default=True, description="Whether to extract PDF/DOCX attachments")
+    download_attachments: bool = Field(
+        default=True,
+        description="Whether to extract PDF/DOCX/legacy DOC attachments",
+    )
     export_format: RagExportFormat = Field(
         default=RagExportFormat.CHUNKS_JSONL,
         description="Artifact to build automatically after the crawl completes",
@@ -145,6 +154,8 @@ class CreateJobRequest(BaseModel):
 
 def get_adapter(source: str, urls: List[str], settings: Settings | None = None):
     settings = settings or Settings.load_from_yaml(SETTINGS_FILE)
+    registry = SourceRegistry.load(settings.governance.source_registry_path)
+    profile = registry.resolve(source, urls)
     crawler = settings.crawler
     common = {
         "user_agent": crawler.user_agent,
@@ -158,19 +169,42 @@ def get_adapter(source: str, urls: List[str], settings: Settings | None = None):
     }
     s = source.lower()
     if s in ["gov_portal", "vanban_chinhphu"]:
-        return GovPortalAdapter(**common)
+        if profile is None:
+            raise ValueError("seed URL is not registered for gov_portal")
+        adapter = GovPortalAdapter(
+            source_id=profile.source_id,
+            source_namespace=profile.source_namespace,
+            authority_namespace=profile.authority_namespace,
+            **common,
+        )
     elif s in ["legal_aggregator", "thuvienphapluat"]:
-        return LegalAggregatorAdapter(**common)
+        if profile is None:
+            raise ValueError(
+                "seed URL is not registered for legal_aggregator"
+            )
+        adapter = LegalAggregatorAdapter(
+            source_id=profile.source_id,
+            source_namespace=profile.source_namespace,
+            authority_namespace=profile.authority_namespace,
+            **common,
+        )
     else:
-        allowed_hosts = {
+        allowed_hosts = profile.allowed_hosts if profile is not None else {
             parsed.hostname
             for raw_url in urls
             if (parsed := urlsplit(raw_url)).hostname
         }
-        return GenericWebAdapter(
+        adapter = GenericWebAdapter(
+            source_id=profile.source_id if profile else "generic_web",
+            source_namespace=(
+                profile.source_namespace if profile else "custom.web"
+            ),
+            authority_namespace=(profile.authority_namespace if profile else None),
             allowed_hosts=allowed_hosts,
             **common,
         )
+    adapter.attach_source_profile(profile)
+    return adapter
 
 def _write_job_metadata(job_dir: Path, payload: Dict[str, Any]) -> None:
     path = job_dir / JOB_METADATA_FILE
@@ -204,6 +238,7 @@ async def execute_crawl_job(
         "preferred_export_format": export_format.value,
         "preferred_export_ready": False,
         "export_status": "PENDING",
+        "crawl_metrics": {},
     }
 
     try:
@@ -234,6 +269,9 @@ async def execute_crawl_job(
             max_ocr_pages=settings.ocr.max_pages,
             max_ocr_image_pixels=settings.ocr.max_image_pixels,
             ocr_page_timeout_seconds=settings.ocr.page_timeout_seconds,
+            legacy_doc_soffice_cmd=settings.legacy_doc.soffice_cmd,
+            legacy_doc_timeout_seconds=settings.legacy_doc.timeout_seconds,
+            legacy_doc_max_output_bytes=settings.legacy_doc.max_output_bytes,
         )
         
         output_dir = await engine.run_job(
@@ -246,6 +284,12 @@ async def execute_crawl_job(
             ),
         )
 
+        JOB_STATUS_MAP[job_id]["crawl_metrics"] = dict(
+            engine.last_run_metrics
+        )
+        JOB_STATUS_MAP[job_id]["crawled_count"] = int(
+            engine.last_run_metrics.get("primary_documents_created", 0)
+        )
         JOB_STATUS_MAP[job_id]["status"] = "COMPLETED"
         JOB_STATUS_MAP[job_id]["export_status"] = "BUILDING"
         try:
@@ -274,6 +318,8 @@ async def execute_crawl_job(
                     "source_adapter": source,
                     "download_attachments": download_attachments,
                     "max_pagination_pages": max_pagination_pages,
+                    "document_limit": limit,
+                    "crawl_metrics": engine.last_run_metrics,
                     "preferred_export_format": export_format.value,
                     "preferred_export_ready": JOB_STATUS_MAP[job_id][
                         "preferred_export_ready"
@@ -336,6 +382,12 @@ async def list_jobs():
                             job_id,
                             exc_info=True,
                         )
+                persisted_metrics = persisted_metadata.get(
+                    "crawl_metrics",
+                    {},
+                )
+                if not isinstance(persisted_metrics, dict):
+                    persisted_metrics = {}
                 
                 # Check memory status first, fallback to completed if preview exists
                 mem_status = JOB_STATUS_MAP.get(job_id, {})
@@ -359,13 +411,38 @@ async def list_jobs():
                     and manifest_file.is_file()
                     and (job_folder / "chunks.jsonl").is_file()
                 )
+                crawl_metrics = mem_status.get(
+                    "crawl_metrics",
+                    persisted_metrics,
+                )
+                if not isinstance(crawl_metrics, dict):
+                    crawl_metrics = {}
+                primary_documents = int(
+                    crawl_metrics.get(
+                        "primary_documents_created",
+                        crawled_count,
+                    )
+                )
 
                 jobs_list.append({
                     "job_id": job_id,
                     "source_adapter": source,
                     "status": status,
-                    "crawled_count": crawled_count,
-                    "limit_count": mem_status.get("limit_count", crawled_count),
+                    "crawled_count": primary_documents,
+                    "observations_count": int(
+                        crawl_metrics.get(
+                            "observations_created",
+                            crawled_count,
+                        )
+                    ),
+                    "limit_count": mem_status.get(
+                        "limit_count",
+                        persisted_metadata.get(
+                            "document_limit",
+                            primary_documents,
+                        ),
+                    ),
+                    "crawl_metrics": crawl_metrics,
                     "created_at": created_at,
                     "has_preview": preview_file.exists(),
                     "preferred_export_format": preferred_format,
@@ -389,6 +466,8 @@ async def list_jobs():
                 "status": jinfo.get("status", "RUNNING"),
                 "crawled_count": jinfo.get("crawled_count", 0),
                 "limit_count": jinfo.get("limit_count", 50),
+                "observations_count": jinfo.get("crawled_count", 0),
+                "crawl_metrics": jinfo.get("crawl_metrics", {}),
                 "created_at": jinfo.get("created_at", ""),
                 "has_preview": False,
                 "preferred_export_format": jinfo.get("preferred_export_format"),

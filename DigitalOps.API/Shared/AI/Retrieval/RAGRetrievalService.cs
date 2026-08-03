@@ -17,7 +17,18 @@ public sealed record RetrievalResult(
     string HeadingPath,
     double Score,
     string CanonicalDocumentKey,
-    string Title
+    string Title,
+    string SourceId,
+    string SourceUrl,
+    string SourceTrustTier,
+    string SourceVersion,
+    string LegalStatus,
+    DateOnly? EffectiveFrom,
+    DateOnly? EffectiveTo,
+    string? DocumentNumber,
+    string? DocumentType,
+    string? Issuer,
+    bool IsEffectivityUnknown
 );
 
 public interface IRAGRetrievalService
@@ -27,6 +38,8 @@ public interface IRAGRetrievalService
         string userRole = "public",
         int topK = 5,
         double minScore = 0.316666,
+        DateOnly? asOf = null,
+        bool includeHistorical = false,
         CancellationToken cancellationToken = default);
 }
 
@@ -53,6 +66,8 @@ public sealed class RAGRetrievalService : IRAGRetrievalService
         string userRole = "public",
         int topK = 5,
         double minScore = 0.316666,
+        DateOnly? asOf = null,
+        bool includeHistorical = false,
         CancellationToken cancellationToken = default)
     {
         var filteredResults = new List<RetrievalResult>();
@@ -63,6 +78,7 @@ public sealed class RAGRetrievalService : IRAGRetrievalService
                 nameof(topK),
                 "topK must be between 1 and 50.");
         }
+        var effectiveDate = asOf ?? DateOnly.FromDateTime(DateTime.UtcNow);
         if (string.IsNullOrWhiteSpace(userRole))
         {
             throw new ArgumentException(
@@ -95,10 +111,26 @@ public sealed class RAGRetrievalService : IRAGRetrievalService
             var activePointsQuery = from p in _dbContext.RagIndexPoints
                                     join d in _dbContext.RagDocuments on p.DocumentId equals d.Id
                                     join c in _dbContext.RagChunks on p.ChunkId equals c.Id
+                                    join v in _dbContext.RagDocumentVersions on p.VersionId equals v.Id
+                                    join s in _dbContext.RagDocumentSources on v.Id equals s.VersionId
                                     where candidatePointIds.Contains(p.QdrantPointId)
                                           && p.Status == "indexed"
                                           && d.ActiveVersionId == p.VersionId
                                           && d.ActiveChunkSetId == p.ChunkSetId
+                                          && s.CorpusType == "legal_reference"
+                                          && ((s.SourceTrustTier == "official"
+                                                  && s.PublishPolicy == "authoritative")
+                                              || (s.SourceTrustTier == "verified_copy"
+                                                  && s.PublishPolicy == "verified_copy"))
+                                          && s.AdmissionReference != null
+                                          && (includeHistorical
+                                              || (v.LegalStatus != "expired"
+                                                  && v.LegalStatus != "repealed"
+                                                  && v.LegalStatus != "superseded"
+                                                  && (v.EffectiveFrom == null
+                                                      || v.EffectiveFrom <= effectiveDate)
+                                                  && (v.EffectiveTo == null
+                                                      || v.EffectiveTo >= effectiveDate)))
                                     select new
                                     {
                                         p.QdrantPointId,
@@ -110,13 +142,28 @@ public sealed class RAGRetrievalService : IRAGRetrievalService
                                         c.AllowedRoles,
                                         c.DeniedRoles,
                                         d.CanonicalDocumentKey,
-                                        d.Title
+                                        d.Title,
+                                        s.SourceId,
+                                        SourceUrl = s.SourceDocumentUrl,
+                                        s.SourceTrustTier,
+                                        SourceVersion = v.SourceVersion ?? string.Empty,
+                                        v.LegalStatus,
+                                        v.EffectiveFrom,
+                                        v.EffectiveTo,
+                                        v.DocumentNumber,
+                                        v.DocumentType,
+                                        v.Issuer
                                     };
 
             var candidateItems = await activePointsQuery
                 .ToListAsync(cancellationToken);
-            var activeByPointId = candidateItems.ToDictionary(
-                item => item.QdrantPointId);
+            var activeByPointId = candidateItems
+                .GroupBy(item => item.QdrantPointId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderBy(item => item.SourceTrustTier == "official" ? 0 : 1)
+                        .First());
 
             filteredResults = vectorCandidates
                 .Where(candidate =>
@@ -144,7 +191,19 @@ public sealed class RAGRetrievalService : IRAGRetrievalService
                     result.Item.HeadingPath,
                     scores[result.Candidate.QdrantPointId],
                     result.Item.CanonicalDocumentKey,
-                    result.Item.Title))
+                    result.Item.Title,
+                    result.Item.SourceId,
+                    result.Item.SourceUrl,
+                    result.Item.SourceTrustTier,
+                    result.Item.SourceVersion,
+                    result.Item.LegalStatus,
+                    result.Item.EffectiveFrom,
+                    result.Item.EffectiveTo,
+                    result.Item.DocumentNumber,
+                    result.Item.DocumentType,
+                    result.Item.Issuer,
+                    result.Item.LegalStatus == "status_unknown"
+                        || result.Item.EffectiveFrom is null))
                 .Take(topK)
                 .ToList();
 

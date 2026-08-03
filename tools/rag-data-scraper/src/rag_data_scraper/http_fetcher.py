@@ -93,7 +93,15 @@ class UrlPolicy:
     @staticmethod
     def _related_asset_hosts(hosts: set[str]) -> set[str]:
         """Infer only conventional public asset aliases for a site's root."""
-        asset_prefixes = {"static", "cdn", "media", "files", "download", "uploads"}
+        asset_prefixes = {
+            "cms",
+            "static",
+            "cdn",
+            "media",
+            "files",
+            "download",
+            "uploads",
+        }
         conventional_entrypoints = {"m", "mobile", "www"}
         common_second_level = {"ac", "co", "com", "edu", "gov", "net", "org"}
         related: set[str] = set()

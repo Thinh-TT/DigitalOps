@@ -31,7 +31,15 @@ public sealed class RagDocumentVersionConfiguration : IEntityTypeConfiguration<R
 {
     public void Configure(EntityTypeBuilder<RagDocumentVersion> builder)
     {
-        builder.ToTable("rag_document_versions");
+        builder.ToTable("rag_document_versions", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_rag_document_versions_legal_status",
+                "legal_status IN ('current', 'expired', 'repealed', 'superseded', 'status_unknown')");
+            table.HasCheckConstraint(
+                "ck_rag_document_versions_effectivity",
+                "effective_from IS NULL OR effective_to IS NULL OR effective_from <= effective_to");
+        });
         builder.HasKey(v => v.Id);
         builder.Property(v => v.Id).HasColumnName("version_id").ValueGeneratedOnAdd().HasDefaultValueSql("gen_random_uuid()");
         builder.Property(v => v.DocumentId).HasColumnName("document_id").IsRequired();
@@ -43,6 +51,15 @@ public sealed class RagDocumentVersionConfiguration : IEntityTypeConfiguration<R
         builder.Property(v => v.CharCount).HasColumnName("char_count").IsRequired();
         builder.Property(v => v.WordCount).HasColumnName("word_count").IsRequired();
         builder.Property(v => v.ExtractionQualityJson).HasColumnName("extraction_quality").HasColumnType("jsonb").IsRequired();
+        builder.Property(v => v.DocumentNumber).HasColumnName("document_number").HasMaxLength(256);
+        builder.Property(v => v.DocumentType).HasColumnName("document_type").HasMaxLength(128);
+        builder.Property(v => v.Issuer).HasColumnName("issuer").HasMaxLength(512);
+        builder.Property(v => v.IssuedDate).HasColumnName("issued_date").HasColumnType("date");
+        builder.Property(v => v.LegalStatus).HasColumnName("legal_status").HasMaxLength(32).HasDefaultValue("status_unknown").IsRequired();
+        builder.Property(v => v.EffectiveFrom).HasColumnName("effective_from").HasColumnType("date");
+        builder.Property(v => v.EffectiveTo).HasColumnName("effective_to").HasColumnType("date");
+        builder.Property(v => v.SourceVersion).HasColumnName("source_version").HasMaxLength(256);
+        builder.Property(v => v.Language).HasColumnName("language").HasMaxLength(16);
         builder.Property(v => v.MetadataJson).HasColumnName("metadata").HasColumnType("jsonb").HasDefaultValue("{}").IsRequired();
         builder.Property(v => v.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -58,7 +75,21 @@ public sealed class RagDocumentSourceConfiguration : IEntityTypeConfiguration<Ra
 {
     public void Configure(EntityTypeBuilder<RagDocumentSource> builder)
     {
-        builder.ToTable("rag_document_sources");
+        builder.ToTable("rag_document_sources", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_rag_document_sources_trust",
+                "source_trust_tier IN ('official', 'verified_copy', 'aggregator', 'unverified')");
+            table.HasCheckConstraint(
+                "ck_rag_document_sources_corpus",
+                "corpus_type IN ('general', 'legal_reference')");
+            table.HasCheckConstraint(
+                "ck_rag_document_sources_publish_policy",
+                "publish_policy IN ('authoritative', 'verified_copy', 'cross_check_only', 'blocked')");
+            table.HasCheckConstraint(
+                "ck_rag_document_sources_trust_policy_pair",
+                "(source_trust_tier = 'official' AND publish_policy = 'authoritative') OR (source_trust_tier = 'verified_copy' AND publish_policy = 'verified_copy') OR (source_trust_tier = 'aggregator' AND publish_policy = 'cross_check_only') OR (source_trust_tier = 'unverified' AND publish_policy = 'blocked')");
+        });
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).HasColumnName("source_mapping_id").ValueGeneratedOnAdd().HasDefaultValueSql("gen_random_uuid()");
         builder.Property(s => s.DocumentId).HasColumnName("document_id").IsRequired();
@@ -66,6 +97,15 @@ public sealed class RagDocumentSourceConfiguration : IEntityTypeConfiguration<Ra
         builder.Property(s => s.SourceId).HasColumnName("source_id").HasMaxLength(128).IsRequired();
         builder.Property(s => s.SourceNamespace).HasColumnName("source_namespace").HasMaxLength(128).IsRequired();
         builder.Property(s => s.SourceDocumentUrl).HasColumnName("source_document_url").HasMaxLength(1024).IsRequired();
+        builder.Property(s => s.RegistryEntryId).HasColumnName("registry_entry_id").HasMaxLength(128);
+        builder.Property(s => s.RegistryVersion).HasColumnName("registry_version").HasMaxLength(64);
+        builder.Property(s => s.SourceDomain).HasColumnName("source_domain").HasMaxLength(253);
+        builder.Property(s => s.SourceTrustTier).HasColumnName("source_trust_tier").HasMaxLength(32).HasDefaultValue("unverified").IsRequired();
+        builder.Property(s => s.CorpusType).HasColumnName("corpus_type").HasMaxLength(32).HasDefaultValue("general").IsRequired();
+        builder.Property(s => s.PublishPolicy).HasColumnName("publish_policy").HasMaxLength(32).HasDefaultValue("blocked").IsRequired();
+        builder.Property(s => s.AdmissionReference).HasColumnName("admission_reference").HasMaxLength(256);
+        builder.Property(s => s.AdmissionApprovedBy).HasColumnName("admission_approved_by").HasMaxLength(256);
+        builder.Property(s => s.AdmissionApprovedAt).HasColumnName("admission_approved_at").HasColumnType("timestamptz");
         builder.Property(s => s.CrawledAt).HasColumnName("crawled_at").HasColumnType("timestamptz").IsRequired();
 
         builder.HasOne(s => s.Document).WithMany().HasForeignKey(s => s.DocumentId).OnDelete(DeleteBehavior.Cascade);
@@ -73,6 +113,8 @@ public sealed class RagDocumentSourceConfiguration : IEntityTypeConfiguration<Ra
         builder.HasIndex(s => new { s.VersionId, s.SourceId, s.SourceDocumentUrl })
             .IsUnique()
             .HasDatabaseName("ux_rag_doc_sources_version_source_url");
+        builder.HasIndex(s => new { s.CorpusType, s.SourceTrustTier })
+            .HasDatabaseName("idx_rag_doc_sources_corpus_trust");
     }
 }
 
@@ -84,7 +126,7 @@ public sealed class RagChunkSetConfiguration : IEntityTypeConfiguration<RagChunk
         {
             table.HasCheckConstraint(
                 "ck_rag_chunk_sets_limits",
-                "target_tokens > 0 AND overlap_tokens >= 0 AND overlap_tokens < target_tokens AND total_chunks > 0");
+                "target_tokens > 0 AND overlap_tokens >= 0 AND overlap_tokens < target_tokens AND (soft_max_tokens IS NULL OR (soft_max_tokens >= target_tokens AND soft_max_tokens <= 512)) AND (max_tokens IS NULL OR (max_tokens >= COALESCE(soft_max_tokens, target_tokens) AND max_tokens <= 512)) AND total_chunks > 0");
         });
         builder.HasKey(cs => cs.Id);
         builder.Property(cs => cs.Id).HasColumnName("chunk_set_id").ValueGeneratedOnAdd().HasDefaultValueSql("gen_random_uuid()");
@@ -93,6 +135,8 @@ public sealed class RagChunkSetConfiguration : IEntityTypeConfiguration<RagChunk
         builder.Property(cs => cs.ChunkerVersion).HasColumnName("chunker_version").HasMaxLength(32).IsRequired();
         builder.Property(cs => cs.TokenizerName).HasColumnName("tokenizer_name").HasMaxLength(128).IsRequired();
         builder.Property(cs => cs.TargetTokens).HasColumnName("target_tokens").IsRequired();
+        builder.Property(cs => cs.SoftMaxTokens).HasColumnName("soft_max_tokens");
+        builder.Property(cs => cs.MaxTokens).HasColumnName("max_tokens");
         builder.Property(cs => cs.OverlapTokens).HasColumnName("overlap_tokens").IsRequired();
         builder.Property(cs => cs.TotalChunks).HasColumnName("total_chunks").IsRequired();
         builder.Property(cs => cs.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").HasDefaultValueSql("CURRENT_TIMESTAMP");

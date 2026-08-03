@@ -1,6 +1,8 @@
 # Hướng dẫn Cài đặt & Chạy RAG Data Scraper Web Dashboard
 
-Tool cào dữ liệu và trích xuất văn bản phục vụ RAG Knowledge Base cho dự án DigitalOps.
+Tool cào dữ liệu và trích xuất văn bản thành **staging package** phục vụ kho tham
+chiếu pháp luật/hướng dẫn của DigitalOps. Crawl hoặc RAG Health thành công không
+đồng nghĩa nguồn đã được duyệt để publish vào Qdrant.
 
 ---
 
@@ -10,6 +12,10 @@ Tool cào dữ liệu và trích xuất văn bản phục vụ RAG Knowledge Bas
 - **Tesseract OCR** (cần cho PDF dạng file quét/image): tool tìm executable
   trong `PATH` và thư mục cài đặt Windows thông dụng. Model ngôn ngữ runtime
   nằm tại `storage/ocr/tessdata`; cấu hình bằng `ocr.tessdata_dir`.
+- **LibreOffice** (cần khi đọc file `.doc`/RTF cũ): tool tìm `soffice` trong
+  `PATH`, thư mục cài đặt Windows thông dụng hoặc biến môi trường
+  `RAG_SCRAPER_LIBREOFFICE`. Chuyển đổi chạy headless trong thư mục tạm, có
+  timeout và giới hạn kích thước output.
 
 ---
 
@@ -42,10 +48,10 @@ Trình duyệt sẽ tự động mở trang web quản trị tại: `http://loca
 
 ### Thao tác 1-Click trên Trang Web:
 1. **Chọn Nguồn Cào**: Chọn `vanban.chinhphu.vn`, `thuvienphapluat.vn` hoặc `Generic Web` (cho URL trang web tùy chỉnh).
-2. **Nhập URL & Giới hạn (`limit`)**: Dán một hoặc nhiều URL và chọn tổng số tài nguyên tối đa cần cào (vd: 10, 50, 100).
-3. **Giới hạn phân trang**: Chọn số URL trang danh sách tối đa mà crawler được phép lần theo. Chỉ cần nhập trang đầu; các liên kết `page=2`, `page=3`, `/page/2`... được tự phát hiện và đi tiếp theo chuỗi.
+2. **Nhập URL & Giới hạn (`limit`)**: Dán một hoặc nhiều URL và chọn số văn bản chính tối đa cần tạo (vd: 10, 50, 100). Trang danh sách và lượt tải attachment không tiêu tốn limit này.
+3. **Giới hạn phân trang**: Chọn số URL trang danh sách tối đa mà crawler được phép lần theo. Chỉ cần nhập trang đầu; các liên kết `page=2`, `page=3`, `/page/2`... được tự phát hiện và đi tiếp theo chuỗi, kể cả khi đã đủ số văn bản đầu ra, để dashboard báo đúng tổng record phát hiện.
 4. **Chọn định dạng đầu ra**: Chọn file cần tạo ngay sau khi cào. `Chunks JSONL` là mặc định khuyên dùng cho RAG; 12 định dạng còn lại vẫn có thể chọn trước hoặc xuất lại sau.
-5. **Tệp đính kèm**: Bật/tắt việc đưa liên kết PDF và DOCX vào hàng đợi cào. File `.doc` cũ được bỏ qua vì không có bộ trích xuất an toàn/tin cậy; nên chuyển sang DOCX hoặc PDF.
+5. **Tệp đính kèm**: Bật/tắt việc đưa liên kết PDF, DOCX và `.doc`/RTF cũ vào hàng đợi cào. `.doc` được chuyển đổi bằng LibreOffice headless; nếu runtime thiếu hoặc file lỗi, record metadata/trích yếu từ trang danh sách vẫn được giữ lại cho RAG.
 6. **Bắt Đầu Cào (1-Click)**: Bấm nút **"Bắt đầu cào dữ liệu"**. Trang web sẽ tự động chạy ngầm, cập nhật tiến trình và tạo file đã chọn khi job hoàn tất.
 7. **Mở RAG Inspector**: Nhấp **"Xem Preview"** để kiểm tra tổng quan, văn bản, chunks, RAG Health và metadata kỹ thuật.
 8. **Xuất định dạng khác**: Chọn định dạng ở cột hành động rồi bấm **"Xuất"**. Định dạng đã chọn trước khi cào được chọn sẵn và hiển thị trạng thái file sẵn sàng.
@@ -55,6 +61,13 @@ Trình duyệt sẽ tự động mở trang web quản trị tại: `http://loca
 ## 4. Chạy qua dòng lệnh CLI (Tùy chọn nâng cao)
 
 Nếu không dùng trang web, bạn vẫn có thể chạy qua dòng lệnh CLI:
+
+Registry quản trị nguồn mặc định nằm tại `config/source-registry.json`. Adapter
+và toàn bộ host seed phải khớp cùng một entry để package nhận
+`corpus_type=legal_reference` cùng provenance đã đăng ký. Generic Web ngoài
+registry vẫn crawl được ở corpus `general/unverified`, nhưng không đủ điều kiện
+admission vào kho tham chiếu pháp luật. Nguồn tổng hợp được gắn
+`cross_check_only`, chỉ phục vụ discovery/đối chiếu.
 
 ### 4.1. Cào từ Cổng thông tin Chính phủ (`vanban.chinhphu.vn`)
 ```powershell
@@ -108,7 +121,7 @@ Dashboard tự tạo định dạng đã chọn trong `exports/` khi job hoàn t
 | Định dạng | Dùng khi nào | Đặc điểm |
 | --- | --- | --- |
 | `chunks_jsonl` | Khuyên dùng cho vector pipeline, embedding hoặc ETL tự động | Mỗi dòng là một chunk gồm `id`, `text` nguyên bản và `metadata` có source, hash, offset, ACL |
-| `staging_zip` | Nạp bằng `DxOs.Workers` hoặc lưu bản lossless | Chứa manifest, observations, chunk-sets, chunks, errors và toàn bộ artifacts |
+| `staging_zip` | Nạp bằng `DigitalOps.RagIngestion` hoặc lưu bản lossless | Chứa manifest, observations, chunk-sets, chunks, errors và toàn bộ artifacts |
 | `chunks_csv` | Kiểm tra thủ công, Excel hoặc pipeline dữ liệu phẳng | UTF-8 BOM; trường có nguy cơ trở thành công thức spreadsheet được thêm dấu `'` ở đầu |
 | `documents_markdown_zip` | Công cụ RAG nhập theo từng tài liệu Markdown | Mỗi observation là một file `.md` có YAML-compatible front matter và normalized text |
 | `documents_html` | Trình duyệt, kho tài liệu HTML hoặc bộ nạp web | Một HTML độc lập; nội dung nguồn được escape và không tải script/tài nguyên ngoài |
@@ -148,10 +161,12 @@ và kiểm tra bằng SHA-256 trước khi tái sử dụng. PPTX giới hạn 2
 
 - Một HTTP client được tái sử dụng trong toàn job, có keep-alive, giới hạn đồng thời theo host và khoảng nghỉ giữa các request.
 - Các lỗi tạm thời `408`, `425`, `429`, `500`, `502`, `503`, `504` được retry theo exponential backoff; header `Retry-After` được tôn trọng trong giới hạn cấu hình.
-- Redirect được kiểm tra lại theo allowlist/SSRF policy. Redirect hạ từ HTTPS xuống HTTP không bao giờ được tải bằng HTTP; crawler chỉ thử nâng đích đến thành HTTPS, sau đó kiểm tra lại host/DNS, kích thước và cấu trúc PDF/DOCX.
-- Với nguồn `generic_web`, các alias tài nguyên công khai thông dụng như `static`, `cdn`, `media`, `files`, `download`, `uploads` cùng domain gốc được cho phép có giới hạn để xử lý tệp đính kèm; adapter chuyên biệt vẫn giữ allowlist chính xác.
+- Redirect được kiểm tra lại theo allowlist/SSRF policy. Redirect hoặc anchor asset hạ từ HTTPS xuống HTTP không bao giờ được tải bằng HTTP; crawler chỉ thử nâng đích đến thành HTTPS, sau đó kiểm tra lại host/DNS, kích thước và chữ ký PDF/DOCX/DOC.
+- Với nguồn `generic_web`, các alias tài nguyên công khai thông dụng như `cms`, `static`, `cdn`, `media`, `files`, `download`, `uploads` cùng domain gốc được cho phép có giới hạn để xử lý tệp đính kèm; adapter chuyên biệt vẫn giữ allowlist chính xác.
 - URL được canonicalize, bỏ tracking parameter, fragment và query trùng; `?page=1` được gộp với URL danh sách gốc. Frontier ưu tiên tài liệu/đính kèm trước trang danh sách và lưu bền trong SQLite.
-- Link phân trang không tiêu tốn content depth, vì vậy một seed URL có thể lần theo trang 2, 3... đến khi chạm `max_pagination_pages`, `limit`, không còn nút trang kế tiếp hoặc URL rời khỏi phạm vi HTTPS/host được phép.
+- Link phân trang không tiêu tốn content depth hoặc document `limit`. Một seed URL có thể lần theo trang 2, 3... đến khi chạm `max_pagination_pages`, hard limit HTTP, không còn nút trang kế tiếp hoặc URL rời khỏi phạm vi HTTPS/host được phép.
+- Trang `m.mattran.org.vn/van-ban-huong-dan.html` có parser record riêng: mỗi cặp dòng `Loại văn bản/Ngày ban hành` + `Trích yếu` tạo một observation ổn định; trang danh sách chỉ dùng để discovery. Attachment liên quan giữ `parent_canonical_keys` trong metadata khi có thể.
+- Dashboard tách riêng `văn bản chính / limit`, số trang danh sách, tổng record phát hiện, attachment đọc được và tổng observation. `crawler.max_total_resources` là hard limit HTTP độc lập (mặc định 2.000) để tránh vòng crawl không giới hạn.
 - `header`, `footer`, `nav`, quảng cáo, menu và link điều hướng không liên quan bị loại trước khi trích xuất/chunking để giảm chunk trùng và URL rác.
 - Mỗi tài liệu hoàn tất có checkpoint atomic. Chạy lại cùng `job_id` sau khi tiến trình bị ngắt sẽ nạp checkpoint đã xác minh SHA-256 và chỉ cào phần frontier còn lại.
 - `ETag`/`Last-Modified` được dùng cho conditional GET. Response `304` chỉ tái sử dụng raw artifact khi đúng adapter và checksum còn hợp lệ.
@@ -174,6 +189,8 @@ Các tham số tương ứng nằm trong `config/settings.yaml`: `retry_attempts
 `per_host_delay_seconds`, `per_host_max_concurrent` và
 `max_pagination_pages`. Giới hạn OCR nằm trong nhóm `ocr`: `max_pages`,
 `max_image_pixels`, `page_timeout_seconds` và `tessdata_dir`.
+Giới hạn chuyển đổi `.doc` nằm trong nhóm `legacy_doc`: `soffice_cmd`,
+`timeout_seconds` và `max_output_bytes`.
 
 ### 5.3. Chính sách chunk thích ứng
 
@@ -215,11 +232,19 @@ trong URL hash.
 RAG Health là kiểm tra trước khi nạp, không phải chứng nhận dữ liệu đúng tuyệt
 đối. Package mới chỉ cảnh báo token khi vượt soft ceiling và báo lỗi khi vượt
 hard limit. Cần review lỗi/cảnh báo về manifest count, quan hệ mồ côi, token budget,
-offset, ACL, extraction, duplicate và crawler error trước khi chạy worker.
+offset, ACL, extraction, duplicate và crawler error trước khi chạy ingestion CLI.
 
 ---
 
-## 6. Nạp Dữ Liệu vào PostgreSQL & Qdrant Vector DB
+## 6. Kiểm tra và nạp có kiểm soát vào PostgreSQL & Qdrant
+
+Theo `Project-Document/02-architecture/03-ai-rag-design.md`, legal package đi qua
+`validate → admit → publish`. `publish` cưỡng chế source registry, provenance,
+metadata hiệu lực và receipt gắn với digest package; observation không đạt được
+quarantine. T4-03 vẫn `[~]` cho đến khi baseline 45 ca regression cộng legal
+fixture đạt gate, nên chỉ publish corpus đã được người có thẩm quyền phê duyệt
+trong môi trường được phép; việc command chạy thành công không phải bằng chứng
+production-ready.
 
 Từ thư mục gốc DigitalOps, áp EF migration một lần:
 
@@ -242,13 +267,29 @@ $env:Rag__QdrantGrpcPort = "6334"
 Kiểm tra package hoặc dry-run không gọi mạng và không ghi dữ liệu:
 
 ```powershell
-dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id> --validate-only
-dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id> --dry-run
+dotnet run --project tools/DigitalOps.RagIngestion -- validate --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
+dotnet run --project tools/DigitalOps.RagIngestion -- plan --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
 ```
 
-Nạp chính thức; thêm `--resume` khi tiếp tục job bị gián đoạn:
+Tạo receipt sau khi người quản trị dữ liệu xem kết quả validation/RAG Inspector:
 
 ```powershell
-dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
-dotnet run --project DxOs.Workers -- --staging-dir tools/rag-data-scraper/storage/staging/<job_id> --resume
+$registry = "tools/rag-data-scraper/config/source-registry.json"
+$staging = "tools/rag-data-scraper/storage/staging/<job_id>"
+dotnet run --project tools/DigitalOps.RagIngestion -- admit --staging-dir $staging --source-registry $registry --approved-by "<data steward>" --approval-reference "<approval id>"
 ```
+
+Lệnh ghi `admission.json`, liệt kê observation được duyệt/quarantine và trả exit
+code `5` nếu không có observation nào đủ điều kiện. Không sửa core staging file
+sau bước này; nếu sửa phải validate/admit lại.
+
+Sau admission, nạp có kiểm soát; thêm `--resume` khi tiếp tục job bị gián đoạn:
+
+```powershell
+dotnet run --project tools/DigitalOps.RagIngestion -- publish --staging-dir $staging --source-registry $registry
+dotnet run --project tools/DigitalOps.RagIngestion -- publish --staging-dir $staging --source-registry $registry --resume
+```
+
+`DigitalOps.RagIngestion` là CLI độc lập chạy một lần rồi thoát. Script hoặc
+orchestrator ngoài gọi `validate`, `plan`, `admit`, `publish` và dùng exit code; tool
+không mở thêm HTTP endpoint. Flag cũ vẫn là compatibility alias tạm thời.

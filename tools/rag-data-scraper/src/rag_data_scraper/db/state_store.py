@@ -21,6 +21,7 @@ class FrontierItem:
     depth: int
     priority: int
     attempts: int
+    resource_kind: str = "document"
 
 
 @dataclass(frozen=True)
@@ -105,7 +106,7 @@ class CrawlerStateStore:
     def prepare_frontier(
         self,
         job_id: str,
-        seeds: Sequence[tuple[str, int]],
+        seeds: Sequence[tuple[str, int] | tuple[str, int, str]],
     ) -> None:
         now = _utc_now()
         with sqlite3.connect(self.db_path) as connection:
@@ -117,56 +118,103 @@ class CrawlerStateStore:
                 """,
                 (now, job_id),
             )
+            normalized_seeds: list[tuple[str, int, str]] = []
+            for seed in seeds:
+                if len(seed) == 2:
+                    url, priority = seed
+                    kind = "document"
+                else:
+                    url, priority, kind = seed
+                normalized_seeds.append((url, priority, kind))
             connection.executemany(
                 """
                 INSERT INTO CrawlFrontier (
-                    job_id, url, depth, priority, status, updated_at
-                ) VALUES (?, ?, 0, ?, 'pending', ?)
-                ON CONFLICT(job_id, url) DO NOTHING
+                    job_id, url, depth, priority, resource_kind, status, updated_at
+                ) VALUES (?, ?, 0, ?, ?, 'pending', ?)
+                ON CONFLICT(job_id, url) DO UPDATE SET
+                    priority = MAX(CrawlFrontier.priority, excluded.priority),
+                    resource_kind = excluded.resource_kind,
+                    updated_at = excluded.updated_at
                 """,
-                ((job_id, url, priority, now) for url, priority in seeds),
+                (
+                    (job_id, url, priority, kind, now)
+                    for url, priority, kind in normalized_seeds
+                ),
             )
 
     def enqueue_frontier(
         self,
         job_id: str,
-        candidates: Sequence[tuple[str, int, int, str]],
+        candidates: Sequence[
+            tuple[str, int, int, str] | tuple[str, int, int, str, str]
+        ],
     ) -> None:
         if not candidates:
             return
         now = _utc_now()
         with sqlite3.connect(self.db_path) as connection:
+            normalized_candidates: list[
+                tuple[str, int, int, str, str]
+            ] = []
+            for candidate in candidates:
+                if len(candidate) == 4:
+                    url, depth, priority, parent = candidate
+                    kind = "document"
+                else:
+                    url, depth, priority, parent, kind = candidate
+                normalized_candidates.append(
+                    (url, depth, priority, parent, kind)
+                )
             connection.executemany(
                 """
                 INSERT INTO CrawlFrontier (
-                    job_id, url, depth, priority, status,
+                    job_id, url, depth, priority, resource_kind, status,
                     discovered_from, updated_at
-                ) VALUES (?, ?, ?, ?, 'pending', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
                 ON CONFLICT(job_id, url) DO UPDATE SET
                     priority = MAX(CrawlFrontier.priority, excluded.priority),
                     depth = MIN(CrawlFrontier.depth, excluded.depth),
+                    resource_kind = CASE
+                        WHEN excluded.resource_kind = 'attachment'
+                        THEN 'attachment'
+                        ELSE CrawlFrontier.resource_kind
+                    END,
                     updated_at = excluded.updated_at
                 """,
                 (
-                    (job_id, url, depth, priority, parent, now)
-                    for url, depth, priority, parent in candidates
+                    (job_id, url, depth, priority, kind, parent, now)
+                    for url, depth, priority, parent, kind
+                    in normalized_candidates
                 ),
             )
 
-    def claim_frontier(self, job_id: str, limit: int) -> list[FrontierItem]:
+    def claim_frontier(
+        self,
+        job_id: str,
+        limit: int,
+        *,
+        resource_kinds: Optional[Sequence[str]] = None,
+    ) -> list[FrontierItem]:
         if limit < 1:
             return []
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
+            kind_filter = ""
+            parameters: list[Any] = [job_id]
+            if resource_kinds:
+                placeholders = ",".join("?" for _ in resource_kinds)
+                kind_filter = f" AND resource_kind IN ({placeholders})"
+                parameters.extend(resource_kinds)
+            parameters.append(limit)
             rows = connection.execute(
-                """
-                SELECT url, depth, priority, attempts
+                f"""
+                SELECT url, depth, priority, attempts, resource_kind
                 FROM CrawlFrontier
-                WHERE job_id = ? AND status = 'pending'
+                WHERE job_id = ? AND status = 'pending'{kind_filter}
                 ORDER BY priority DESC, depth ASC, url ASC
                 LIMIT ?
                 """,
-                (job_id, limit),
+                parameters,
             ).fetchall()
             now = _utc_now()
             connection.executemany(
@@ -179,7 +227,7 @@ class CrawlerStateStore:
                 ((now, job_id, row[0]) for row in rows),
             )
         return [
-            FrontierItem(row[0], row[1], row[2], row[3] + 1)
+            FrontierItem(row[0], row[1], row[2], row[3] + 1, row[4])
             for row in rows
         ]
 
@@ -200,6 +248,36 @@ class CrawlerStateStore:
                 WHERE job_id = ? AND url = ?
                 """,
                 (status, error_message, _utc_now(), job_id, url),
+            )
+
+    def release_frontier(self, job_id: str, url: str) -> None:
+        """Return claimed work to pending without losing resume state."""
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                UPDATE CrawlFrontier
+                SET status = 'pending', updated_at = ?
+                WHERE job_id = ? AND url = ? AND status = 'running'
+                """,
+                (_utc_now(), job_id, url),
+            )
+
+    def set_frontier_resource_kind(
+        self,
+        job_id: str,
+        url: str,
+        resource_kind: str,
+    ) -> None:
+        if resource_kind not in {"document", "pagination", "attachment"}:
+            raise ValueError("invalid frontier resource kind")
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                UPDATE CrawlFrontier
+                SET resource_kind = ?, updated_at = ?
+                WHERE job_id = ? AND url = ? AND status = 'pending'
+                """,
+                (resource_kind, _utc_now(), job_id, url),
             )
 
     def frontier_counts(self, job_id: str) -> dict[str, int]:

@@ -14,10 +14,10 @@ _SKIPPED_SUFFIXES = frozenset(
     {
         ".7z", ".avi", ".bmp", ".css", ".exe", ".gif", ".ico", ".jpeg",
         ".jpg", ".js", ".mov", ".mp3", ".mp4", ".mpeg", ".png", ".rar",
-        ".tar", ".webm", ".webp", ".woff", ".woff2", ".zip", ".doc",
+        ".tar", ".webm", ".webp", ".woff", ".woff2", ".zip",
     }
 )
-_ATTACHMENT_SUFFIXES = frozenset({".docx", ".pdf"})
+_ATTACHMENT_SUFFIXES = frozenset({".doc", ".docx", ".pdf"})
 _PAGINATION_KEYS = frozenset({"page", "p", "paged", "pageindex", "trang"})
 _PAGINATION_PATH = re.compile(
     r"(?:^|/)(?:page|paged|trang|trang-chu)(?:/|-)?\d+(?:/|$)",
@@ -93,6 +93,17 @@ class CrawlPolicy:
             return True
         return bool(_PAGINATION_PATH.search(path))
 
+    def is_attachment(self, raw_url: str) -> bool:
+        path = urlsplit(raw_url).path.lower()
+        return PurePosixPath(path).suffix in _ATTACHMENT_SUFFIXES
+
+    def resource_kind(self, raw_url: str) -> str:
+        if self.is_attachment(raw_url):
+            return "attachment"
+        if self.is_pagination(raw_url):
+            return "pagination"
+        return "document"
+
     def next_depth(
         self,
         raw_url: str,
@@ -110,10 +121,12 @@ class CrawlPolicy:
     def priority(self, raw_url: str) -> int:
         parsed = urlsplit(raw_url)
         path = parsed.path.lower()
+        if self.is_pagination(raw_url):
+            # Finish discovering listing records before large attachments use
+            # the bounded HTTP budget.
+            return 110
         if PurePosixPath(path).suffix in _ATTACHMENT_SUFFIXES:
             return 100
-        if self.is_pagination(raw_url):
-            return 20
         if any(
             marker in path
             for marker in ("/van-ban", "/document", "/detail", "/chi-tiet")

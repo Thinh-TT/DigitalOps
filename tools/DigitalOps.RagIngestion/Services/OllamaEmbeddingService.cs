@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Threading;
 
-namespace DxOs.Workers.Services;
+namespace DigitalOps.RagIngestion.Services;
 
 public sealed record OllamaEmbeddingRequest(
     [property: JsonPropertyName("model")] string Model,

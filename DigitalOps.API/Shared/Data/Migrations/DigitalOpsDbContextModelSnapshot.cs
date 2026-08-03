@@ -854,9 +854,17 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<int?>("MaxTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_tokens");
+
                     b.Property<int>("OverlapTokens")
                         .HasColumnType("integer")
                         .HasColumnName("overlap_tokens");
+
+                    b.Property<int?>("SoftMaxTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("soft_max_tokens");
 
                     b.Property<int>("TargetTokens")
                         .HasColumnType("integer")
@@ -885,7 +893,7 @@ namespace DigitalOps.API.Shared.Data.Migrations
 
                     b.ToTable("rag_chunk_sets", null, t =>
                         {
-                            t.HasCheckConstraint("ck_rag_chunk_sets_limits", "target_tokens > 0 AND overlap_tokens >= 0 AND overlap_tokens < target_tokens AND total_chunks > 0");
+                            t.HasCheckConstraint("ck_rag_chunk_sets_limits", "target_tokens > 0 AND overlap_tokens >= 0 AND overlap_tokens < target_tokens AND (soft_max_tokens IS NULL OR (soft_max_tokens >= target_tokens AND soft_max_tokens <= 512)) AND (max_tokens IS NULL OR (max_tokens >= COALESCE(soft_max_tokens, target_tokens) AND max_tokens <= 512)) AND total_chunks > 0");
                         });
                 });
 
@@ -1009,6 +1017,28 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .HasColumnName("source_mapping_id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<DateTime?>("AdmissionApprovedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("admission_approved_at");
+
+                    b.Property<string>("AdmissionApprovedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("admission_approved_by");
+
+                    b.Property<string>("AdmissionReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("admission_reference");
+
+                    b.Property<string>("CorpusType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("general")
+                        .HasColumnName("corpus_type");
+
                     b.Property<DateTime>("CrawledAt")
                         .HasColumnType("timestamptz")
                         .HasColumnName("crawled_at");
@@ -1017,11 +1047,34 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("document_id");
 
+                    b.Property<string>("PublishPolicy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("blocked")
+                        .HasColumnName("publish_policy");
+
+                    b.Property<string>("RegistryEntryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("registry_entry_id");
+
+                    b.Property<string>("RegistryVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("registry_version");
+
                     b.Property<string>("SourceDocumentUrl")
                         .IsRequired()
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)")
                         .HasColumnName("source_document_url");
+
+                    b.Property<string>("SourceDomain")
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("source_domain");
 
                     b.Property<string>("SourceId")
                         .IsRequired()
@@ -1035,6 +1088,14 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("source_namespace");
 
+                    b.Property<string>("SourceTrustTier")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("unverified")
+                        .HasColumnName("source_trust_tier");
+
                     b.Property<Guid>("VersionId")
                         .HasColumnType("uuid")
                         .HasColumnName("version_id");
@@ -1045,11 +1106,23 @@ namespace DigitalOps.API.Shared.Data.Migrations
                     b.HasIndex("DocumentId")
                         .HasDatabaseName("ix_rag_document_sources_document_id");
 
+                    b.HasIndex("CorpusType", "SourceTrustTier")
+                        .HasDatabaseName("idx_rag_doc_sources_corpus_trust");
+
                     b.HasIndex("VersionId", "SourceId", "SourceDocumentUrl")
                         .IsUnique()
                         .HasDatabaseName("ux_rag_doc_sources_version_source_url");
 
-                    b.ToTable("rag_document_sources", (string)null);
+                    b.ToTable("rag_document_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_document_sources_corpus", "corpus_type IN ('general', 'legal_reference')");
+
+                            t.HasCheckConstraint("ck_rag_document_sources_publish_policy", "publish_policy IN ('authoritative', 'verified_copy', 'cross_check_only', 'blocked')");
+
+                            t.HasCheckConstraint("ck_rag_document_sources_trust", "source_trust_tier IN ('official', 'verified_copy', 'aggregator', 'unverified')");
+
+                            t.HasCheckConstraint("ck_rag_document_sources_trust_policy_pair", "(source_trust_tier = 'official' AND publish_policy = 'authoritative') OR (source_trust_tier = 'verified_copy' AND publish_policy = 'verified_copy') OR (source_trust_tier = 'aggregator' AND publish_policy = 'cross_check_only') OR (source_trust_tier = 'unverified' AND publish_policy = 'blocked')");
+                        });
                 });
 
             modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocumentVersion", b =>
@@ -1074,10 +1147,50 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("document_id");
 
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("document_number");
+
+                    b.Property<string>("DocumentType")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("document_type");
+
+                    b.Property<DateOnly?>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateOnly?>("EffectiveTo")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_to");
+
                     b.Property<string>("ExtractionQualityJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("extraction_quality");
+
+                    b.Property<DateOnly?>("IssuedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_date");
+
+                    b.Property<string>("Issuer")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("language");
+
+                    b.Property<string>("LegalStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("status_unknown")
+                        .HasColumnName("legal_status");
 
                     b.Property<string>("MetadataJson")
                         .IsRequired()
@@ -1118,6 +1231,11 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .HasColumnName("raw_sha256")
                         .IsFixedLength();
 
+                    b.Property<string>("SourceVersion")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_version");
+
                     b.Property<int>("WordCount")
                         .HasColumnType("integer")
                         .HasColumnName("word_count");
@@ -1132,7 +1250,12 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_rag_doc_versions_document_hash");
 
-                    b.ToTable("rag_document_versions", (string)null);
+                    b.ToTable("rag_document_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_document_versions_effectivity", "effective_from IS NULL OR effective_to IS NULL OR effective_from <= effective_to");
+
+                            t.HasCheckConstraint("ck_rag_document_versions_legal_status", "legal_status IN ('current', 'expired', 'repealed', 'superseded', 'status_unknown')");
+                        });
                 });
 
             modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIndexGeneration", b =>

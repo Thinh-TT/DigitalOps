@@ -58,6 +58,7 @@ Các bảng Identity được ánh xạ sang tên `snake_case`, ví dụ `AspNet
 | Văn bản   | `attachments`                         | Metadata file, trạng thái và text trích xuất |
 | Thẩm định | `review_history`                      | Snapshot và kết quả từng lần thẩm định  |
 | Nhắc hạn  | `reminder_history`                    | Thông báo nhắc hạn nội bộ               |
+| RAG dẫn xuất | `rag_*` theo mục 1.6               | Ingestion provenance/version/chunk/index mapping và citation audit; không lưu vector |
 
 ### 1.5. Giới hạn MVP
 
@@ -71,12 +72,48 @@ Các bảng Identity được ánh xạ sang tên `snake_case`, ví dụ `AspNet
 
 ### 1.6. Ranh giới dữ liệu RAG
 
-PostgreSQL tiếp tục là system of record. Qdrant là external derived index có thể
-tái tạo từ dữ liệu nguồn đã được phép trong PostgreSQL; vì vậy MVP không thêm
-bảng embedding, cột vector, EF migration hoặc quan hệ khóa ngoại cho Qdrant.
-Collection `digitalops_knowledge_v1` và payload/index lifecycle được mô tả tại
-`03-ai-rag-design.md`. Docker named volume chỉ cung cấp persistence local cho
-demo và không được xem là backup nghiệp vụ.
+PostgreSQL tiếp tục là system of record cho dữ liệu nghiệp vụ. Qdrant là external
+derived vector index; PostgreSQL không lưu vector/embedding và không có khóa
+ngoại sang Qdrant.
+
+Migration `20260803041733_AddRagIngestionSchema` bổ sung **derived ingestion
+catalog** để quản lý provenance, version, chunk, index generation, job/error và
+citation audit cho dữ liệu RAG bên ngoài. Migration
+`20260803150752_AddLegalRagGovernance` bổ sung các field được promote để admission
+và retrieval legal corpus có thể filter/audit bằng cột có kiểu:
+
+- `rag_documents`, `rag_document_versions`, `rag_document_sources`;
+- `rag_chunk_sets`, `rag_chunks`, `rag_index_points`;
+- `rag_index_generations`, `rag_ingestion_jobs`, `rag_ingestion_errors`;
+- `rag_citation_snapshots`.
+
+Các cột governance chính:
+
+- `rag_document_versions`: `document_number`, `document_type`, `issuer`,
+  `issued_date`, `legal_status`, `effective_from`, `effective_to`,
+  `source_version`, `language`;
+- `rag_document_sources`: `registry_entry_id`, `registry_version`,
+  `source_domain`, `source_trust_tier`, `corpus_type`, `publish_policy`,
+  `admission_reference`, `admission_approved_by`, `admission_approved_at`;
+- `rag_chunk_sets`: `soft_max_tokens`, `max_tokens`.
+
+Database check constraint giới hạn vocabulary legal status/trust tier/corpus
+type/publish policy và đảm bảo `effective_from <= effective_to`,
+`target_tokens <= soft_max_tokens <= max_tokens` khi các giá trị được cung cấp.
+Admission receipt đầy đủ vẫn nằm ở staging artifact; database giữ audit fields
+cần cho retrieval và truy vết.
+
+Các bảng này không phải source of truth cho nội dung/hiệu lực pháp luật và không
+thay thế raw/staging artifact hoặc nguồn công bố chính thức. `rag_index_points`
+chỉ giữ mapping/trạng thái point; vector nằm trong Qdrant.
+
+Collection `digitalops_knowledge_v1`, admission/publish lifecycle và ranh giới
+legal corpus được mô tả tại `03-ai-rag-design.md`. `DigitalOps.RagIngestion
+publish` chỉ ghi observation có admission receipt hợp lệ và lưu approval audit;
+retrieval chỉ nhận source `legal_reference` đã admit thuộc tier
+`official/verified_copy`. T4-03 vẫn chưa hoàn tất cho đến khi regression cộng
+legal fixture đạt evaluation gate. Docker named volume chỉ cung cấp persistence
+local cho demo và không được xem là backup nghiệp vụ.
 
 ## 2. Sơ Đồ ER (Entity Relationship)
 

@@ -89,9 +89,36 @@ public sealed class RAGRetrievalServiceTests
             NormalizedTextSha256 = new string('2', 64),
             CharCount = 1000,
             WordCount = 200,
-            ExtractionQualityJson = "{}"
+            ExtractionQualityJson = "{}",
+            DocumentNumber = "15/2023/NĐ-CP",
+            DocumentType = "Nghị định",
+            Issuer = "Chính phủ",
+            IssuedDate = new DateOnly(2023, 4, 15),
+            LegalStatus = "current",
+            EffectiveFrom = new DateOnly(2023, 5, 1),
+            SourceVersion = "sha256:official-v1",
+            Language = "vi"
         };
         db.RagDocumentVersions.Add(docVersion);
+        db.RagDocumentSources.Add(new RagDocumentSource
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = docId,
+            VersionId = versionId,
+            SourceId = "vanban_chinhphu",
+            SourceNamespace = "vanban.chinhphu.vn",
+            SourceDocumentUrl = "https://vanban.chinhphu.vn/doc-15",
+            RegistryEntryId = "vanban-chinhphu-official",
+            RegistryVersion = "2026-08-03.1",
+            SourceDomain = "vanban.chinhphu.vn",
+            SourceTrustTier = "official",
+            CorpusType = "legal_reference",
+            PublishPolicy = "authoritative",
+            AdmissionReference = "T4-03-test",
+            AdmissionApprovedBy = "Test",
+            AdmissionApprovedAt = DateTime.UtcNow,
+            CrawledAt = DateTime.UtcNow
+        });
         await db.SaveChangesAsync();
 
         var chunkSet = new RagChunkSet
@@ -162,6 +189,36 @@ public sealed class RAGRetrievalServiceTests
         Assert.Single(results);
         Assert.Equal(activeChunk.Id, results[0].ChunkId);
         Assert.Equal("Nghị định 15/2023/NĐ-CP", results[0].Title);
+        Assert.Equal("https://vanban.chinhphu.vn/doc-15", results[0].SourceUrl);
+        Assert.Equal("official", results[0].SourceTrustTier);
+        Assert.Equal("15/2023/NĐ-CP", results[0].DocumentNumber);
+        Assert.False(results[0].IsEffectivityUnknown);
+
+        var source = await db.RagDocumentSources.SingleAsync();
+        source.SourceTrustTier = "aggregator";
+        source.PublishPolicy = "cross_check_only";
+        await db.SaveChangesAsync();
+        Assert.Empty(await service.RetrieveAsync(
+            queryVector,
+            userRole: "staff",
+            topK: 5));
+
+        source.SourceTrustTier = "official";
+        source.PublishPolicy = "authoritative";
+        docVersion.LegalStatus = "expired";
+        docVersion.EffectiveTo = new DateOnly(2025, 12, 31);
+        await db.SaveChangesAsync();
+        Assert.Empty(await service.RetrieveAsync(
+            queryVector,
+            userRole: "staff",
+            topK: 5,
+            asOf: new DateOnly(2026, 8, 3)));
+        Assert.Single(await service.RetrieveAsync(
+            queryVector,
+            userRole: "staff",
+            topK: 5,
+            asOf: new DateOnly(2026, 8, 3),
+            includeHistorical: true));
     }
 
     [Fact]
@@ -201,9 +258,36 @@ public sealed class RAGRetrievalServiceTests
             NormalizedTextSha256 = new string('4', 64),
             CharCount = 500,
             WordCount = 100,
-            ExtractionQualityJson = "{}"
+            ExtractionQualityJson = "{}",
+            DocumentNumber = "02/2024/QĐ",
+            DocumentType = "Quyết định",
+            Issuer = "Cơ quan thử nghiệm",
+            IssuedDate = new DateOnly(2024, 1, 1),
+            LegalStatus = "current",
+            EffectiveFrom = new DateOnly(2024, 1, 1),
+            SourceVersion = "sha256:secret-v1",
+            Language = "vi"
         };
         db.RagDocumentVersions.Add(docVersion);
+        db.RagDocumentSources.Add(new RagDocumentSource
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = docId,
+            VersionId = versionId,
+            SourceId = "vanban_chinhphu",
+            SourceNamespace = "vanban.chinhphu.vn",
+            SourceDocumentUrl = "https://vanban.chinhphu.vn/secret",
+            RegistryEntryId = "vanban-chinhphu-official",
+            RegistryVersion = "2026-08-03.1",
+            SourceDomain = "vanban.chinhphu.vn",
+            SourceTrustTier = "official",
+            CorpusType = "legal_reference",
+            PublishPolicy = "authoritative",
+            AdmissionReference = "T4-03-test",
+            AdmissionApprovedBy = "Test",
+            AdmissionApprovedAt = DateTime.UtcNow,
+            CrawledAt = DateTime.UtcNow
+        });
         await db.SaveChangesAsync();
 
         var chunkSet = new RagChunkSet

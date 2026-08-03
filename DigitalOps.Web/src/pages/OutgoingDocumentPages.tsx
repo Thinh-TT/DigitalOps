@@ -24,6 +24,7 @@ import {
   getOutgoingReviews,
   updateOutgoingDocument, uploadOutgoingAttachment,
 } from "../shared/outgoing-documents/outgoing-document-service";
+import { ReviewCitations } from "../shared/outgoing-documents/ReviewCitations";
 import type {
   OutgoingDocumentCreateRequest, OutgoingDocumentListParameters,
   OutgoingDocumentResponse, OutgoingDocumentStatus, ReviewResponse,
@@ -382,7 +383,7 @@ export function OutgoingDocumentDetailPage() {
             { title: "Người gửi", key: "reviewedByStaff", render: (_, review) => review.reviewedByStaff?.fullName ?? "Hệ thống" },
             { title: "Thời điểm", dataIndex: "reviewedAt", width: 170, render: formatDateTime },
           ]}
-          expandable={{ expandedRowRender: review => <Space className="review-history-detail" orientation="vertical" size="middle"><div><Typography.Text strong>Nội dung tại thời điểm thẩm định</Typography.Text><pre className="document-content-preview">{review.contentSnapshot}</pre></div><div><Typography.Text strong>Issues</Typography.Text>{review.reviewIssues.length === 0 ? <Typography.Text type="secondary">Không có issue.</Typography.Text> : <List size="small" dataSource={review.reviewIssues} renderItem={issue => <List.Item><Space wrap><ReviewSeverityTag severity={issue.severity} /><Typography.Text code>{issue.ruleCode}</Typography.Text><Typography.Text>{issue.message}</Typography.Text>{issue.location && <Typography.Text type="secondary">{issue.location}</Typography.Text>}</Space></List.Item>} />}</div></Space> }}
+          expandable={{ expandedRowRender: review => <Space className="review-history-detail" orientation="vertical" size="middle"><div><Typography.Text strong>Nội dung tại thời điểm thẩm định</Typography.Text><pre className="document-content-preview">{review.contentSnapshot}</pre></div><div><Typography.Text strong>Issues</Typography.Text>{review.reviewIssues.length === 0 ? <Typography.Text type="secondary">Không có issue.</Typography.Text> : <List size="small" dataSource={review.reviewIssues} renderItem={issue => <List.Item><Space wrap><ReviewSeverityTag severity={issue.severity} /><Typography.Text code>{issue.ruleCode}</Typography.Text><Typography.Text>{issue.message}</Typography.Text>{issue.location && <Typography.Text type="secondary">{issue.location}</Typography.Text>}</Space></List.Item>} />}</div><div><Typography.Text strong>Nguồn pháp lý đã dùng</Typography.Text><ReviewCitations citations={review.citations} /></div></Space> }}
           pagination={{ current: reviews?.page ?? 1, pageSize: reviews?.pageSize ?? 20, total: reviews?.totalCount ?? 0, showSizeChanger: false, onChange: page => void loadReviews(page) }}
         />
       </Card>

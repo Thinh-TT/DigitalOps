@@ -66,6 +66,7 @@ def test_adaptive_chunk_limits_load_from_settings_and_validate_order() -> None:
         settings.chunker.overlap_tokens,
     ) == (448, 480, 512, 64)
     assert settings.crawler.max_response_bytes == 32 * 1024 * 1024
+    assert settings.crawler.max_total_resources == 2000
     assert settings.ocr.max_pages == 50
     assert settings.ocr.max_image_pixels == 3_000_000
 
@@ -401,14 +402,15 @@ def test_crawl_policy_canonicalizes_deduplicates_and_filters_attachments() -> No
     assert candidates == ["https://example.gov.vn/van-ban?a=1&id=2"]
     assert policy.priority(candidates[0]) == 50
     assert CrawlPolicy().priority("https://example.gov.vn/law.pdf") == 100
-    assert not CrawlPolicy().should_visit("https://example.gov.vn/legacy.doc")
+    assert CrawlPolicy().should_visit("https://example.gov.vn/legacy.doc")
+    assert not policy.should_visit("https://example.gov.vn/legacy.doc")
     assert CrawlPolicy().is_pagination("https://example.gov.vn/list?page=3")
     assert CrawlPolicy().canonicalize(
         "https://example.gov.vn/list?page=1"
     ) == "https://example.gov.vn/list"
     assert CrawlPolicy().priority(
         "https://example.gov.vn/van-ban?page=3"
-    ) == 20
+    ) == 110
     assert CrawlPolicy().next_depth(
         "https://example.gov.vn/list?page=3",
         parent_depth=1,
@@ -901,7 +903,7 @@ async def test_engine_skips_stale_pending_url_under_current_policy(
     db_path = tmp_path / "state" / "crawler.db"
     store = CrawlerStateStore(db_path)
     job_id = "JOB_POLICY_RESUME"
-    legacy_url = "https://example.gov.vn/files/legacy.doc"
+    stale_url = "https://example.gov.vn/files/tool.exe"
     valid_url = "https://example.gov.vn/article"
     store.start_job(
         job_id=job_id,
@@ -911,7 +913,7 @@ async def test_engine_skips_stale_pending_url_under_current_policy(
         identity_strategy="authoritative",
         base_url=valid_url,
     )
-    store.prepare_frontier(job_id, [(legacy_url, 100)])
+    store.prepare_frontier(job_id, [(stale_url, 100)])
 
     adapter = _ConcurrentAdapter()
     output = await CrawlEngine(
@@ -933,7 +935,7 @@ async def test_engine_skips_stale_pending_url_under_current_policy(
                 (job_id,),
             ).fetchall()
         )
-    assert statuses == {legacy_url: "skipped", valid_url: "done"}
+    assert statuses == {stale_url: "skipped", valid_url: "done"}
 
 
 def test_delete_job_removes_scoped_state_but_keeps_shared_cache(

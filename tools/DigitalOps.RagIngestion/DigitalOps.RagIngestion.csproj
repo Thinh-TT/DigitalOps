@@ -5,15 +5,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>DigitalOps.RagIngestion</AssemblyName>
+    <RootNamespace>DigitalOps.RagIngestion</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Qdrant.Client" Version="1.13.0" />
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DigitalOps.API\DigitalOps.API.csproj" />
+    <ProjectReference Include="..\..\DigitalOps.API\DigitalOps.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalOps.RagIngestion.Tests" />
   </ItemGroup>
 
 </Project>

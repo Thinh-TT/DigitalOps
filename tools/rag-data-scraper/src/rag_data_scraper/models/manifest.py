@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -11,6 +11,10 @@ class ManifestFiles(BaseModel):
 
 
 class StagingManifest(BaseModel):
+    schema_version: str = "1.0"
+    corpus_type: Literal["general", "legal_reference"] = "general"
+    source_registry_version: Optional[str] = None
+    source_registry_entry_ids: list[str] = Field(default_factory=list)
     job_id: str
     started_at: datetime
     completed_at: datetime

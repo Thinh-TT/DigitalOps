@@ -16,7 +16,7 @@
 | Đăng nhập JWT, đổi mật khẩu tạm lần đầu và quản trị cơ bản tài khoản/cán bộ/role | MFA, email kích hoạt, quên mật khẩu tự phục vụ |
 | CRUD, tìm kiếm và import Excel hồ sơ hội viên | Membership nâng cao, lịch sử biến động, CCCD, chi hội |
 | Văn bản đến, AI gợi ý điều phối có xác nhận của văn thư, nhắc hạn nội bộ | Điều phối tự động không có xác nhận, email/SMS reminder |
-| Mẫu văn bản, AI sinh nháp, thẩm định thể thức, phê duyệt, phát hành và lưu trữ | Kiểm tra tính đúng-sai nội dung hoặc pháp lý |
+| Mẫu văn bản, AI sinh nháp, thẩm định thể thức và tra cứu tham chiếu pháp luật đã duyệt nguồn, phê duyệt, phát hành và lưu trữ | AI kết luận tính đúng-sai nội dung/pháp lý, tư vấn pháp lý hoặc cổng tra cứu pháp luật công cộng |
 | Attachment PDF/DOCX/XLSX/JPG/JPEG/PNG và tìm kiếm text-based file | OCR ảnh/PDF scan, tìm kiếm nội dung ảnh, Citizen Portal |
 | Full-text search bằng PostgreSQL | Search service ngoài, đồng bộ đa hệ thống |
 
@@ -26,7 +26,7 @@
 | --- | --- |
 | ASP.NET Core Identity + JWT | Đăng nhập, role, đổi mật khẩu, khóa tài khoản |
 | PostgreSQL + EF Core | Lưu dữ liệu nghiệp vụ, history, reminder và full-text index |
-| RAG local-first + Ollama (baseline v3 đã Approved for MVP/demo) | Gợi ý điều phối, sinh nháp, kiểm tra thể thức; xem 02-architecture/03-ai-rag-design.md để biết phạm vi MVP/demo và các production gate còn lại |
+| RAG local-first + Ollama (baseline v3 đã Approved for MVP/demo) | Gợi ý điều phối, sinh nháp, kiểm tra thể thức; phần tra cứu tham chiếu pháp luật cho FR-013 chỉ được bật sau source-admission và evaluation gate riêng trong 02-architecture/03-ai-rag-design.md |
 | File storage | Lưu file đính kèm ngoài database |
 | Text extraction worker | Trích xuất text từ PDF có text layer, DOCX và XLSX |
 | Reminder worker | Tạo nhắc trước hạn, đến hạn và quá hạn |
@@ -76,7 +76,7 @@ Một `Staff` có thể được gán nhiều role. Không có role `Reviewer` r
 | FR-010 | Nhắc hạn tự động và đọc thông báo | Reminder Worker, Staff | P0 | `incoming_documents`, `reminder_history` |
 | FR-011 | Tạo văn bản đi theo mẫu | Cán bộ soạn thảo | P0 | `outgoing_documents`, `document_templates`, `members` |
 | FR-012 | AI sinh nháp và chỉnh sửa văn bản | Cán bộ soạn thảo, AI Service | P0 | `outgoing_documents` |
-| FR-013 | Thẩm định thể thức và xem lịch sử review | Cán bộ soạn thảo, AI Service | P0 | `outgoing_documents`, `review_history` |
+| FR-013 | Thẩm định thể thức, tham chiếu pháp luật và xem lịch sử review | Cán bộ soạn thảo, AI Service | P0 | `outgoing_documents`, `review_history`, derived legal corpus |
 | FR-014 | Phê duyệt hoặc trả lại văn bản | Lãnh đạo | P0 | `outgoing_documents`, `review_history` |
 | FR-015 | Cấp số, phát hành và lưu trữ | Văn thư | P0 | `outgoing_documents`, `attachments` |
 | FR-016 | Tìm kiếm toàn văn văn bản | Tất cả Staff đang hoạt động | P0 | `incoming_documents`, `outgoing_documents`, `attachments` |
@@ -445,35 +445,40 @@ Một `Staff` có thể được gán nhiều role. Không có role `Reviewer` r
 - Lỗi AI không làm mất nội dung chưa lưu của người dùng trên UI hoặc nội dung đã lưu trong database.
 - Instruction được giữ trong modal khi gặp `409/503` để người dùng có thể thử lại hoặc tiếp tục sửa thủ công.
 
-### FR-013 — Thẩm định thể thức và xem lịch sử review
+### FR-013 — Thẩm định thể thức, tham chiếu pháp luật và xem lịch sử review
 
 | Thuộc tính | Nội dung |
 | --- | --- |
-| Mục tiêu | Kiểm tra thể thức qua rule/AI và lưu vết rõ từng vòng sửa. |
+| Mục tiêu | Kiểm tra thể thức qua rule/AI, cung cấp tham chiếu pháp luật có nguồn để cán bộ đối chiếu và lưu vết rõ từng vòng sửa. |
 | Vai trò | Cán bộ soạn thảo, AI Service. |
 | Tiền điều kiện | Người dùng là DraftedByStaff; văn bản ở Editing hoặc ReviewFailed; template có FormatRules. |
 | Hậu điều kiện | Tạo một ReviewHistory immutable và cập nhật trạng thái/lỗi gần nhất của văn bản. |
-| Dữ liệu | `outgoing_documents`, `document_templates`, `review_history`. |
+| Dữ liệu | `outgoing_documents`, `document_templates`, `review_history`; legal corpus trong RAG index là dữ liệu dẫn xuất, không phải system of record. |
 | Phân quyền | Người soạn gửi review; mọi Staff active được xem lịch sử vì có quyền xem toàn bộ văn bản. |
 
 **Luồng chính**
 
 1. Người soạn gửi văn bản thẩm định; hệ thống chuyển yêu cầu sang service rule/AI.
-2. Service lấy FormatRules của template và kiểm tra thể thức, không kết luận nội dung/pháp lý.
-3. Trong cùng transaction, hệ thống tạo AttemptNo kế tiếp, lưu ContentSnapshot, ReviewResult và ReviewIssues.
-4. Hệ thống cập nhật `OutgoingDocuments.ReviewIssues` bằng lỗi mới nhất.
-5. Nếu Failed, status chuyển `ReviewFailed`; nếu Passed, status chuyển `PendingApproval`.
-6. Người dùng xem danh sách lịch sử để so sánh snapshot/lỗi giữa các attempt.
+2. Service lấy FormatRules của template và kiểm tra thể thức bằng rule xác định trước.
+3. Khi legal corpus đã qua gate và có ngữ cảnh phù hợp, service truy hồi văn bản pháp luật/hướng dẫn theo nguồn, phiên bản, hiệu lực và quyền; mỗi gợi ý phải kèm tham chiếu để cán bộ tự đối chiếu.
+4. AI không kết luận nội dung/pháp lý. Phát hiện dựa trên tham chiếu pháp luật chỉ là `Warning`/`Info`, không tự làm review `Failed`; chỉ rule xác định mới tạo `Error`.
+5. Trong cùng transaction, hệ thống tạo AttemptNo kế tiếp, lưu ContentSnapshot, ReviewResult và ReviewIssues.
+6. Hệ thống cập nhật `OutgoingDocuments.ReviewIssues` bằng lỗi mới nhất.
+7. Nếu có `Error`, status chuyển `ReviewFailed`; nếu không có `Error`, status chuyển `PendingApproval`.
+8. Người dùng xem danh sách lịch sử để so sánh snapshot/lỗi và tham chiếu giữa các attempt.
 
 **Ngoại lệ**
 
 - AI/rule service lỗi trước khi có kết quả: không tạo ReviewHistory, giữ trạng thái Editing/ReviewFailed và cho phép thử lại.
 - Văn bản không ở trạng thái hợp lệ: từ chối gửi review.
+- Không tìm thấy nguồn đủ tin cậy, nguồn mâu thuẫn hoặc chưa xác định được hiệu lực: AI phải abstain/nêu thiếu bằng chứng; không sinh trích dẫn giả và không làm review thất bại.
 
 **Tiêu chí nghiệm thu**
 
 - Mỗi review thành công thêm đúng một dòng, AttemptNo tăng tuần tự.
 - Một review Passed không có issue severity Error và chuyển đúng PendingApproval.
+- Mỗi issue tham chiếu pháp luật có tối thiểu tên/số hiệu văn bản, cơ quan ban hành, trạng thái/phiên bản đã truy hồi và URL nguồn; nguồn tổng hợp không được đứng một mình làm căn cứ.
+- Không có legal corpus hoặc không đủ bằng chứng vẫn chạy được phần FormatRules và không làm mất nội dung/trạng thái hiện có.
 
 ### FR-014 — Phê duyệt hoặc trả lại văn bản
 
@@ -597,7 +602,7 @@ Một `Staff` có thể được gán nhiều role. Không có role `Reviewer` r
 1. Lỗi/timeout AI không ghi đè Content, AiDraftContent, assignment hoặc status hiện tại.
 2. AiDraftContent chỉ lưu bản AI đầu tiên; Content là bản cán bộ có thể tiếp tục chỉnh.
 3. Mỗi review thành công tạo một ReviewHistory immutable với snapshot, AttemptNo, result và issues.
-4. Thẩm định chỉ kiểm tra thể thức/hình thức; không xác nhận nội dung hoặc căn cứ pháp lý đúng-sai.
+4. Thẩm định kiểm tra thể thức/hình thức bằng rule xác định; RAG chỉ cung cấp tham chiếu pháp luật có trích dẫn để cán bộ đối chiếu, không xác nhận nội dung hoặc căn cứ pháp lý đúng-sai.
 5. Reminder chỉ được tạo cho incoming document đã giao người và chưa Completed.
 6. Unique key reminder bảo đảm job chạy lại không tạo trùng; overdue reminder có thể có một bản ghi mỗi ngày.
 

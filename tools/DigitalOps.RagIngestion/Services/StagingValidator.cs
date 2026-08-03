@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using DxOs.Workers.Models;
+using System.Text.Json.Serialization;
+using DigitalOps.RagIngestion.Models;
 
-namespace DxOs.Workers.Services;
+namespace DigitalOps.RagIngestion.Services;
 
 public sealed record ValidationReport(
     bool IsValid,
@@ -17,6 +18,12 @@ public sealed record ValidationReport(
 
 public static class StagingValidator
 {
+    internal static readonly JsonSerializerOptions ContractJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+    };
+
     public static ValidationReport Validate(string stagingDirectoryPath)
     {
         var errors = new List<string>();
@@ -49,7 +56,9 @@ public static class StagingValidator
         try
         {
             var json = File.ReadAllText(manifestPath);
-            manifest = JsonSerializer.Deserialize<StagingManifest>(json);
+            manifest = JsonSerializer.Deserialize<StagingManifest>(
+                json,
+                ContractJsonOptions);
         }
         catch (Exception ex)
         {
@@ -64,7 +73,9 @@ public static class StagingValidator
             if (string.IsNullOrWhiteSpace(line)) continue;
             try
             {
-                var obs = JsonSerializer.Deserialize<DocumentObservationDto>(line);
+                var obs = JsonSerializer.Deserialize<DocumentObservationDto>(
+                    line,
+                    ContractJsonOptions);
                 if (obs != null) observations.Add(obs);
             }
             catch (Exception ex)
@@ -81,7 +92,9 @@ public static class StagingValidator
             if (string.IsNullOrWhiteSpace(line)) continue;
             try
             {
-                var cs = JsonSerializer.Deserialize<ChunkSetDto>(line);
+                var cs = JsonSerializer.Deserialize<ChunkSetDto>(
+                    line,
+                    ContractJsonOptions);
                 if (cs != null) chunkSets.Add(cs);
             }
             catch (Exception ex)
@@ -98,7 +111,9 @@ public static class StagingValidator
             if (string.IsNullOrWhiteSpace(line)) continue;
             try
             {
-                var ck = JsonSerializer.Deserialize<ChunkDto>(line);
+                var ck = JsonSerializer.Deserialize<ChunkDto>(
+                    line,
+                    ContractJsonOptions);
                 if (ck != null) chunks.Add(ck);
             }
             catch (Exception ex)

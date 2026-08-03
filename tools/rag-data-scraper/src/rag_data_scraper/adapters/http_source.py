@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import io
+from dataclasses import replace
 from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping, Optional
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 from zipfile import BadZipFile, ZipFile
 
 from bs4 import BeautifulSoup
@@ -101,6 +102,20 @@ class HttpSourceAdapter(BaseAdapter):
     ) -> str:
         return self._url_key("web", canonical_url)
 
+    def _embedded_documents_for_html(
+        self,
+        soup: BeautifulSoup,
+        final_url: str,
+    ) -> list[CrawlResult]:
+        return []
+
+    def _is_discovery_only_html(
+        self,
+        soup: BeautifulSoup,
+        final_url: str,
+    ) -> bool:
+        return False
+
     @staticmethod
     def _should_follow_anchor(anchor) -> bool:
         href = anchor.get("href")
@@ -144,6 +159,27 @@ class HttpSourceAdapter(BaseAdapter):
         digest = hashlib.sha256(canonical_url.encode("utf-8")).hexdigest()[:24]
         return f"{self._key_prefix}_{kind}:{digest}"
 
+    def _normalize_discovered_url(
+        self,
+        base_url: str,
+        raw_href: str,
+    ) -> Optional[str]:
+        candidate = urljoin(base_url, raw_href)
+        parsed = urlsplit(candidate)
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+        if (
+            parsed.scheme.lower() == "http"
+            and hostname in self._fetcher.policy.allowed_hosts
+        ):
+            candidate = urlunsplit(
+                ("https", parsed.netloc, parsed.path, parsed.query, "")
+            )
+        try:
+            safe = self._fetcher.policy.normalize_and_validate(candidate)
+        except (TypeError, UnsafeUrlError):
+            return None
+        return self._crawl_policy.canonicalize(safe)
+
     def _canonical_url(self, soup: BeautifulSoup, final_url: str) -> str:
         canonical = soup.find("link", rel=lambda value: value and "canonical" in value)
         href = canonical.get("href") if canonical else None
@@ -153,6 +189,55 @@ class HttpSourceAdapter(BaseAdapter):
         except (TypeError, UnsafeUrlError):
             safe = final_url
         return self._crawl_policy.canonicalize(safe)
+
+    def _parse_html(
+        self,
+        content: bytes,
+        final_url: str,
+    ) -> tuple[
+        str,
+        str,
+        dict[str, Any],
+        list[str],
+        list[CrawlResult],
+        bool,
+    ]:
+        soup = BeautifulSoup(content, "lxml")
+        title = (
+            soup.title.string.strip()
+            if soup.title and soup.title.string
+            else PurePosixPath(urlsplit(final_url).path).name or final_url
+        )
+        canonical_url = self._canonical_url(soup, final_url)
+        metadata = self._metadata_for_html(soup, canonical_url)
+        metadata["source_url"] = canonical_url
+        embedded_documents = self._embedded_documents_for_html(
+            soup,
+            canonical_url,
+        )
+        embedded_links = {
+            link
+            for document in embedded_documents
+            for link in document.discovered_links
+        }
+        links: list[str] = []
+        for anchor in soup.find_all("a", href=True):
+            if not self._should_follow_anchor(anchor):
+                continue
+            discovered = self._normalize_discovered_url(
+                final_url,
+                str(anchor["href"]),
+            )
+            if discovered and discovered not in embedded_links:
+                links.append(discovered)
+        return (
+            title,
+            canonical_url,
+            metadata,
+            list(dict.fromkeys(links)),
+            embedded_documents,
+            self._is_discovery_only_html(soup, canonical_url),
+        )
 
     def _classify(self, content_type: str, final_url: str, content: bytes) -> str:
         lowered_type = content_type.lower().split(";", 1)[0].strip()
@@ -192,6 +277,13 @@ class HttpSourceAdapter(BaseAdapter):
                 ) from exc
             return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         if lowered_type == "application/msword" or suffix == ".doc":
+            if not (
+                content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+                or content.lstrip().startswith(b"{\\rtf")
+            ):
+                raise UnsupportedContentTypeError(
+                    "legacy DOC response is neither OLE Compound File nor RTF"
+                )
             return "application/msword"
         if lowered_type.startswith(("image/", "audio/", "video/")):
             return lowered_type
@@ -250,29 +342,20 @@ class HttpSourceAdapter(BaseAdapter):
         title = PurePosixPath(urlsplit(final_url).path).name or final_url
 
         if mime_type == "text/html":
-            soup = BeautifulSoup(response.content, "lxml")
-            title = (
-                soup.title.string.strip()
-                if soup.title and soup.title.string
-                else title
-            )
-            canonical_url = self._canonical_url(soup, final_url)
-            metadata.update(self._metadata_for_html(soup, canonical_url))
-            metadata["source_url"] = canonical_url
+            (
+                title,
+                canonical_url,
+                html_metadata,
+                links,
+                embedded_documents,
+                discovery_only,
+            ) = self._parse_html(response.content, final_url)
+            metadata.update(html_metadata)
             canonical_key = self._html_canonical_key(canonical_url, metadata)
-            for anchor in soup.find_all("a", href=True):
-                if not self._should_follow_anchor(anchor):
-                    continue
-                try:
-                    discovered = self._fetcher.policy.normalize_and_validate(
-                        urljoin(final_url, anchor["href"])
-                    )
-                except UnsafeUrlError:
-                    continue
-                links.append(self._crawl_policy.canonicalize(discovered))
-            links = list(dict.fromkeys(links))
             final_url = canonical_url
         else:
+            embedded_documents = []
+            discovery_only = False
             kind = "media" if mime_type.startswith(("image/", "audio/", "video/")) else (
                 "pdf" if mime_type == "application/pdf" else
                 "docx" if "wordprocessingml" in mime_type else "doc"
@@ -296,6 +379,35 @@ class HttpSourceAdapter(BaseAdapter):
             response_headers=response.headers,
             attempt_count=response.attempt_count,
             elapsed_ms=response.elapsed_ms,
+            embedded_documents=embedded_documents,
+            discovery_only=discovery_only,
+        )
+
+    def rehydrate_cached_result(self, result: CrawlResult) -> CrawlResult:
+        if result.mime_type.lower() != "text/html":
+            return result
+        (
+            title,
+            canonical_url,
+            html_metadata,
+            links,
+            embedded_documents,
+            discovery_only,
+        ) = self._parse_html(
+            result.html_or_bytes,
+            result.final_url or result.url,
+        )
+        metadata = {**result.metadata, **html_metadata}
+        return replace(
+            result,
+            url=canonical_url,
+            final_url=canonical_url,
+            title=title,
+            canonical_key=self._html_canonical_key(canonical_url, metadata),
+            metadata=metadata,
+            discovered_links=links,
+            embedded_documents=embedded_documents,
+            discovery_only=discovery_only,
         )
 
     async def aclose(self) -> None:

@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS CrawlFrontier (
     url TEXT NOT NULL,
     depth INTEGER NOT NULL CHECK(depth >= 0),
     priority INTEGER NOT NULL DEFAULT 0,
+    resource_kind TEXT NOT NULL DEFAULT 'document',
     status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'done', 'failed', 'skipped')),
     discovered_from TEXT,
     attempts INTEGER NOT NULL DEFAULT 0,
@@ -105,6 +106,10 @@ _RESOURCE_COLUMNS = {
     "resource_authority_namespace": "TEXT",
 }
 
+_FRONTIER_COLUMNS = {
+    "resource_kind": "TEXT NOT NULL DEFAULT 'document'",
+}
+
 
 def _upgrade_existing_schema(connection: sqlite3.Connection) -> None:
     existing = {
@@ -115,6 +120,15 @@ def _upgrade_existing_schema(connection: sqlite3.Connection) -> None:
         if name not in existing:
             connection.execute(
                 f'ALTER TABLE CrawledResources ADD COLUMN "{name}" {data_type}'
+            )
+    frontier_existing = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(CrawlFrontier)")
+    }
+    for name, data_type in _FRONTIER_COLUMNS.items():
+        if name not in frontier_existing:
+            connection.execute(
+                f'ALTER TABLE CrawlFrontier ADD COLUMN "{name}" {data_type}'
             )
 
 def init_sqlite_db(db_path: Path | str) -> None:

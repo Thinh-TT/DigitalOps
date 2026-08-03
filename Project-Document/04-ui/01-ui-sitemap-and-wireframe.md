@@ -191,7 +191,7 @@ Khi action không hợp lệ do trạng thái, không hiển thị hoặc disabl
 | SCR-010 | /reminders                                                            | BusinessAccess                              | FR-010                 | GET /reminders; POST /reminders/:id/read                                      | Danh sách thông báo của người dùng; Administrator có filter recipient.                     |
 | SCR-011 | /outgoing-documents, /outgoing-documents/new                          | BusinessAccess; create Drafter              | FR-011                 | GET/POST /outgoing-documents; GET template/member lookup                      | Table filter, tạo theo mẫu, chọn liên kết optional.                                        |
 | SCR-012 | /outgoing-documents/:id                                               | BusinessAccess; edit Drafter owner          | FR-008, FR-011, FR-012 | GET/PATCH outgoing; AI draft; attachment APIs                                 | Editor plain text, bản AI đầu tiên read-only, attachment và trạng thái workflow.           |
-| SCR-013 | /outgoing-documents/:id?tab=review                                    | BusinessAccess; submit Drafter owner        | FR-013                 | POST/GET /outgoing-documents/:id/reviews                                      | Nút thẩm định, lỗi gần nhất, snapshot và lịch sử theo AttemptNo.                           |
+| SCR-013 | /outgoing-documents/:id?tab=review                                    | BusinessAccess; submit Drafter owner        | FR-013                 | POST/GET /outgoing-documents/:id/reviews                                      | Nút thẩm định, lỗi gần nhất, content/citation snapshot và lịch sử theo AttemptNo.          |
 | SCR-014 | /approval-queue                                                       | Leader                                      | FR-014                 | GET outgoing filter PendingApproval; POST approval                            | Table hàng chờ, drawer tóm tắt, nút Duyệt/Trả.                                             |
 | SCR-015 | /archive-queue                                                        | Clerk                                       | FR-015                 | GET outgoing filter Approved; POST archive                                    | Table hàng chờ, modal nhập số ký hiệu và ngày phát hành.                                   |
 | SCR-016 | /search                                                               | BusinessAccess                              | FR-016                 | GET /documents/search                                                         | Query, filter, result source/snippet/score và mở chi tiết đúng loại tài liệu.              |
@@ -326,6 +326,9 @@ Boundary UI T2-03:
 | |                  textarea Content                    | | [Xem lịch sử]      |
 | |                                                      | | #1 Chưa đạt ...    |
 | +------------------------------------------------------+ | #2 Đạt ...          |
+|                                                        | Nguồn pháp lý:      |
+|                                                        | [Chính thức] link ↗ |
+|                                                        | Số hiệu · hiệu lực  |
 |---------------------------------------------------------+----------------------|
 | Attachment [Thêm file]  | file.docx | Đã trích xuất | [Tải] [Xóa]            |
 | {Tab Bản AI đầu tiên: aiDraftContent, chỉ đọc/so sánh}                        |
@@ -335,7 +338,13 @@ Boundary UI T2-03:
 - Tạo mới bắt buộc chọn template Active và nhập title; member lookup chỉ trả hội viên Active. Related incoming document và related member là optional theo API.
 - [Sinh nháp AI] mở modal nhập instruction optional. Xác nhận modal là bước chấp nhận và lưu ngay kết quả qua một endpoint, không có preview riêng; nếu title/Content đang dirty thì yêu cầu [Lưu] trước. Khi thành công, dùng response server làm state mới và hiển thị aiDraftContent read-only; các lần sinh sau chỉ thay Content. Khi `409/503`, không reload resource, giữ form và instruction để thử lại hoặc sửa thủ công.
 - [Lưu] gọi PATCH khi document editable và Drafter là draftedByStaff. Nút [Gửi thẩm định] chỉ hiện khi trạng thái/ownership hợp lệ; trong lúc review disable nút để không tạo attempt trùng.
-- Tab review hiển thị attemptNo, reviewedAt, reviewSource, reviewResult, reviewIssues và ContentSnapshot. Kết quả Failed hiển thị lỗi tại panel và trạng thái ReviewFailed; kết quả Passed chuyển PendingApproval.
+- Tab review hiển thị attemptNo, reviewedAt, reviewSource, reviewResult,
+  reviewIssues, ContentSnapshot và danh sách citation đã snapshot tại lần review.
+  Mỗi citation hiển thị title/số hiệu, cơ quan ban hành, tier nguồn, phiên bản,
+  trạng thái/khoảng hiệu lực và link mở nguồn ở tab mới; không hiển thị raw chunk,
+  vector hoặc prompt. Nếu `isEffectivityUnknown=true`, UI cảnh báo phải kiểm tra
+  văn bản gốc trước khi phê duyệt. Kết quả Failed hiển thị lỗi tại panel và trạng
+  thái ReviewFailed; kết quả Passed chuyển PendingApproval.
 - Khi resource PendingApproval, Approved hoặc Archived, editor read-only. Nếu Leader trả document, API trả Editing và owner có thể sửa, rồi gửi review vòng mới.
 
 ### 8.5. SCR-016 — Tìm kiếm toàn văn
@@ -408,7 +417,7 @@ Boundary UI T2-03:
 | FR-010   | SCR-010, header badge | GET /reminders; POST /reminders/:id/read                                                                 | Không có UI chạy background worker.                                  |
 | FR-011   | SCR-011, SCR-012      | GET/POST /outgoing-documents; GET /members/lookup; GET /document-templates                               | Tạo theo template, liên kết optional.                                |
 | FR-012   | SCR-012               | PATCH /outgoing-documents/{id}; POST /outgoing-documents/{id}/ai-draft                                   | Textarea Content; aiDraftContent chỉ đọc.                            |
-| FR-013   | SCR-013               | POST/GET /outgoing-documents/{id}/reviews                                                                | Review issues, snapshot, AttemptNo và trạng thái.                    |
+| FR-013   | SCR-013               | POST/GET /outgoing-documents/{id}/reviews                                                                | Review issues, content/citation snapshot, AttemptNo và trạng thái.   |
 | FR-014   | SCR-014               | GET /outgoing-documents?status=PendingApproval; POST /outgoing-documents/{id}/approval                   | Approve hoặc Return, không có approval comment MVP.                  |
 | FR-015   | SCR-015               | GET /outgoing-documents?status=Approved; POST /outgoing-documents/{id}/archive                           | Modal referenceNumber/issuedDate bắt buộc.                           |
 | FR-016   | SCR-016               | GET /documents/search                                                                                    | Filters, matchSource, snippet, score và deep link.                   |

@@ -685,6 +685,16 @@ public sealed class QdrantKnowledgeClient(
                         {
                             key = "isActive",
                             match = new { value = true }
+                        },
+                        new
+                        {
+                            key = "corpus_type",
+                            match = new { value = "legal_reference" }
+                        },
+                        new
+                        {
+                            key = "admission_status",
+                            match = new { value = "approved" }
                         }
                     }
                 },

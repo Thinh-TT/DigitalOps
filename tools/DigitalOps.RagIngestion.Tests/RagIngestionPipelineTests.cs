@@ -7,14 +7,14 @@ using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.Data.Entities;
 using DigitalOps.API.Shared.Data;
-using DxOs.Workers.Models;
-using DxOs.Workers.Services;
+using DigitalOps.RagIngestion.Models;
+using DigitalOps.RagIngestion.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace DxOs.Workers.Tests;
+namespace DigitalOps.RagIngestion.Tests;
 
 public sealed class RagIngestionPipelineTests
 {
@@ -37,10 +37,21 @@ public sealed class RagIngestionPipelineTests
             embedding,
             qdrant);
         var report = CreateReport();
+        var receipt = new AdmissionReceipt(
+            "1.0",
+            new string('c', 64),
+            "registry-test-1",
+            "approved",
+            "legal-data-steward",
+            DateTime.UtcNow,
+            "ADM-2026-PIPELINE",
+            [report.Observations.Single().ObservationId],
+            []);
 
         var processed = await pipeline.ProcessStagingPackageAsync(
             report,
-            stagingDirectory: "C:\\staging\\JOB_TEST");
+            stagingDirectory: "C:\\staging\\JOB_TEST",
+            admissionReceipt: receipt);
 
         Assert.Equal(1, processed);
         Assert.Equal(1, embedding.CallCount);
@@ -56,11 +67,23 @@ public sealed class RagIngestionPipelineTests
         Assert.Equal(
             "completed",
             (await dbContext.RagIngestionJobs.SingleAsync()).Status);
+        var version = await dbContext.RagDocumentVersions.SingleAsync();
+        var source = await dbContext.RagDocumentSources.SingleAsync();
+        Assert.Equal("01/2026/QD", version.DocumentNumber);
+        Assert.Equal("current", version.LegalStatus);
+        Assert.Equal("sha256:source-version", version.SourceVersion);
+        Assert.Equal("official", source.SourceTrustTier);
+        Assert.Equal("legal_reference", source.CorpusType);
+        Assert.Equal("ADM-2026-PIPELINE", source.AdmissionReference);
+        Assert.Contains("source_provenance", version.MetadataJson);
+        Assert.Equal("official", qdrant.Points.Single().SourceTrustTier);
+        Assert.Equal("current", qdrant.Points.Single().LegalStatus);
 
         processed = await pipeline.ProcessStagingPackageAsync(
             report,
             isResume: true,
-            stagingDirectory: "C:\\staging\\JOB_TEST");
+            stagingDirectory: "C:\\staging\\JOB_TEST",
+            admissionReceipt: receipt);
 
         Assert.Equal(1, processed);
         Assert.Equal(1, embedding.CallCount);
@@ -206,7 +229,11 @@ public sealed class RagIngestionPipelineTests
                 1,
                 1,
                 1,
-                0),
+                0,
+                "1.0",
+                "legal_reference",
+                "registry-test-1",
+                ["official-source"]),
             [
                 new DocumentObservationDto(
                     observationId,
@@ -226,7 +253,27 @@ public sealed class RagIngestionPipelineTests
                     text.Length,
                     text.Split(' ').Length,
                     new ExtractionQualityDto("clean", false, 1.0),
-                    now)
+                    now,
+                    new SourceProvenanceDto(
+                        "official-source",
+                        "registry-test-1",
+                        "legal_reference",
+                        "official",
+                        "example.gov.vn",
+                        "sha256:source-version",
+                        "authoritative",
+                        "vi"),
+                    new LegalDocumentMetadataDto(
+                        "01/2026/QD",
+                        "Quyet dinh",
+                        "Co quan nha nuoc",
+                        new DateOnly(2026, 1, 1),
+                        "current",
+                        new DateOnly(2026, 2, 1),
+                        null,
+                        [],
+                        [],
+                        []))
             ],
             [
                 new ChunkSetDto(
@@ -424,4 +471,3 @@ public sealed class SqliteTestModelCustomizer(
             .HasDefaultValue(defaultValue);
     }
 }
-

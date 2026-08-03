@@ -13,6 +13,7 @@ import {
   decideOutgoingDocumentApproval, getOutgoingDocument, getOutgoingDocuments,
   getOutgoingReviews,
 } from "../shared/outgoing-documents/outgoing-document-service";
+import { ReviewCitations } from "../shared/outgoing-documents/ReviewCitations";
 import type {
   ApprovalDecision, OutgoingDocumentResponse, ReviewIssueResponse, ReviewResponse,
 } from "../shared/outgoing-documents/types";
@@ -249,6 +250,10 @@ function ApprovalDrawerContent({
               <Typography.Text type="secondary">{formatDateTime(review.reviewedAt)}</Typography.Text>
             </Space>
             <ReviewIssues issues={review.reviewIssues} empty="Không có issue." />
+            <section>
+              <Typography.Text strong>Nguồn pháp lý đã dùng</Typography.Text>
+              <ReviewCitations citations={review.citations} />
+            </section>
             <ContentSection title="Snapshot nội dung" content={review.contentSnapshot} />
           </Space>
         </List.Item>}
