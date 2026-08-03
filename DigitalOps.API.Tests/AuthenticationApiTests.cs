@@ -11,6 +11,7 @@ using DigitalOps.API.Features.Drafting;
 using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Review;
 using DigitalOps.API.Shared.Data;
+using DigitalOps.API.Shared.Data.Entities;
 using DigitalOps.API.Shared.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -441,6 +442,50 @@ public sealed class AuthenticationTestModelCustomizer(
     public override void Customize(ModelBuilder modelBuilder, DbContext context)
     {
         base.Customize(modelBuilder, context);
+        modelBuilder.Entity<RagChunk>()
+            .Property(chunk => chunk.PageNumbers)
+            .HasConversion(
+                value => string.Join(",", value),
+                value => string.IsNullOrEmpty(value)
+                    ? Array.Empty<int>()
+                    : value.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries)
+                        .Select(int.Parse)
+                        .ToArray())
+            .HasColumnType("TEXT");
+        modelBuilder.Entity<RagChunk>()
+            .Property(chunk => chunk.AllowedRoles)
+            .HasConversion(
+                value => string.Join(",", value),
+                value => string.IsNullOrEmpty(value)
+                    ? Array.Empty<string>()
+                    : value.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries))
+            .HasColumnType("TEXT");
+        modelBuilder.Entity<RagChunk>()
+            .Property(chunk => chunk.DeniedRoles)
+            .HasConversion(
+                value => string.Join(",", value),
+                value => string.IsNullOrEmpty(value)
+                    ? Array.Empty<string>()
+                    : value.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries))
+            .HasColumnType("TEXT");
+        modelBuilder.Entity<RagCitationSnapshot>()
+            .Property(snapshot => snapshot.RetrievedChunkIds)
+            .HasConversion(
+                value => string.Join(",", value),
+                value => string.IsNullOrEmpty(value)
+                    ? Array.Empty<Guid>()
+                    : value.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries)
+                        .Select(Guid.Parse)
+                        .ToArray())
+            .HasColumnType("TEXT");
         modelBuilder.Entity<DocumentTemplate>()
             .Property(template => template.FormatRules)
             .HasConversion(

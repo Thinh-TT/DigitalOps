@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Chunk",
+  "type": "object",
+  "required": [
+    "chunk_id",
+    "chunk_set_id",
+    "chunk_index",
+    "text",
+    "token_count",
+    "character_start",
+    "character_end",
+    "content_sha256",
+    "structure_metadata",
+    "chunk_acl"
+  ],
+  "properties": {
+    "chunk_id": { "type": "string", "format": "uuid" },
+    "chunk_set_id": { "type": "string", "format": "uuid" },
+    "chunk_index": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string" },
+    "token_count": { "type": "integer", "minimum": 1 },
+    "character_start": { "type": "integer", "minimum": 0 },
+    "character_end": { "type": "integer", "minimum": 0 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "heading_path": { "type": ["string", "null"] },
+    "page_numbers": {
+      "type": "array",
+      "items": { "type": "integer" }
+    },
+    "structure_metadata": { "type": "object" },
+    "chunk_acl": {
+      "type": "object",
+      "required": ["allowed_roles", "denied_roles", "security_classification"],
+      "properties": {
+        "allowed_roles": { "type": "array", "items": { "type": "string" } },
+        "denied_roles": { "type": "array", "items": { "type": "string" } },
+        "security_classification": { "type": "string" }
+      }
+    }
+  }
+}

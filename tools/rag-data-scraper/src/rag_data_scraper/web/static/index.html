@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DigitalOps - RAG Data Scraper Web Dashboard</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #06b6d4;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #818cf8, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .grid > *, .card, form {
+            min-width: 0;
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            header { align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; }
+            .card { padding: 1.1rem; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+        }
+
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%;
+            max-width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 0.5rem;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+        }
+
+        textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group input {
+            width: 1.1rem;
+            height: 1.1rem;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .format-picker {
+            margin-top: 0.15rem;
+            padding: 0.85rem;
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            border-radius: 0.65rem;
+            background: rgba(14, 116, 144, 0.08);
+        }
+
+        .field-hint {
+            display: block;
+            margin-top: 0.45rem;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
+        .export-ready {
+            color: #34d399;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.85rem 1.5rem;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            color: #fff;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+            margin-top: 1rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: rgba(51, 65, 85, 0.8);
+            box-shadow: none;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            width: auto;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(71, 85, 105, 1);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            box-shadow: none;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            width: auto;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.4);
+            color: #ffffff;
+        }
+
+        /* Table style */
+        .table-responsive {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-completed { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-running { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .badge-pending { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-failed { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        .job-id {
+            font-family: monospace;
+            font-weight: 600;
+            color: #a5b4fc;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(2, 6, 23, 0.76);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            padding: 3vh 2vw;
+        }
+
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            width: min(1600px, 96vw);
+            max-width: none;
+            height: 94dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            min-height: 52px;
+            padding: 0.65rem 1rem;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-body {
+            flex: 1;
+            min-height: 0;
+            padding: 0;
+        }
+
+        .modal-body iframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .close-btn {
+            min-height: 34px;
+            padding: 0.4rem 0.75rem;
+            background: transparent;
+            border: 1px solid var(--card-border);
+            border-radius: 0.4rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .close-btn:hover { color: var(--text-main); border-color: var(--accent); }
+
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .export-controls {
+            display: flex;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .export-select {
+            min-width: 155px;
+            max-width: 210px;
+            padding: 0.55rem 0.65rem;
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.85);
+            color: var(--text-main);
+            font: inherit;
+        }
+
+        .export-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>DigitalOps - RAG Data Scraper</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">
+                    Hệ thống cào & trích xuất văn bản đa nguồn tự động cho RAG Pipeline
+                </p>
+            </div>
+            <div class="status-badge">
+                <span class="pulse-dot"></span>
+                <span>Web Dashboard Online</span>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Form Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span>🚀</span> Bắt Đầu Cào Dữ Liệu Mới (1-Click)
+                </div>
+                <form id="crawlForm">
+                    <div class="form-group">
+                        <label for="adapterSelect">Nguồn dữ liệu (Adapter):</label>
+                        <select id="adapterSelect" required>
+                            <option value="gov_portal">Cổng Thông tin Chính phủ (vanban.chinhphu.vn)</option>
+                            <option value="legal_aggregator">Thư Viện Pháp Luật (thuvienphapluat.vn)</option>
+                            <option value="generic_web">Trang Web Tùy Chỉnh (Generic Crawler)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="urlsInput">Đường dẫn bắt đầu (Seed URLs - Mỗi URL 1 dòng):</label>
+                        <textarea id="urlsInput" placeholder="https://vanban.chinhphu.vn..." required></textarea>
+                    </div>
+
+                    <div class="grid" style="margin-bottom: 0; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="jobIdInput">Mã Job (Job ID):</label>
+                            <input type="text" id="jobIdInput" placeholder="Tự động tạo nếu để trống">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="limitInput">Giới hạn số lượng cào (Limit):</label>
+                            <input type="number" id="limitInput" value="50" min="1" max="10000" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="paginationLimitInput">Giới hạn trang phân trang:</label>
+                            <input type="number" id="paginationLimitInput" value="25" min="1" max="500" required>
+                            <span class="field-hint">Trang 2, 3… được đi tiếp theo chuỗi nhưng vẫn nằm trong Limit tổng.</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group format-picker">
+                        <label for="outputFormatSelect">Định dạng đầu ra sau khi cào:</label>
+                        <select id="outputFormatSelect" required>
+                            <option value="chunks_jsonl" selected>Chunks JSONL — khuyên dùng cho RAG</option>
+                            <option value="staging_zip">Staging ZIP — gói đầy đủ cho DigitalOps Worker</option>
+                            <option value="documents_html">Web / HTML</option>
+                            <option value="documents_pdf">PDF</option>
+                            <option value="documents_docx">DOCX</option>
+                            <option value="documents_txt_zip">TXT ZIP</option>
+                            <option value="documents_markdown_zip">Markdown ZIP</option>
+                            <option value="chunks_csv">CSV</option>
+                            <option value="chunks_xlsx">XLSX</option>
+                            <option value="chunks_json">JSON</option>
+                            <option value="documents_pptx">PPTX</option>
+                            <option value="documents_xml">XML</option>
+                            <option value="documents_svg_zip">SVG ZIP</option>
+                        </select>
+                        <span class="field-hint">
+                            Hệ thống sẽ tự tạo file này ngay khi job hoàn tất. Bạn vẫn có thể xuất sang định dạng khác trong bảng bên dưới.
+                        </span>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="attachmentsCheck" checked>
+                        <label for="attachmentsCheck" style="margin-bottom:0; cursor:pointer;">
+                            Tự động phát hiện & đọc tệp đính kèm (PDF, DOCX)
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn" id="submitBtn">
+                        <span>⚡</span> Bắt Đầu Cào Ngay
+                    </button>
+                </form>
+            </div>
+
+            <!-- Stats & Presets Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span>💡</span> Hướng Dẫn & Nguồn Nhanh
+                </div>
+                <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1rem;">
+                    Chọn một trong các nguồn phổ biến dưới đây để dán nhanh URL hoặc chọn tùy chỉnh URL trang web cá nhân của bạn:
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <button class="btn btn-secondary" onclick="setPreset('gov')">
+                        🏛️ Nguồn mẫu: Cổng Văn Bản Chính Phủ (vanban.chinhphu.vn)
+                    </button>
+                    <button class="btn btn-secondary" onclick="setPreset('legal')">
+                        ⚖️ Nguồn mẫu: Thư Viện Pháp Luật (thuvienphapluat.vn)
+                    </button>
+                </div>
+
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                    <h4 style="font-size: 0.9rem; color: var(--accent); margin-bottom: 0.5rem;">Cơ chế xử lý tự động:</h4>
+                    <ul style="font-size: 0.85rem; color: var(--text-muted); padding-left: 1.2rem; line-height: 1.5;">
+                        <li>Bóc tách văn bản chuẩn HTML/PDF/DOCX loại bỏ bớt quảng cáo & header.</li>
+                        <li>Cắt nhỏ (Chunking) theo cấu trúc ngữ nghĩa tiếng Việt.</li>
+                        <li><strong>13 định dạng xuất:</strong> dữ liệu RAG, tài liệu văn phòng và đồ họa.</li>
+                        <li><strong>JSONL:</strong> khuyên dùng để nạp vector pipeline; Staging ZIP dành cho worker DigitalOps.</li>
+                        <li><strong>JSON/CSV/XLSX/XML:</strong> tích hợp, kiểm tra thủ công và ETL.</li>
+                        <li><strong>HTML/PDF/DOCX/TXT/Markdown/PPTX/SVG:</strong> chia sẻ hoặc nạp theo tài liệu.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Card -->
+        <div class="card">
+            <div class="card-title" style="justify-content: space-between;">
+                <div>
+                    <span>📊</span> Danh Sách Các Job Cào Dữ Liệu
+                </div>
+                <button class="btn btn-secondary" onclick="loadJobs()">🔄 Làm mới</button>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Job ID</th>
+                            <th>Nguồn (Adapter)</th>
+                            <th>Trạng Thái</th>
+                            <th>Đã Cào / Limit</th>
+                            <th>Thời Gian Tải</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobsTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách job...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+        <div class="modal-content" role="document">
+            <div class="modal-header">
+                <h3 id="modalTitle" style="font-size: 1.1rem; color: var(--accent);">Bảng Xem Trước Dữ Liệu (Preview)</h3>
+                <div class="modal-header-actions">
+                    <button class="close-btn" id="openPreviewTabBtn" type="button" onclick="openPreviewInNewTab()">Mở tab mới</button>
+                    <button class="close-btn" id="closePreviewBtn" type="button" onclick="closeModal()">Đóng</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <iframe id="previewIframe" src="" sandbox="allow-scripts" title="RAG staging data inspector"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        const EXPORT_LABELS = Object.freeze({
+            staging_zip: 'Staging ZIP',
+            chunks_jsonl: 'Chunks JSONL (khuyên dùng)',
+            chunks_csv: 'Chunks CSV',
+            documents_markdown_zip: 'Documents Markdown ZIP',
+            documents_html: 'Documents HTML',
+            documents_pdf: 'Documents PDF',
+            documents_docx: 'Documents DOCX',
+            documents_txt_zip: 'Documents TXT ZIP',
+            chunks_xlsx: 'Chunks XLSX',
+            chunks_json: 'Chunks JSON',
+            documents_pptx: 'Documents PPTX',
+            documents_xml: 'Documents XML',
+            documents_svg_zip: 'Documents SVG ZIP'
+        });
+        let lastJobsSignature = null;
+        let currentPreviewUrl = '';
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function setPreset(type) {
+
+            const adapter = document.getElementById('adapterSelect');
+            const urls = document.getElementById('urlsInput');
+            const jobId = document.getElementById('jobIdInput');
+
+            if (type === 'gov') {
+                adapter.value = 'gov_portal';
+                urls.value = 'https://vanban.chinhphu.vn';
+                jobId.value = 'JOB_GOV_' + Math.floor(Math.random() * 1000);
+            } else if (type === 'legal') {
+                adapter.value = 'legal_aggregator';
+                urls.value = 'https://thuvienphapluat.vn';
+                jobId.value = 'JOB_LEGAL_' + Math.floor(Math.random() * 1000);
+            }
+        }
+
+        async function loadJobs() {
+            try {
+                const res = await fetch(API_BASE + '/api/jobs');
+                const data = await res.json();
+                const tbody = document.getElementById('jobsTableBody');
+
+                const jobsSignature = JSON.stringify(data.jobs || []);
+                if (jobsSignature === lastJobsSignature) {
+                    return;
+                }
+                lastJobsSignature = jobsSignature;
+                if (!data.jobs || data.jobs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Chưa có job cào nào được thực hiện.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.jobs.map(job => {
+                    let badgeClass = 'badge-pending';
+                    if (job.status === 'COMPLETED') badgeClass = 'badge-completed';
+                    if (job.status === 'RUNNING') badgeClass = 'badge-running';
+                    if (job.status === 'FAILED') badgeClass = 'badge-failed';
+                    const safeJobId = escapeHtml(job.job_id);
+                    const exportFormats =
+                        Array.isArray(job.export_formats)
+                            ? job.export_formats
+                            : [];
+                    const preferredFormat = exportFormats.includes(job.preferred_export_format)
+                        ? job.preferred_export_format
+                        : exportFormats[0];
+                    const exportOptions = exportFormats.map(format => {
+                        const safeFormat = escapeHtml(format);
+                        const selected = format === preferredFormat ? ' selected' : '';
+                        return `<option value="${safeFormat}"${selected}>${escapeHtml(EXPORT_LABELS[format] || format)}</option>`;
+                    }).join('');
+                    const exportReady = job.preferred_export_ready
+                        ? `<span class="export-ready" title="File đã được tạo và kiểm tra checksum">● File đã sẵn sàng</span>`
+                        : '';
+                    const exportControls =
+                        exportFormats.length > 0
+                            ? `
+                                <div class="export-controls">
+                                    <select class="export-select" aria-label="Định dạng xuất cho ${safeJobId}">
+                                        ${exportOptions}
+                                    </select>
+                                    <button class="btn btn-secondary" data-job-id="${safeJobId}" onclick="downloadExport(this.dataset.jobId, this.previousElementSibling.value)">⬇️ Xuất</button>
+                                    ${exportReady}
+                                </div>
+                            `
+                            : '';
+
+                    return `
+                        <tr>
+                            <td class="job-id">${safeJobId}</td>
+                            <td>${escapeHtml(job.source_adapter)}</td>
+                            <td><span class="badge ${badgeClass}">${escapeHtml(job.status)}</span></td>
+                            <td>${job.crawled_count || 0} / ${job.limit_count}</td>
+                            <td>${escapeHtml(job.created_at || 'N/A')}</td>
+                            <td>
+                                <div class="action-btns">
+                                    ${job.has_preview ?
+                                        `<button class="btn btn-secondary" data-job-id="${safeJobId}" onclick="openPreview(this.dataset.jobId)">👁️ Xem Preview</button>` :
+                                        `<span style="color:var(--text-muted); font-size:0.8rem;">Chưa có preview</span>`
+                                    }
+                                    ${exportControls}
+                                    <button class="btn btn-danger" data-job-id="${safeJobId}" onclick="deleteJob(this.dataset.jobId)">🗑️ Xóa</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Lỗi tải danh sách job:', err);
+            }
+
+
+        }
+
+        async function deleteJob(jobId) {
+            if (!confirm(`⚠️ Bạn có chắc chắn muốn XÓA Job [${jobId}], gồm staging, raw/checkpoint và lịch sử chạy của job không?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(jobId)}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await res.json();
+                if (res.ok) {
+                    alert(`🗑️ Đã xóa thành công Job [${jobId}] và toàn bộ dữ liệu riêng của job!`);
+                    loadJobs();
+                } else {
+                    alert(`❌ Lỗi khi xóa Job: ${result.detail || 'Không thể xóa'}`);
+                }
+            } catch (err) {
+                alert(`❌ Lỗi kết nối server: ${err.message}`);
+            }
+        }
+
+        function downloadExport(jobId, format) {
+            if (!jobId || !format) {
+                return;
+            }
+            const target = `${API_BASE}/api/jobs/${encodeURIComponent(jobId)}/exports/${encodeURIComponent(format)}`;
+            window.location.assign(target);
+        }
+
+        document.getElementById('crawlForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const adapter = document.getElementById('adapterSelect').value;
+            const urlsRaw = document.getElementById('urlsInput').value;
+            let jobId = document.getElementById('jobIdInput').value.trim();
+            const limit = parseInt(document.getElementById('limitInput').value, 10);
+            const paginationLimit = parseInt(document.getElementById('paginationLimitInput').value, 10);
+            const downloadAttachments = document.getElementById('attachmentsCheck').checked;
+            const exportFormat = document.getElementById('outputFormatSelect').value;
+
+            if (!jobId) {
+                const now = new Date();
+                jobId = 'JOB_' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            }
+
+            const urls = urlsRaw.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '⏳ Đang khởi tạo Job...';
+
+            try {
+                const res = await fetch(API_BASE + '/api/jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        job_id: jobId,
+                        source: adapter,
+                        urls: urls,
+                        limit: limit,
+                        max_pagination_pages: paginationLimit,
+                        download_attachments: downloadAttachments,
+                        export_format: exportFormat
+                    })
+                });
+
+                const result = await res.json();
+                if (res.ok) {
+                    const formatLabel = EXPORT_LABELS[exportFormat] || exportFormat;
+                    alert(`✅ Đã khởi chạy Job [${jobId}]. File ${formatLabel} sẽ được tạo tự động khi cào xong.`);
+                    loadJobs();
+                } else {
+                    alert(`❌ Lỗi: ${result.detail || 'Không thể tạo Job'}`);
+                }
+            } catch (err) {
+                alert(`❌ Lỗi kết nối server: ${err.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '⚡ Bắt Đầu Cào Ngay';
+            }
+        });
+
+        function openPreview(jobId) {
+            const modal = document.getElementById('previewModal');
+            const iframe = document.getElementById('previewIframe');
+            const title = document.getElementById('modalTitle');
+
+            title.innerText = 'Bảng Xem Trước Dữ Liệu - ' + jobId;
+            currentPreviewUrl = API_BASE + '/api/jobs/' + encodeURIComponent(jobId) + '/preview';
+            iframe.src = currentPreviewUrl;
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('closePreviewBtn').focus();
+        }
+
+        function openPreviewInNewTab() {
+            if (!currentPreviewUrl) {
+                return;
+            }
+            const opened = window.open(currentPreviewUrl, '_blank', 'noopener,noreferrer');
+            if (opened) {
+                opened.opener = null;
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('previewModal');
+            const iframe = document.getElementById('previewIframe');
+            iframe.src = '';
+            currentPreviewUrl = '';
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('previewModal').addEventListener('click', (event) => {
+            if (event.currentTarget === event.target) {
+                closeModal();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && document.getElementById('previewModal').style.display === 'flex') {
+                closeModal();
+            }
+        });
+
+        // Auto reload jobs table every 4 seconds
+        loadJobs();
+        setInterval(loadJobs, 4000);
+    </script>
+</body>
+</html>

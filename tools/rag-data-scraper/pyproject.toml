@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-data-scraper"
+version = "0.1.0"
+description = "Multi-source RAG Data Crawler & Extraction Pipeline for DigitalOps"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.5.0",
+    "jsonschema>=4.20.0",
+    "pyyaml>=6.0.1",
+    "httpx>=0.26.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.1.0",
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
+    "reportlab>=4.2.0",
+    "openpyxl>=3.1.5",
+    "python-pptx>=1.0.2",
+    "pytesseract>=0.3.10",
+    "pillow>=10.2.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.setuptools.package-data]
+rag_data_scraper = ["web/static/*.html"]

@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="DigitalOps.API.Tests/DigitalOps.API.Tests.csproj" />
   <Project Path="DigitalOps.API/DigitalOps.API.csproj" />
+  <Project Path="DxOs.Workers/DxOs.Workers.csproj" />
+  <Project Path="DxOs.Workers.Tests/DxOs.Workers.Tests.csproj" />
 </Solution>

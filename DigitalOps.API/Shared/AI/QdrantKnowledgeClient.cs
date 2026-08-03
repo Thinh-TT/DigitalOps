@@ -642,6 +642,79 @@ public sealed class QdrantKnowledgeClient(
         return candidates;
     }
 
+    public async Task<IReadOnlyList<RagChunkKnowledgeCandidate>> SearchRagChunksAsync(
+        float[] queryVector,
+        int limit,
+        double minScore,
+        CancellationToken cancellationToken = default)
+    {
+        if (queryVector.Length != VectorDimensions)
+        {
+            throw new AiProviderException(
+                $"Qdrant query vector dimension must be {VectorDimensions}.");
+        }
+        if (limit is < 1 or > 200)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(limit),
+                "RAG search limit must be between 1 and 200.");
+        }
+        if (minScore is < 0 or > 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(minScore),
+                "RAG minimum score must be between 0 and 1.");
+        }
+
+        using var response = await SendAsync(
+            HttpMethod.Post,
+            $"{CollectionPath()}/points/query",
+            new
+            {
+                query = queryVector,
+                filter = new
+                {
+                    must = new object[]
+                    {
+                        new
+                        {
+                            key = "sourceType",
+                            match = new { value = "RagChunk" }
+                        },
+                        new
+                        {
+                            key = "isActive",
+                            match = new { value = true }
+                        }
+                    }
+                },
+                score_threshold = minScore,
+                limit,
+                with_payload = false,
+                with_vector = false
+            },
+            cancellationToken);
+        using var document = await ReadJsonAsync(response, cancellationToken);
+        var points = GetRequiredProperty(
+            GetRequiredProperty(document.RootElement, "result"),
+            "points");
+        var candidates = new List<RagChunkKnowledgeCandidate>();
+        foreach (var point in points.EnumerateArray())
+        {
+            if (!point.TryGetProperty("id", out var idElement)
+                || idElement.ValueKind != JsonValueKind.String
+                || !Guid.TryParse(idElement.GetString(), out var pointId)
+                || !point.TryGetProperty("score", out var scoreElement)
+                || !scoreElement.TryGetDouble(out var score))
+            {
+                throw new AiProviderException(
+                    "Qdrant returned an invalid RAG chunk point.");
+            }
+            candidates.Add(new RagChunkKnowledgeCandidate(pointId, score));
+        }
+        return candidates;
+    }
+
     private async Task ValidateCollectionAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)

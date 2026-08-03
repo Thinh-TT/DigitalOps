@@ -9,10 +9,16 @@
 *.suo
 *.userosscache
 *.sln.docstates
+.DS_Store
+Thumbs.db
 
 # Test results and coverage
 TestResults/
 coverage/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # Local configuration and secrets
 .env
@@ -24,3 +30,27 @@ coverage/
 
 # Local attachment objects
 DigitalOps.API/App_Data/
+
+# Python Virtual Environments & Pycache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.tox/
+.nox/
+.venv/
+venv/
+*.egg-info/
+
+# Runtime logs
+*.log
+
+# RAG Scraper Local Cache & Database Outputs
+tools/rag-data-scraper/storage/raw/*
+!tools/rag-data-scraper/storage/raw/.gitkeep
+tools/rag-data-scraper/storage/staging/*
+!tools/rag-data-scraper/storage/staging/.gitkeep
+tools/rag-data-scraper/storage/state/*
+!tools/rag-data-scraper/storage/state/.gitkeep

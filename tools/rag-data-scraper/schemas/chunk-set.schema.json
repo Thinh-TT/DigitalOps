@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChunkSet",
+  "type": "object",
+  "required": [
+    "chunk_set_id",
+    "observation_id",
+    "job_id",
+    "chunking_strategy",
+    "chunker_version",
+    "tokenizer_name",
+    "target_tokens",
+    "overlap_tokens",
+    "total_chunks",
+    "created_at"
+  ],
+  "properties": {
+    "chunk_set_id": { "type": "string", "format": "uuid" },
+    "observation_id": { "type": "string", "format": "uuid" },
+    "job_id": { "type": "string" },
+    "chunking_strategy": { "type": "string" },
+    "chunker_version": { "type": "string" },
+    "tokenizer_name": { "type": "string" },
+    "target_tokens": { "type": "integer", "minimum": 1 },
+    "soft_max_tokens": { "type": ["integer", "null"], "minimum": 1 },
+    "max_tokens": { "type": ["integer", "null"], "minimum": 1 },
+    "overlap_tokens": { "type": "integer", "minimum": 0 },
+    "total_chunks": { "type": "integer", "minimum": 0 },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}
