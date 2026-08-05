@@ -17,6 +17,7 @@ from ..adapters.legal_aggregator import LegalAggregatorAdapter
 from ..adapters.generic import GenericWebAdapter
 from ..crawler.engine import CrawlEngine
 from ..crawler.policy import CrawlPolicy
+from ..crawler.url_probe import UrlProbeService
 from ..chunkers.structure_chunker import StructureChunker
 from ..db.state_store import CrawlerStateStore
 
@@ -69,6 +70,55 @@ def get_job_dir(job_id: str) -> Path:
 
 # In-memory status map for tracking active jobs
 JOB_STATUS_MAP: Dict[str, Dict[str, Any]] = {}
+URL_PROBE_SEMAPHORE = asyncio.Semaphore(2)
+
+
+def _live_crawl_metrics(
+    job_id: str,
+    status: str,
+    base_metrics: Dict[str, Any],
+    primary_documents: int,
+) -> Dict[str, Any]:
+    """Merge persisted metrics with a current durable-frontier snapshot."""
+    metrics = dict(base_metrics)
+    metrics["primary_documents_created"] = primary_documents
+    if status != "RUNNING" or not STATE_DB.is_file():
+        return metrics
+
+    try:
+        metrics.update(CrawlerStateStore(STATE_DB).frontier_progress(job_id))
+    except Exception:
+        logger.warning(
+            "Unable to read live crawler progress for job %s",
+            job_id,
+            exc_info=True,
+        )
+    return metrics
+
+
+def _crawl_phase(
+    status: str,
+    export_status: Any,
+    metrics: Dict[str, Any],
+) -> str:
+    if status == "FAILED":
+        return "failed"
+    if status == "COMPLETED":
+        return "exporting" if export_status == "BUILDING" else "completed"
+    if status != "RUNNING":
+        return "pending"
+
+    if (
+        int(metrics.get("listing_pages_pending", 0)) > 0
+        or int(metrics.get("primary_documents_created", 0)) == 0
+    ):
+        return "discovery"
+    attachments_active = int(metrics.get("attachments_pending", 0)) + int(
+        metrics.get("attachments_running", 0)
+    )
+    if attachments_active > 0:
+        return "attachments"
+    return "finalizing"
 
 
 def get_export_service(job_id: str) -> RagExportService:
@@ -152,6 +202,85 @@ class CreateJobRequest(BaseModel):
                     f"seed host is outside {self.source} scope")
         return self
 
+
+class UrlProbeRequest(BaseModel):
+    source: Literal["gov_portal", "legal_aggregator", "generic_web"]
+    urls: List[str] = Field(..., min_length=1, max_length=10)
+    max_pagination_pages: int = Field(
+        default=25,
+        ge=1,
+        le=100,
+        description=(
+            "Maximum pagination URLs inspected in addition to seed URLs"
+        ),
+    )
+
+    @field_validator("urls")
+    @classmethod
+    def validate_urls(cls, urls: List[str]) -> List[str]:
+        normalized = list(dict.fromkeys(url.strip() for url in urls))
+        for url in normalized:
+            if len(url) > 2048 or any(ord(character) < 32 for character in url):
+                raise ValueError(
+                    "probe URLs must be at most 2048 characters and contain no control characters"
+                )
+            parsed = urlsplit(url)
+            if parsed.scheme.lower() != "https":
+                raise ValueError("probe URLs must use HTTPS")
+            if not parsed.hostname or parsed.username or parsed.password:
+                raise ValueError(
+                    "probe URLs require a host and cannot contain credentials"
+                )
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_source_scope(self):
+        approved_hosts = {
+            "gov_portal": {
+                "vanban.chinhphu.vn",
+                "www.vanban.chinhphu.vn",
+            },
+            "legal_aggregator": {
+                "thuvienphapluat.vn",
+                "www.thuvienphapluat.vn",
+            },
+        }
+        allowed = approved_hosts.get(self.source)
+        if allowed is not None and any(
+            urlsplit(url).hostname not in allowed for url in self.urls
+        ):
+            raise ValueError(f"probe host is outside {self.source} scope")
+        return self
+
+
+class UrlProbeIssueResponse(BaseModel):
+    code: str
+    url: str
+    message: str
+
+
+class UrlProbeResponse(BaseModel):
+    status: Literal["COMPLETE", "PARTIAL"]
+    count_mode: Literal[
+        "EXACT_LISTING_RECORDS",
+        "ESTIMATED_LINKS",
+        "MIXED",
+    ]
+    seed_count: int
+    pages_scanned: int
+    listing_pages_scanned: int
+    listing_pages_detected: int
+    pagination_pages_detected: int
+    pagination_pages_followed: int
+    max_pagination_pages: int
+    documents_detected: int
+    attachments_detected: int
+    pagination_limit_reached: bool
+    duration_ms: int
+    sample_titles: List[str]
+    issues: List[UrlProbeIssueResponse]
+
+
 def get_adapter(source: str, urls: List[str], settings: Settings | None = None):
     settings = settings or Settings.load_from_yaml(SETTINGS_FILE)
     registry = SourceRegistry.load(settings.governance.source_registry_path)
@@ -234,6 +363,7 @@ async def execute_crawl_job(
         "crawled_count": 0,
         "limit_count": limit,
         "max_pagination_pages": max_pagination_pages,
+        "download_attachments": download_attachments,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "preferred_export_format": export_format.value,
         "preferred_export_ready": False,
@@ -243,6 +373,9 @@ async def execute_crawl_job(
 
     try:
         settings = Settings.load_from_yaml(SETTINGS_FILE)
+        JOB_STATUS_MAP[job_id]["http_fetch_limit"] = (
+            settings.crawler.max_total_resources
+        )
         adapter = get_adapter(source, urls, settings)
         engine = CrawlEngine(
             adapter=adapter,
@@ -343,6 +476,46 @@ async def serve_dashboard():
         raise HTTPException(status_code=404, detail="Dashboard UI index.html not found")
     return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
 
+
+@app.post("/api/url-probes", response_model=UrlProbeResponse)
+async def create_url_probe(req: UrlProbeRequest):
+    """Inspect listing/pagination capacity without creating crawl state."""
+    adapter = None
+    try:
+        settings = Settings.load_from_yaml(SETTINGS_FILE)
+        adapter = get_adapter(req.source, req.urls, settings)
+        service = UrlProbeService(
+            adapter,
+            max_pagination_pages=req.max_pagination_pages,
+        )
+        async with URL_PROBE_SEMAPHORE:
+            async with asyncio.timeout(120):
+                summary = await service.run(req.urls)
+        return UrlProbeResponse.model_validate(summary.to_dict())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="URL inspection exceeded the 120 second limit.",
+        ) from exc
+    except Exception as exc:
+        logger.error("URL inspection failed", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="The URL could not be inspected safely.",
+        ) from exc
+    finally:
+        if adapter is not None:
+            try:
+                await adapter.aclose()
+            except Exception:
+                logger.warning(
+                    "Unable to close URL inspection adapter",
+                    exc_info=True,
+                )
+
+
 @app.get("/api/jobs")
 async def list_jobs():
     jobs_list = []
@@ -418,10 +591,27 @@ async def list_jobs():
                 if not isinstance(crawl_metrics, dict):
                     crawl_metrics = {}
                 primary_documents = int(
-                    crawl_metrics.get(
-                        "primary_documents_created",
-                        crawled_count,
+                    mem_status.get(
+                        "crawled_count",
+                        crawl_metrics.get(
+                            "primary_documents_created",
+                            crawled_count,
+                        ),
                     )
+                )
+                crawl_metrics = _live_crawl_metrics(
+                    job_id,
+                    status,
+                    crawl_metrics,
+                    primary_documents,
+                )
+                export_status = mem_status.get(
+                    "export_status",
+                    persisted_metadata.get("export_status"),
+                )
+                displayed_created_at = mem_status.get(
+                    "created_at",
+                    created_at,
                 )
 
                 jobs_list.append({
@@ -432,7 +622,11 @@ async def list_jobs():
                     "observations_count": int(
                         crawl_metrics.get(
                             "observations_created",
-                            crawled_count,
+                            (
+                                primary_documents
+                                if status == "RUNNING"
+                                else crawled_count
+                            ),
                         )
                     ),
                     "limit_count": mem_status.get(
@@ -443,14 +637,27 @@ async def list_jobs():
                         ),
                     ),
                     "crawl_metrics": crawl_metrics,
-                    "created_at": created_at,
-                    "has_preview": preview_file.exists(),
+                    "crawl_phase": _crawl_phase(
+                        status,
+                        export_status,
+                        crawl_metrics,
+                    ),
+                    "max_pagination_pages": mem_status.get(
+                        "max_pagination_pages",
+                        persisted_metadata.get("max_pagination_pages"),
+                    ),
+                    "download_attachments": mem_status.get(
+                        "download_attachments",
+                        persisted_metadata.get("download_attachments", True),
+                    ),
+                    "created_at": displayed_created_at,
+                    "has_preview": (
+                        status != "RUNNING" and preview_file.exists()
+                    ),
                     "preferred_export_format": preferred_format,
                     "preferred_export_ready": preferred_ready,
-                    "export_status": mem_status.get(
-                        "export_status",
-                        persisted_metadata.get("export_status"),
-                    ),
+                    "export_status": export_status,
+                    "error": mem_status.get("error"),
                     "export_formats": [
                         item["format_id"]
                         for item in RagExportService.descriptors()
@@ -460,19 +667,47 @@ async def list_jobs():
     # Also append active running jobs in memory not yet in staging directory
     for jid, jinfo in JOB_STATUS_MAP.items():
         if not any(j["job_id"] == jid for j in jobs_list):
+            status = jinfo.get("status", "RUNNING")
+            primary_documents = int(jinfo.get("crawled_count", 0))
+            base_metrics = jinfo.get("crawl_metrics", {})
+            if not isinstance(base_metrics, dict):
+                base_metrics = {}
+            crawl_metrics = _live_crawl_metrics(
+                jid,
+                status,
+                base_metrics,
+                primary_documents,
+            )
+            export_status = jinfo.get("export_status")
             jobs_list.append({
                 "job_id": jid,
                 "source_adapter": jinfo.get("source_adapter", "custom"),
-                "status": jinfo.get("status", "RUNNING"),
-                "crawled_count": jinfo.get("crawled_count", 0),
+                "status": status,
+                "crawled_count": primary_documents,
                 "limit_count": jinfo.get("limit_count", 50),
-                "observations_count": jinfo.get("crawled_count", 0),
-                "crawl_metrics": jinfo.get("crawl_metrics", {}),
+                "observations_count": int(
+                    crawl_metrics.get(
+                        "observations_created",
+                        primary_documents,
+                    )
+                ),
+                "crawl_metrics": crawl_metrics,
+                "crawl_phase": _crawl_phase(
+                    status,
+                    export_status,
+                    crawl_metrics,
+                ),
+                "max_pagination_pages": jinfo.get("max_pagination_pages"),
+                "download_attachments": jinfo.get(
+                    "download_attachments",
+                    True,
+                ),
                 "created_at": jinfo.get("created_at", ""),
                 "has_preview": False,
                 "preferred_export_format": jinfo.get("preferred_export_format"),
                 "preferred_export_ready": False,
-                "export_status": jinfo.get("export_status"),
+                "export_status": export_status,
+                "error": jinfo.get("error"),
                 "export_formats": [],
             })
 

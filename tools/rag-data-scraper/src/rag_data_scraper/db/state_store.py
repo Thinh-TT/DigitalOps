@@ -293,6 +293,53 @@ class CrawlerStateStore:
             ).fetchall()
         return {row[0]: row[1] for row in rows}
 
+    def frontier_progress(self, job_id: str) -> dict[str, int]:
+        """Return a live, UI-oriented snapshot of a job frontier."""
+        with sqlite3.connect(self.db_path) as connection:
+            rows = connection.execute(
+                """
+                SELECT resource_kind, status, COUNT(*)
+                FROM CrawlFrontier
+                WHERE job_id = ?
+                GROUP BY resource_kind, status
+                """,
+                (job_id,),
+            ).fetchall()
+
+        counts = {
+            (str(resource_kind), str(status)): int(count)
+            for resource_kind, status, count in rows
+        }
+
+        def count(kind: str, *statuses: str) -> int:
+            return sum(counts.get((kind, status), 0) for status in statuses)
+
+        terminal_statuses = ("done", "failed", "skipped")
+        active_statuses = ("pending", "running")
+        resource_total = sum(counts.values())
+        return {
+            "listing_pages_scanned": count("pagination", "done"),
+            "listing_pages_total": count(
+                "pagination", *terminal_statuses, *active_statuses
+            ),
+            "listing_pages_pending": count(
+                "pagination", *active_statuses
+            ),
+            "attachments_discovered": count(
+                "attachment", *terminal_statuses, *active_statuses
+            ),
+            "attachments_fetched": count("attachment", "done"),
+            "attachments_pending": count("attachment", "pending"),
+            "attachments_running": count("attachment", "running"),
+            "attachment_failures": count("attachment", "failed"),
+            "attachments_skipped": count("attachment", "skipped"),
+            "http_resources_terminal": sum(
+                count(kind, *terminal_statuses)
+                for kind in ("document", "pagination", "attachment")
+            ),
+            "http_resources_total": resource_total,
+        }
+
     def frontier_urls(self, job_id: str) -> list[str]:
         with sqlite3.connect(self.db_path) as connection:
             rows = connection.execute(

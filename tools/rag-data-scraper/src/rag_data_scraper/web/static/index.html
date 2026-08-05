@@ -187,6 +187,136 @@
             line-height: 1.45;
         }
 
+        .url-probe-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 0.65rem;
+        }
+
+        .url-probe-actions .btn {
+            flex: 0 0 auto;
+            margin-top: 0;
+        }
+
+        .url-probe-actions .field-hint {
+            margin-top: 0;
+        }
+
+        .url-probe-result {
+            margin-top: 0.8rem;
+            overflow: hidden;
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 0.75rem;
+            background: rgba(8, 47, 73, 0.22);
+        }
+
+        .url-probe-result[hidden] {
+            display: none;
+        }
+
+        .url-probe-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 0.85rem 0.95rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .url-probe-title {
+            color: #bae6fd;
+            font-size: 0.86rem;
+            font-weight: 650;
+        }
+
+        .url-probe-description {
+            margin-top: 0.2rem;
+            color: var(--text-muted);
+            font-size: 0.74rem;
+            line-height: 1.4;
+        }
+
+        .url-probe-status {
+            padding: 0.22rem 0.5rem;
+            border-radius: 0.35rem;
+            background: rgba(56, 189, 248, 0.14);
+            color: #7dd3fc;
+            font-size: 0.7rem;
+            font-weight: 650;
+            white-space: nowrap;
+        }
+
+        .url-probe-result[data-state="error"] {
+            border-color: rgba(248, 113, 113, 0.32);
+            background: rgba(127, 29, 29, 0.13);
+        }
+
+        .url-probe-result[data-state="error"] .url-probe-title,
+        .url-probe-result[data-state="error"] .url-probe-status {
+            color: #fca5a5;
+        }
+
+        .url-probe-result[data-state="complete"] .url-probe-status {
+            color: #6ee7b7;
+            background: rgba(16, 185, 129, 0.14);
+        }
+
+        .url-probe-result[data-state="partial"] .url-probe-status {
+            color: #fcd34d;
+            background: rgba(245, 158, 11, 0.14);
+        }
+
+        .url-probe-result[data-state="loading"] .url-probe-status {
+            animation: pulse 2s infinite;
+        }
+
+        .url-probe-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .url-probe-metric {
+            min-width: 0;
+            padding: 0.75rem 0.9rem;
+        }
+
+        .url-probe-metric + .url-probe-metric {
+            border-left: 1px solid var(--card-border);
+        }
+
+        .url-probe-metric span {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.68rem;
+        }
+
+        .url-probe-metric strong {
+            display: block;
+            margin-top: 0.22rem;
+            color: var(--text-main);
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 1rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .url-probe-notes {
+            padding: 0.75rem 0.95rem;
+            border-top: 1px solid var(--card-border);
+            color: var(--text-muted);
+            font-size: 0.74rem;
+            line-height: 1.45;
+        }
+
+        .url-probe-samples {
+            margin-top: 0.5rem;
+            padding-left: 1.15rem;
+        }
+
+        .url-probe-samples:empty {
+            display: none;
+        }
+
         .export-ready {
             color: #34d399;
             font-size: 0.75rem;
@@ -250,35 +380,223 @@
             color: #ffffff;
         }
 
-        /* Table style */
-        .table-responsive {
-            width: 100%;
-            max-width: 100%;
-            overflow-x: auto;
+        .jobs-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-            font-size: 0.9rem;
+        .jobs-heading .card-title {
+            margin-bottom: 0.2rem;
         }
 
-        th, td {
-            padding: 0.85rem 1rem;
-            border-bottom: 1px solid var(--card-border);
-        }
-
-        th {
+        .jobs-heading-copy {
             color: var(--text-muted);
-            font-weight: 500;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
+            font-size: 0.8rem;
+            line-height: 1.45;
         }
 
-        tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
+        .jobs-heading-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            flex-shrink: 0;
+        }
+
+        .jobs-updated-at {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .job-list {
+            display: grid;
+            gap: 0.85rem;
+        }
+
+        .job-list-state {
+            min-height: 92px;
+            display: grid;
+            place-items: center;
+            color: var(--text-muted);
+            border: 1px dashed var(--card-border);
+            border-radius: 0.75rem;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .job-panel {
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            border-radius: 0.85rem;
+            background: rgba(15, 23, 42, 0.48);
+        }
+
+        .job-panel[data-status="RUNNING"] {
+            border-color: rgba(96, 165, 250, 0.34);
+        }
+
+        .job-panel[data-status="FAILED"] {
+            border-color: rgba(248, 113, 113, 0.34);
+        }
+
+        .job-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem 1.1rem 0.9rem;
+        }
+
+        .job-identity {
+            min-width: 0;
+        }
+
+        .job-title-line {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .job-meta {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 0.42rem;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+
+        .job-phase {
+            padding: 0.85rem 1.1rem;
+            border-top: 1px solid var(--card-border);
+            background: rgba(30, 41, 59, 0.28);
+        }
+
+        .job-phase-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .job-phase-name {
+            color: #bfdbfe;
+            font-size: 0.86rem;
+            font-weight: 650;
+        }
+
+        .job-phase-detail {
+            margin-top: 0.22rem;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            line-height: 1.4;
+        }
+
+        .job-live-label {
+            color: #93c5fd;
+            font-size: 0.74rem;
+            white-space: nowrap;
+        }
+
+        .job-live-label::before {
+            content: "";
+            display: inline-block;
+            width: 0.45rem;
+            height: 0.45rem;
+            margin-right: 0.4rem;
+            border-radius: 50%;
+            background: currentColor;
+            vertical-align: 0.04rem;
+            animation: pulse 2s infinite;
+        }
+
+        .job-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            border-top: 1px solid var(--card-border);
+        }
+
+        .job-metric {
+            min-width: 0;
+            padding: 0.9rem 1.1rem;
+        }
+
+        .job-metric + .job-metric {
+            border-left: 1px solid var(--card-border);
+        }
+
+        .job-metric-label {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.045em;
+            text-transform: uppercase;
+        }
+
+        .job-metric-value {
+            display: block;
+            margin-top: 0.28rem;
+            color: var(--text-main);
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .job-metric-note {
+            display: block;
+            min-height: 1.1em;
+            margin-top: 0.18rem;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            line-height: 1.35;
+        }
+
+        .attachment-progress {
+            padding: 0 1.1rem 0.95rem;
+        }
+
+        .attachment-progress-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.4rem;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 0.38rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.16);
+        }
+
+        .progress-value {
+            height: 100%;
+            border-radius: inherit;
+            background: #60a5fa;
+            transition: width 0.25s ease;
+        }
+
+        .job-panel-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem 1.1rem;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .job-footer-note {
+            color: var(--text-muted);
+            font-size: 0.74rem;
         }
 
         .badge {
@@ -294,9 +612,50 @@
         .badge-failed { background: rgba(239, 68, 68, 0.2); color: #f87171; }
 
         .job-id {
-            font-family: monospace;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
             font-weight: 600;
             color: #a5b4fc;
+        }
+
+        @media (max-width: 900px) {
+            .job-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .job-metric:nth-child(3) { border-left: 0; border-top: 1px solid var(--card-border); }
+            .job-metric:nth-child(4) { border-top: 1px solid var(--card-border); }
+        }
+
+        @media (max-width: 600px) {
+            .jobs-heading,
+            .job-panel-header,
+            .job-phase-row,
+            .job-panel-footer {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .jobs-heading-actions { justify-content: space-between; }
+            .job-metrics { grid-template-columns: 1fr; }
+            .job-metric + .job-metric {
+                border-left: 0;
+                border-top: 1px solid var(--card-border);
+            }
+            .action-btns { width: 100%; }
+            .export-controls { width: 100%; flex-wrap: wrap; }
+            .export-select { flex: 1; min-width: 0; }
+            .url-probe-actions,
+            .url-probe-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .url-probe-actions .btn { width: 100%; }
+            .url-probe-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .url-probe-metric:nth-child(3) { border-left: 0; border-top: 1px solid var(--card-border); }
+            .url-probe-metric:nth-child(4) { border-top: 1px solid var(--card-border); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .job-live-label::before,
+            .pulse-dot,
+            .url-probe-result[data-state="loading"] .url-probe-status { animation: none; }
+            .progress-value { transition: none; }
         }
 
         .modal {
@@ -429,6 +788,43 @@
                     <div class="form-group">
                         <label for="urlsInput">Đường dẫn bắt đầu (Seed URLs - Mỗi URL 1 dòng):</label>
                         <textarea id="urlsInput" placeholder="https://vanban.chinhphu.vn..." required></textarea>
+                        <div class="url-probe-actions">
+                            <button type="button" class="btn btn-secondary" id="urlProbeBtn" onclick="probeUrls()">
+                                Kiểm tra URL
+                            </button>
+                            <span class="field-hint">Chỉ đọc trang HTML và phân trang, tối đa 10 URL và 100 trang; không tạo job, không tải tệp hoặc ghi dữ liệu crawler.</span>
+                        </div>
+                        <div class="url-probe-result" id="urlProbeResult" hidden data-state="idle" aria-live="polite">
+                            <div class="url-probe-header">
+                                <div>
+                                    <div class="url-probe-title" id="urlProbeTitle">Kết quả kiểm tra URL</div>
+                                    <div class="url-probe-description" id="urlProbeDescription"></div>
+                                </div>
+                                <span class="url-probe-status" id="urlProbeStatus"></span>
+                            </div>
+                            <div class="url-probe-metrics">
+                                <div class="url-probe-metric">
+                                    <span>Trang danh sách</span>
+                                    <strong id="urlProbeListingPages">-</strong>
+                                </div>
+                                <div class="url-probe-metric">
+                                    <span>Phân trang phát hiện / kiểm tra</span>
+                                    <strong id="urlProbePaginationPages">-</strong>
+                                </div>
+                                <div class="url-probe-metric">
+                                    <span>Văn bản có thể quét</span>
+                                    <strong id="urlProbeDocuments">-</strong>
+                                </div>
+                                <div class="url-probe-metric">
+                                    <span>Tệp đính kèm phát hiện</span>
+                                    <strong id="urlProbeAttachments">-</strong>
+                                </div>
+                            </div>
+                            <div class="url-probe-notes">
+                                <div id="urlProbeNotes"></div>
+                                <ul class="url-probe-samples" id="urlProbeSamples"></ul>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="grid" style="margin-bottom: 0; gap: 1rem;">
@@ -452,8 +848,8 @@
                     <div class="form-group format-picker">
                         <label for="outputFormatSelect">Định dạng đầu ra sau khi cào:</label>
                         <select id="outputFormatSelect" required>
-                            <option value="chunks_jsonl" selected>Chunks JSONL — khuyên dùng cho RAG</option>
-                            <option value="staging_zip">Staging ZIP — gói đầy đủ cho DigitalOps Worker</option>
+                            <option value="chunks_jsonl" selected>Chunks JSONL - khuyên dùng cho RAG</option>
+                            <option value="staging_zip">Staging ZIP - gói đầy đủ cho DigitalOps Worker</option>
                             <option value="documents_html">Web / HTML</option>
                             <option value="documents_pdf">PDF</option>
                             <option value="documents_docx">DOCX</option>
@@ -517,31 +913,19 @@
 
         <!-- History Card -->
         <div class="card">
-            <div class="card-title" style="justify-content: space-between;">
+            <div class="jobs-heading">
                 <div>
-                    <span>📊</span> Danh Sách Các Job Cào Dữ Liệu
+                    <div class="card-title">Danh Sách Các Job Cào Dữ Liệu</div>
+                    <div class="jobs-heading-copy">Theo dõi trực tiếp từng giai đoạn của crawler và pipeline xuất dữ liệu.</div>
                 </div>
-                <button class="btn btn-secondary" onclick="loadJobs()">🔄 Làm mới</button>
+                <div class="jobs-heading-actions">
+                    <span class="jobs-updated-at" id="jobsUpdatedAt">Chưa cập nhật</span>
+                    <button class="btn btn-secondary" id="jobsRefreshBtn" type="button" onclick="loadJobs(true)">Làm mới</button>
+                </div>
             </div>
 
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Job ID</th>
-                            <th>Nguồn (Adapter)</th>
-                            <th>Trạng Thái</th>
-                            <th>Văn bản / Limit</th>
-                            <th>Thời Gian Tải</th>
-                            <th>Hành Động</th>
-                        </tr>
-                    </thead>
-                    <tbody id="jobsTableBody">
-                        <tr>
-                            <td colspan="6" style="text-align: center; color: var(--text-muted);">Đang tải danh sách job...</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="job-list" id="jobsList" role="list" aria-live="polite" aria-busy="true">
+                <div class="job-list-state">Đang tải danh sách job...</div>
             </div>
         </div>
     </div>
@@ -607,90 +991,395 @@
                 urls.value = 'https://thuvienphapluat.vn';
                 jobId.value = 'JOB_LEGAL_' + Math.floor(Math.random() * 1000);
             }
+            invalidateUrlProbe();
         }
 
-        async function loadJobs() {
-            try {
-                const res = await fetch(API_BASE + '/api/jobs');
-                const data = await res.json();
-                const tbody = document.getElementById('jobsTableBody');
+        function formUrls() {
+            return document.getElementById('urlsInput').value
+                .split('\n')
+                .map(url => url.trim())
+                .filter(Boolean);
+        }
 
-                const jobsSignature = JSON.stringify(data.jobs || []);
+        function probeErrorMessage(payload) {
+            const detail = payload && payload.detail;
+            if (typeof detail === 'string' && detail.trim()) {
+                return detail;
+            }
+            if (Array.isArray(detail)) {
+                return detail
+                    .map(item => item && item.msg)
+                    .filter(Boolean)
+                    .join(' ');
+            }
+            return 'Không thể kiểm tra URL. Hãy kiểm tra kết nối và thử lại.';
+        }
+
+        function setProbeState(state, title, description, status) {
+            const panel = document.getElementById('urlProbeResult');
+            panel.hidden = false;
+            panel.dataset.state = state;
+            document.getElementById('urlProbeTitle').textContent = title;
+            document.getElementById('urlProbeDescription').textContent = description;
+            document.getElementById('urlProbeStatus').textContent = status;
+        }
+
+        function clearProbeMetrics() {
+            document.getElementById('urlProbeListingPages').textContent = '-';
+            document.getElementById('urlProbePaginationPages').textContent = '-';
+            document.getElementById('urlProbeDocuments').textContent = '-';
+            document.getElementById('urlProbeAttachments').textContent = '-';
+            document.getElementById('urlProbeNotes').textContent = '';
+            document.getElementById('urlProbeSamples').replaceChildren();
+        }
+
+        function invalidateUrlProbe() {
+            const panel = document.getElementById('urlProbeResult');
+            if (panel.dataset.state !== 'loading') {
+                panel.hidden = true;
+                panel.dataset.state = 'idle';
+            }
+        }
+
+        function renderUrlProbeResult(result) {
+            const modes = {
+                EXACT_LISTING_RECORDS: 'Đếm chính xác theo cấu trúc danh sách',
+                ESTIMATED_LINKS: 'Ước lượng từ liên kết HTML',
+                MIXED: 'Kết hợp bản ghi chính xác và liên kết ước lượng'
+            };
+            const isPartial = result.status === 'PARTIAL';
+            const statusLabel = isPartial ? 'Một phần' : 'Hoàn tất';
+            const description = [
+                `${modes[result.count_mode] || 'Kết quả thăm dò'}.`,
+                `Đã đọc ${formatNumber(result.pages_scanned)} trang trong ${formatNumber(result.duration_ms)} ms.`
+            ].join(' ');
+            setProbeState(
+                isPartial ? 'partial' : 'complete',
+                'Kết quả kiểm tra URL',
+                description,
+                statusLabel
+            );
+
+            document.getElementById('urlProbeListingPages').textContent = formatNumber(result.listing_pages_detected);
+            document.getElementById('urlProbePaginationPages').textContent =
+                `${formatNumber(result.pagination_pages_detected)} / ${formatNumber(result.pagination_pages_followed)}`;
+            document.getElementById('urlProbeDocuments').textContent = formatNumber(result.documents_detected);
+            document.getElementById('urlProbeAttachments').textContent = formatNumber(result.attachments_detected);
+
+            const notes = [];
+            if (result.count_mode !== 'EXACT_LISTING_RECORDS') {
+                notes.push('Số văn bản là ước lượng; menu, liên kết phụ hoặc nội dung tải bằng JavaScript có thể làm kết quả lệch so với lần cào thật.');
+            }
+            if (result.pagination_limit_reached) {
+                notes.push(`Đã chạm giới hạn kiểm tra ${formatNumber(result.max_pagination_pages)} trang phân trang; tăng giới hạn rồi kiểm tra lại để có số đầy đủ hơn.`);
+            }
+            if (Array.isArray(result.issues) && result.issues.length > 0) {
+                const issueCodes = [...new Set(result.issues.map(issue => issue.code).filter(Boolean))];
+                notes.push(`${formatNumber(result.issues.length)} trang không kiểm tra được (${issueCodes.join(', ')}).`);
+            }
+            if (notes.length === 0) {
+                notes.push('Không phát hiện cảnh báo trong phạm vi đã kiểm tra.');
+            }
+            document.getElementById('urlProbeNotes').textContent = notes.join(' ');
+
+            const samples = document.getElementById('urlProbeSamples');
+            samples.replaceChildren();
+            (result.sample_titles || []).slice(0, 5).forEach(title => {
+                const item = document.createElement('li');
+                item.textContent = title;
+                samples.appendChild(item);
+            });
+        }
+
+        async function probeUrls() {
+            const button = document.getElementById('urlProbeBtn');
+            const adapter = document.getElementById('adapterSelect').value;
+            const paginationInput = Number.parseInt(
+                document.getElementById('paginationLimitInput').value,
+                10
+            );
+            const urls = formUrls();
+
+            clearProbeMetrics();
+            if (urls.length === 0) {
+                setProbeState('error', 'Chưa có URL', 'Nhập ít nhất một URL HTTPS để kiểm tra.', 'Cần URL');
+                return;
+            }
+            if (urls.length > 10) {
+                setProbeState('error', 'Quá nhiều URL', 'Mỗi lần chỉ kiểm tra tối đa 10 URL.', 'Không hợp lệ');
+                return;
+            }
+
+            const maxPaginationPages = Number.isFinite(paginationInput)
+                ? Math.max(1, Math.min(paginationInput, 100))
+                : 25;
+            setProbeState(
+                'loading',
+                'Đang kiểm tra URL',
+                `Đang đọc trang danh sách và tối đa ${formatNumber(maxPaginationPages)} trang phân trang...`,
+                'Đang kiểm tra'
+            );
+            button.disabled = true;
+            button.textContent = 'Đang kiểm tra...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/url-probes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source: adapter,
+                        urls,
+                        max_pagination_pages: maxPaginationPages
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(probeErrorMessage(payload));
+                }
+                renderUrlProbeResult(payload);
+            } catch (error) {
+                clearProbeMetrics();
+                setProbeState(
+                    'error',
+                    'Không thể kiểm tra URL',
+                    error instanceof Error ? error.message : 'Đã xảy ra lỗi không xác định.',
+                    'Thất bại'
+                );
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Kiểm tra URL';
+            }
+        }
+
+        const STATUS_LABELS = Object.freeze({
+            RUNNING: 'Đang chạy',
+            COMPLETED: 'Hoàn tất',
+            FAILED: 'Thất bại',
+            PENDING: 'Đang chờ',
+            UNKNOWN: 'Chưa xác định'
+        });
+
+        const PHASE_LABELS = Object.freeze({
+            discovery: 'Quét trang danh sách',
+            attachments: 'Tải và đọc tệp đính kèm',
+            finalizing: 'Hoàn thiện dữ liệu RAG',
+            exporting: 'Tạo file xuất',
+            completed: 'Pipeline đã hoàn tất',
+            failed: 'Pipeline gặp lỗi',
+            pending: 'Đang chuẩn bị'
+        });
+
+        function numberValue(value) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+        }
+
+        function formatNumber(value) {
+            return Math.round(numberValue(value)).toLocaleString('vi-VN');
+        }
+
+        function metricBlock(label, value, note) {
+            return `
+                <div class="job-metric">
+                    <span class="job-metric-label">${escapeHtml(label)}</span>
+                    <span class="job-metric-value">${escapeHtml(value)}</span>
+                    <span class="job-metric-note">${escapeHtml(note)}</span>
+                </div>
+            `;
+        }
+
+        function phaseDetail(job, metrics) {
+            const attachmentTotal = numberValue(metrics.attachments_discovered);
+            if (job.crawl_phase === 'failed' && job.error) {
+                return `Lỗi: ${String(job.error)}`;
+            }
+            const details = {
+                discovery: 'Đang duyệt liên kết phân trang và tạo hồ sơ văn bản.',
+                attachments: `Đã phát hiện ${formatNumber(attachmentTotal)} tệp. Crawler tiếp tục tải, bóc tách và OCR khi cần.`,
+                finalizing: 'Đang hoàn thiện observation, chunk, staging và Preview.',
+                exporting: 'Dữ liệu đã sẵn sàng. Hệ thống đang tạo định dạng xuất đã chọn.',
+                completed: 'Preview và các định dạng xuất đã sẵn sàng để kiểm tra.',
+                failed: 'Job đã dừng. Kiểm tra lỗi crawler để biết URL hoặc bước xử lý gặp vấn đề.',
+                pending: 'Job đang được đưa vào hàng đợi xử lý.'
+            };
+            return details[job.crawl_phase] || details.pending;
+        }
+
+        function renderJob(job) {
+            let badgeClass = 'badge-pending';
+            if (job.status === 'COMPLETED') badgeClass = 'badge-completed';
+            if (job.status === 'RUNNING') badgeClass = 'badge-running';
+            if (job.status === 'FAILED') badgeClass = 'badge-failed';
+
+            const safeJobId = escapeHtml(job.job_id);
+            const metrics = job.crawl_metrics && typeof job.crawl_metrics === 'object'
+                ? job.crawl_metrics
+                : {};
+            const primaryDocuments = numberValue(job.crawled_count);
+            const documentLimit = numberValue(job.limit_count);
+            const pagesScanned = numberValue(metrics.listing_pages_scanned);
+            const pageLimit = numberValue(job.max_pagination_pages);
+            const attachmentsFetched = numberValue(metrics.attachments_fetched);
+            const attachmentsTotal = numberValue(metrics.attachments_discovered);
+            const attachmentsRunning = numberValue(metrics.attachments_running);
+            const attachmentsPending = numberValue(metrics.attachments_pending);
+            const attachmentFailures = numberValue(metrics.attachment_failures);
+            const attachmentsSkipped = numberValue(metrics.attachments_skipped);
+            const attachmentsProcessed = Math.min(
+                attachmentsTotal,
+                attachmentsFetched + attachmentFailures + attachmentsSkipped
+            );
+            const attachmentPercent = attachmentsTotal > 0
+                ? Math.min(100, Math.round((attachmentsProcessed / attachmentsTotal) * 100))
+                : 0;
+            const observations = numberValue(job.observations_count);
+
+            const pageNote = pageLimit > 0
+                ? `Giới hạn ${formatNumber(pageLimit)} trang`
+                : 'Trang đã xử lý';
+            const attachmentNote = job.status === 'RUNNING'
+                ? `${formatNumber(attachmentsRunning)} đang chạy, ${formatNumber(attachmentsPending)} chờ`
+                : attachmentFailures > 0
+                    ? `${formatNumber(attachmentFailures)} tệp lỗi`
+                    : 'Đã xử lý xong';
+            const observationNote = job.status === 'RUNNING'
+                ? 'Sẽ tăng khi đọc xong tệp'
+                : 'Đã ghi vào staging';
+
+            const exportFormats = Array.isArray(job.export_formats)
+                ? job.export_formats
+                : [];
+            const preferredFormat = exportFormats.includes(job.preferred_export_format)
+                ? job.preferred_export_format
+                : exportFormats[0];
+            const exportOptions = exportFormats.map(format => {
+                const safeFormat = escapeHtml(format);
+                const selected = format === preferredFormat ? ' selected' : '';
+                return `<option value="${safeFormat}"${selected}>${escapeHtml(EXPORT_LABELS[format] || format)}</option>`;
+            }).join('');
+            const exportReady = job.preferred_export_ready
+                ? '<span class="export-ready" title="File đã được tạo và kiểm tra checksum">File sẵn sàng</span>'
+                : '';
+            const exportControls = exportFormats.length > 0
+                ? `
+                    <div class="export-controls">
+                        <select class="export-select" aria-label="Định dạng xuất cho ${safeJobId}">
+                            ${exportOptions}
+                        </select>
+                        <button class="btn btn-secondary" data-job-id="${safeJobId}" onclick="downloadExport(this.dataset.jobId, this.previousElementSibling.value)">Xuất</button>
+                        ${exportReady}
+                    </div>
+                `
+                : '';
+            const previewControl = job.has_preview
+                ? `<button class="btn btn-secondary" data-job-id="${safeJobId}" onclick="openPreview(this.dataset.jobId)">Xem Preview</button>`
+                : '';
+            const deleteControl = job.status === 'RUNNING'
+                ? ''
+                : `<button class="btn btn-danger" data-job-id="${safeJobId}" onclick="deleteJob(this.dataset.jobId)">Xóa</button>`;
+            const footerNote = job.status === 'RUNNING'
+                ? 'Preview và file xuất sẽ xuất hiện sau khi pipeline hoàn tất.'
+                : job.has_preview
+                    ? 'Dữ liệu staging đã sẵn sàng.'
+                    : 'Job chưa có Preview.';
+            const liveLabel = job.status === 'RUNNING'
+                ? '<span class="job-live-label">Cập nhật mỗi 4 giây</span>'
+                : '';
+            const progress = attachmentsTotal > 0
+                ? `
+                    <div class="attachment-progress">
+                        <div class="attachment-progress-head">
+                            <span>Tiến độ xử lý tệp</span>
+                            <span>${formatNumber(attachmentsProcessed)} / ${formatNumber(attachmentsTotal)} (${attachmentPercent}%)</span>
+                        </div>
+                        <div class="progress-track" role="progressbar" aria-label="Tiến độ xử lý tệp của ${safeJobId}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${attachmentPercent}">
+                            <div class="progress-value" style="width:${attachmentPercent}%"></div>
+                        </div>
+                    </div>
+                `
+                : '';
+
+            return `
+                <article class="job-panel" role="listitem" data-status="${escapeHtml(job.status)}">
+                    <div class="job-panel-header">
+                        <div class="job-identity">
+                            <div class="job-title-line">
+                                <span class="job-id">${safeJobId}</span>
+                                <span class="badge ${badgeClass}">${escapeHtml(STATUS_LABELS[job.status] || job.status)}</span>
+                            </div>
+                            <div class="job-meta">
+                                <span>Nguồn: ${escapeHtml(job.source_adapter || 'custom')}</span>
+                                <span>Bắt đầu: ${escapeHtml(job.created_at || 'N/A')}</span>
+                            </div>
+                        </div>
+                        ${liveLabel}
+                    </div>
+                    <div class="job-phase">
+                        <div class="job-phase-row">
+                            <div>
+                                <div class="job-phase-name">${escapeHtml(PHASE_LABELS[job.crawl_phase] || PHASE_LABELS.pending)}</div>
+                                <div class="job-phase-detail">${escapeHtml(phaseDetail(job, metrics))}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="job-metrics">
+                        ${metricBlock('Trang danh sách', formatNumber(pagesScanned), pageNote)}
+                        ${metricBlock('Văn bản chính', `${formatNumber(primaryDocuments)} / ${formatNumber(documentLimit)}`, 'Giới hạn văn bản đầu ra')}
+                        ${metricBlock('Tệp đã đọc', `${formatNumber(attachmentsFetched)} / ${formatNumber(attachmentsTotal)}`, attachmentNote)}
+                        ${metricBlock('Observation', formatNumber(observations), observationNote)}
+                    </div>
+                    ${progress}
+                    <div class="job-panel-footer">
+                        <span class="job-footer-note">${escapeHtml(footerNote)}</span>
+                        <div class="action-btns">
+                            ${previewControl}
+                            ${exportControls}
+                            ${deleteControl}
+                        </div>
+                    </div>
+                </article>
+            `;
+        }
+
+        async function loadJobs(force = false) {
+            const list = document.getElementById('jobsList');
+            const refreshButton = document.getElementById('jobsRefreshBtn');
+            if (force || lastJobsSignature === null) {
+                list.setAttribute('aria-busy', 'true');
+            }
+            if (force) {
+                refreshButton.disabled = true;
+            }
+
+            try {
+                const res = await fetch(API_BASE + '/api/jobs', { cache: 'no-store' });
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+                const jobsSignature = JSON.stringify(jobs);
+                document.getElementById('jobsUpdatedAt').textContent =
+                    `Cập nhật ${new Date().toLocaleTimeString('vi-VN')}`;
+                list.setAttribute('aria-busy', 'false');
+
                 if (jobsSignature === lastJobsSignature) {
                     return;
                 }
                 lastJobsSignature = jobsSignature;
-                if (!data.jobs || data.jobs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Chưa có job cào nào được thực hiện.</td></tr>`;
+                if (jobs.length === 0) {
+                    list.innerHTML = '<div class="job-list-state">Chưa có job cào dữ liệu. Tạo job mới để bắt đầu theo dõi.</div>';
                     return;
                 }
 
-                tbody.innerHTML = data.jobs.map(job => {
-                    let badgeClass = 'badge-pending';
-                    if (job.status === 'COMPLETED') badgeClass = 'badge-completed';
-                    if (job.status === 'RUNNING') badgeClass = 'badge-running';
-                    if (job.status === 'FAILED') badgeClass = 'badge-failed';
-                    const safeJobId = escapeHtml(job.job_id);
-                    const exportFormats =
-                        Array.isArray(job.export_formats)
-                            ? job.export_formats
-                            : [];
-                    const preferredFormat = exportFormats.includes(job.preferred_export_format)
-                        ? job.preferred_export_format
-                        : exportFormats[0];
-                    const exportOptions = exportFormats.map(format => {
-                        const safeFormat = escapeHtml(format);
-                        const selected = format === preferredFormat ? ' selected' : '';
-                        return `<option value="${safeFormat}"${selected}>${escapeHtml(EXPORT_LABELS[format] || format)}</option>`;
-                    }).join('');
-                    const exportReady = job.preferred_export_ready
-                        ? `<span class="export-ready" title="File đã được tạo và kiểm tra checksum">● File đã sẵn sàng</span>`
-                        : '';
-                    const exportControls =
-                        exportFormats.length > 0
-                            ? `
-                                <div class="export-controls">
-                                    <select class="export-select" aria-label="Định dạng xuất cho ${safeJobId}">
-                                        ${exportOptions}
-                                    </select>
-                                    <button class="btn btn-secondary" data-job-id="${safeJobId}" onclick="downloadExport(this.dataset.jobId, this.previousElementSibling.value)">⬇️ Xuất</button>
-                                    ${exportReady}
-                                </div>
-                            `
-                            : '';
-
-                    return `
-                        <tr>
-                            <td class="job-id">${safeJobId}</td>
-                            <td>${escapeHtml(job.source_adapter)}</td>
-                            <td><span class="badge ${badgeClass}">${escapeHtml(job.status)}</span></td>
-                            <td>
-                                <div>${job.crawled_count || 0} / ${job.limit_count}</div>
-                                <small style="color:var(--text-muted);">
-                                    ${(job.crawl_metrics && job.crawl_metrics.listing_pages_scanned) || 0} trang danh sách ·
-                                    ${(job.crawl_metrics && job.crawl_metrics.attachments_fetched) || 0} tệp đọc được ·
-                                    ${job.observations_count || 0} observation
-                                </small>
-                            </td>
-                            <td>${escapeHtml(job.created_at || 'N/A')}</td>
-                            <td>
-                                <div class="action-btns">
-                                    ${job.has_preview ?
-                                        `<button class="btn btn-secondary" data-job-id="${safeJobId}" onclick="openPreview(this.dataset.jobId)">👁️ Xem Preview</button>` :
-                                        `<span style="color:var(--text-muted); font-size:0.8rem;">Chưa có preview</span>`
-                                    }
-                                    ${exportControls}
-                                    <button class="btn btn-danger" data-job-id="${safeJobId}" onclick="deleteJob(this.dataset.jobId)">🗑️ Xóa</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
+                list.innerHTML = jobs.map(renderJob).join('');
             } catch (err) {
                 console.error('Lỗi tải danh sách job:', err);
+                list.setAttribute('aria-busy', 'false');
+                list.innerHTML = '<div class="job-list-state">Không thể tải trạng thái job. Kiểm tra kết nối backend rồi thử làm mới.</div>';
+            } finally {
+                refreshButton.disabled = false;
             }
-
-
         }
 
         async function deleteJob(jobId) {
@@ -728,7 +1417,6 @@
 
             const submitBtn = document.getElementById('submitBtn');
             const adapter = document.getElementById('adapterSelect').value;
-            const urlsRaw = document.getElementById('urlsInput').value;
             let jobId = document.getElementById('jobIdInput').value.trim();
             const limit = parseInt(document.getElementById('limitInput').value, 10);
             const paginationLimit = parseInt(document.getElementById('paginationLimitInput').value, 10);
@@ -740,7 +1428,7 @@
                 jobId = 'JOB_' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
             }
 
-            const urls = urlsRaw.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+            const urls = formUrls();
 
             submitBtn.disabled = true;
             submitBtn.innerHTML = '⏳ Đang khởi tạo Job...';
@@ -819,6 +1507,11 @@
             if (event.key === 'Escape' && document.getElementById('previewModal').style.display === 'flex') {
                 closeModal();
             }
+        });
+
+        ['urlsInput', 'adapterSelect', 'paginationLimitInput'].forEach(id => {
+            const element = document.getElementById(id);
+            element.addEventListener(id === 'adapterSelect' ? 'change' : 'input', invalidateUrlProbe);
         });
 
         // Auto reload jobs table every 4 seconds

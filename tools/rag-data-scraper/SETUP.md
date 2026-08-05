@@ -49,12 +49,19 @@ Trình duyệt sẽ tự động mở trang web quản trị tại: `http://loca
 ### Thao tác 1-Click trên Trang Web:
 1. **Chọn Nguồn Cào**: Chọn `vanban.chinhphu.vn`, `thuvienphapluat.vn` hoặc `Generic Web` (cho URL trang web tùy chỉnh).
 2. **Nhập URL & Giới hạn (`limit`)**: Dán một hoặc nhiều URL và chọn số văn bản chính tối đa cần tạo (vd: 10, 50, 100). Trang danh sách và lượt tải attachment không tiêu tốn limit này.
-3. **Giới hạn phân trang**: Chọn số URL trang danh sách tối đa mà crawler được phép lần theo. Chỉ cần nhập trang đầu; các liên kết `page=2`, `page=3`, `/page/2`... được tự phát hiện và đi tiếp theo chuỗi, kể cả khi đã đủ số văn bản đầu ra, để dashboard báo đúng tổng record phát hiện.
-4. **Chọn định dạng đầu ra**: Chọn file cần tạo ngay sau khi cào. `Chunks JSONL` là mặc định khuyên dùng cho RAG; 12 định dạng còn lại vẫn có thể chọn trước hoặc xuất lại sau.
-5. **Tệp đính kèm**: Bật/tắt việc đưa liên kết PDF, DOCX và `.doc`/RTF cũ vào hàng đợi cào. `.doc` được chuyển đổi bằng LibreOffice headless; nếu runtime thiếu hoặc file lỗi, record metadata/trích yếu từ trang danh sách vẫn được giữ lại cho RAG.
-6. **Bắt Đầu Cào (1-Click)**: Bấm nút **"Bắt đầu cào dữ liệu"**. Trang web sẽ tự động chạy ngầm, cập nhật tiến trình và tạo file đã chọn khi job hoàn tất.
-7. **Mở RAG Inspector**: Nhấp **"Xem Preview"** để kiểm tra tổng quan, văn bản, chunks, RAG Health và metadata kỹ thuật.
-8. **Xuất định dạng khác**: Chọn định dạng ở cột hành động rồi bấm **"Xuất"**. Định dạng đã chọn trước khi cào được chọn sẵn và hiển thị trạng thái file sẵn sàng.
+3. **Kiểm tra URL trước khi cào**: Bấm **"Kiểm tra URL"** để đọc tối đa 10 seed URL và 100 trang phân trang. Kết quả cho biết số trang danh sách, số văn bản có thể quét và số tệp đính kèm nhưng không tạo job, không tải tệp và không ghi raw/checkpoint/SQLite. Nguồn có parser danh sách riêng được đếm theo record; website chung chỉ là ước lượng từ liên kết HTML và được ghi nhãn rõ trên giao diện.
+4. **Giới hạn phân trang**: Chọn số URL trang danh sách tối đa mà crawler được phép lần theo. Chỉ cần nhập trang đầu; các liên kết `page=2`, `page=3`, `/page/2`... được tự phát hiện và đi tiếp theo chuỗi, kể cả khi đã đủ số văn bản đầu ra, để dashboard báo đúng tổng record phát hiện.
+5. **Chọn định dạng đầu ra**: Chọn file cần tạo ngay sau khi cào. `Chunks JSONL` là mặc định khuyên dùng cho RAG; 12 định dạng còn lại vẫn có thể chọn trước hoặc xuất lại sau.
+6. **Tệp đính kèm**: Bật/tắt việc đưa liên kết PDF, DOCX và `.doc`/RTF cũ vào hàng đợi cào. `.doc` được chuyển đổi bằng LibreOffice headless; nếu runtime thiếu hoặc file lỗi, record metadata/trích yếu từ trang danh sách vẫn được giữ lại cho RAG.
+7. **Bắt Đầu Cào (1-Click)**: Bấm nút **"Bắt đầu cào dữ liệu"**. Trang web sẽ tự động chạy ngầm, cập nhật tiến trình và tạo file đã chọn khi job hoàn tất.
+8. **Mở RAG Inspector**: Nhấp **"Xem Preview"** để kiểm tra tổng quan, văn bản, chunks, RAG Health và metadata kỹ thuật.
+9. **Xuất định dạng khác**: Chọn định dạng ở cột hành động rồi bấm **"Xuất"**. Định dạng đã chọn trước khi cào được chọn sẵn và hiển thị trạng thái file sẵn sàng.
+
+API thăm dò tương ứng nhận HTTPS URL và không tạo trạng thái crawler:
+
+```text
+POST /api/url-probes
+```
 
 ---
 
