@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "registry_version": "2026-08-03.1",
+  "sources": [
+    {
+      "entry_id": "vanban-chinhphu-official",
+      "adapter": "gov_portal",
+      "source_id": "vanban_chinhphu",
+      "source_namespace": "vanban.chinhphu.vn",
+      "authority_namespace": "gov.vn",
+      "corpus_type": "legal_reference",
+      "source_trust_tier": "official",
+      "publish_policy": "authoritative",
+      "allowed_hosts": [
+        "vanban.chinhphu.vn",
+        "www.vanban.chinhphu.vn"
+      ],
+      "default_issuer": "Chính phủ",
+      "language": "vi"
+    },
+    {
+      "entry_id": "mattran-guidance-official",
+      "adapter": "generic_web",
+      "source_id": "mattran_guidance",
+      "source_namespace": "mattran.org.vn",
+      "authority_namespace": "mattran.org.vn",
+      "corpus_type": "legal_reference",
+      "source_trust_tier": "official",
+      "publish_policy": "authoritative",
+      "allowed_hosts": [
+        "m.mattran.org.vn",
+        "mattran.org.vn",
+        "www.mattran.org.vn"
+      ],
+      "default_issuer": "Ủy ban Trung ương Mặt trận Tổ quốc Việt Nam",
+      "language": "vi"
+    },
+    {
+      "entry_id": "thuvienphapluat-aggregator",
+      "adapter": "legal_aggregator",
+      "source_id": "thuvienphapluat",
+      "source_namespace": "thuvienphapluat.vn",
+      "authority_namespace": null,
+      "corpus_type": "legal_reference",
+      "source_trust_tier": "aggregator",
+      "publish_policy": "cross_check_only",
+      "allowed_hosts": [
+        "thuvienphapluat.vn",
+        "www.thuvienphapluat.vn"
+      ],
+      "default_issuer": null,
+      "language": "vi"
+    }
+  ]
+}

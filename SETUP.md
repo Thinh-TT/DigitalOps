@@ -94,6 +94,8 @@ Mở `DigitalOps.API/.env` và thay toàn bộ placeholder. Không commit file n
 | `Ai__External__DisableThinking` | Không | Đặt `true` cho DeepSeek JSON mode để nhận `message.content` thay vì chỉ reasoning |
 | `Ai__Qdrant__BaseUrl` | Có | Qdrant HTTP loopback; baseline dùng `http://127.0.0.1:6333` |
 | `Ai__Qdrant__ApiKey` | Có | API key riêng của Qdrant, không commit hoặc đưa vào frontend |
+| `Rag__QdrantGrpcHost` | Worker | Qdrant gRPC loopback; mặc định `127.0.0.1` |
+| `Rag__QdrantGrpcPort` | Worker | Qdrant gRPC; mặc định `6334` |
 | `Ai__Qdrant__CollectionName` | Có | Khóa ở `digitalops_knowledge_v1` |
 | `Ai__Qdrant__MinScore` | Có | Khóa ở `0.316666` theo baseline v3 |
 
@@ -280,6 +282,7 @@ docker run --name digitalops-qdrant `
   --detach `
   --restart unless-stopped `
   --publish 127.0.0.1:6333:6333 `
+  --publish 127.0.0.1:6334:6334 `
   --volume digitalops-qdrant-storage:/qdrant/storage `
   --env QDRANT__SERVICE__API_KEY=$env:DIGITALOPS_QDRANT_API_KEY `
   --env QDRANT__TELEMETRY_DISABLED=true `
@@ -367,7 +370,172 @@ Set-Location DigitalOps.Web
 npm.cmd run dev
 ```
 
-## 10. Kiểm tra hệ thống
+## 10. Multi-source RAG Data Crawler & Ingestion CLI
+
+Hệ thống RAG Pipeline bao gồm Python Scraper (cào, trích xuất và tạo staging
+package) và .NET 10 Ingestion CLI (validate/plan hoặc nạp có kiểm soát vào
+derived ingestion catalog và Qdrant). Crawl thành công không tự phê duyệt nguồn.
+
+### 10.1. Cài đặt Python Data Scraper
+
+Thư mục: `tools/rag-data-scraper`
+
+Yêu cầu: Python 3.11+.
+
+```powershell
+Set-Location tools/rag-data-scraper
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+```
+
+### 10.2. Chạy Tool Cào dữ liệu (Crawler CLI)
+
+Tạo dữ liệu Staging JSONL từ các cổng thông tin pháp luật:
+
+#### Cách 1: Giao diện Trang Web 1-Click (Khuyên dùng)
+
+Chạy 1 câu lệnh để mở giao diện quản trị cào dữ liệu trên trình duyệt:
+
+```powershell
+python -m rag_data_scraper.cli web --open
+```
+*(Hoặc nhấp đúp file `tools/rag-data-scraper/run_web.bat`)*
+
+Trình duyệt sẽ tự động mở trang web tại `http://localhost:8000`. Dashboard
+chỉ bind loopback và chỉ nhận URL HTTPS thuộc đúng phạm vi của adapter đã chọn.
+
+#### Cách 2: Chạy dòng lệnh CLI (Nâng cao)
+
+1. **Khởi tạo cơ sở dữ liệu SQLite theo dõi trạng thái cào (Chỉ cần chạy 1 lần đầu)**:
+   ```powershell
+   python -m rag_data_scraper.cli init-db
+   ```
+
+2. **Cào dữ liệu từ Cổng thông tin Chính phủ (`vanban.chinhphu.vn`)**:
+   ```powershell
+   python -m rag_data_scraper.cli crawl --source gov_portal --job-id JOB_GOV_01 --urls https://vanban.chinhphu.vn
+   ```
+
+3. **Cào dữ liệu từ Thư Viện Pháp Luật (`thuvienphapluat.vn`)**:
+   ```powershell
+   python -m rag_data_scraper.cli crawl --source legal_aggregator --job-id JOB_LEGAL_01 --urls https://thuvienphapluat.vn
+   ```
+
+4. **Xem Báo cáo trực quan dạng Bảng (HTML Preview)**:
+   ```powershell
+   python -m rag_data_scraper.cli preview --job-id JOB_GOV_01 --open
+   ```
+
+Dữ liệu cào & chunking được xuất thành package tự chứa tại
+`tools/rag-data-scraper/storage/staging/<job_id>/` (gồm artifact và `preview.html`).
+Với trang danh sách được hỗ trợ, `limit` là số văn bản chính đầu ra; trang phân
+trang và lượt tải attachment được theo dõi bằng metrics riêng. File `.doc` cũ
+được chuyển đổi bằng LibreOffice headless có timeout/size cap trước khi chunk.
+
+Preview mới là **RAG Inspector** tự chứa: có tab Tổng quan/Văn bản/Chunks/
+Vấn đề/Kỹ thuật, phân trang 50 dòng, bộ lọc và drawer chi tiết. RAG Health phát
+hiện sai lệch manifest, quan hệ mồ côi, token budget, offset, ACL, extraction,
+duplicate và crawler error; đây là cảnh báo review trước ingestion, không thay
+thế bước validate của `DigitalOps.RagIngestion`.
+
+#### Xuất định dạng phục vụ RAG từ Dashboard
+
+Sau khi job hoàn tất, tại cột **Hành động**, chọn định dạng và bấm **Xuất**:
+
+- `chunks_jsonl` (khuyên dùng): một chunk mỗi dòng, giữ nguyên `text`, source,
+  hash, offset và ACL để nạp vector pipeline;
+- `staging_zip`: package lossless dùng trực tiếp với `DigitalOps.RagIngestion`;
+- dữ liệu có cấu trúc: `chunks_json`, `chunks_csv`, `chunks_xlsx` và
+  `documents_xml`;
+- tài liệu: `documents_html`, `documents_pdf`, `documents_docx`,
+  `documents_txt_zip`, `documents_markdown_zip`, `documents_pptx` và
+  `documents_svg_zip`.
+
+API tải xuống ổn định:
+
+```text
+GET http://127.0.0.1:8000/api/jobs/<job_id>/exports
+GET http://127.0.0.1:8000/api/jobs/<job_id>/exports/<format>
+```
+
+Server chỉ export job đã hoàn tất và kiểm tra lại manifest, SHA-256, quan hệ
+observation/chunk-set/chunk, offset, content hash và ACL. Package không hợp lệ
+trả `409`; package hoặc output vượt giới hạn 1 GiB trả `413`; writer runtime bị
+thiếu trả `503` mà không lộ chi tiết dependency. Xem bảng contract chi tiết
+trong `tools/rag-data-scraper/SETUP.md`.
+
+
+### 10.3. Kiểm tra và nạp có kiểm soát vào PostgreSQL & Qdrant (Ingestion CLI)
+
+Legal corpus phải đi qua source-admission và evaluation gate T4-03 trong
+`Project-Document/02-architecture/03-ai-rag-design.md`. CLI đã cưỡng chế receipt
+admission gắn với digest package; T4-03 vẫn `[~]` đến khi 45 ca regression cộng
+legal fixture đạt gate, vì vậy command thành công không phải tuyên bố
+production-ready.
+
+Project độc lập: `tools/DigitalOps.RagIngestion`. Đây là CLI chạy một lần rồi
+thoát, không phải background worker hay public HTTP service. Tiến trình ngoài có
+thể gọi bốn command ổn định `validate`, `plan`, `admit`, `publish` và kiểm tra exit code.
+Contract đầy đủ nằm tại `tools/DigitalOps.RagIngestion/README.md`.
+
+1. **Áp dụng EF migration RAG trên PostgreSQL**:
+   ```powershell
+   dotnet ef database update `
+     --project DigitalOps.API/DigitalOps.API.csproj `
+     --startup-project DigitalOps.API/DigitalOps.API.csproj
+   ```
+
+   EF migration là nguồn schema chính thức; không chạy thêm
+   `tools/rag-data-scraper/sql/001_init_rag_schema.sql` trên cùng database.
+
+2. **Cấu hình ingestion CLI ngoài source control**:
+   ```powershell
+   $env:ConnectionStrings__DigitalOps = "<PostgreSQL connection string>"
+   $env:Ai__Ollama__BaseUrl = "http://127.0.0.1:11434"
+   $env:Ai__Qdrant__ApiKey = "<same key configured in Qdrant>"
+   $env:Rag__QdrantGrpcHost = "127.0.0.1"
+   $env:Rag__QdrantGrpcPort = "6334"
+   ```
+
+3. **Kiểm tra toàn vẹn package, không gọi mạng/không ghi DB**:
+   ```powershell
+   dotnet run --project tools/DigitalOps.RagIngestion -- validate --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
+   ```
+
+4. **Mô phỏng deterministic ID, không gọi mạng/không ghi DB**:
+   ```powershell
+   dotnet run --project tools/DigitalOps.RagIngestion -- plan --staging-dir tools/rag-data-scraper/storage/staging/<job_id>
+   ```
+
+5. **Duyệt admission sau khi kiểm tra RAG Inspector/validation**:
+   ```powershell
+   $registry = "tools/rag-data-scraper/config/source-registry.json"
+   $staging = "tools/rag-data-scraper/storage/staging/<job_id>"
+   dotnet run --project tools/DigitalOps.RagIngestion -- admit --staging-dir $staging --source-registry $registry --approved-by "<data steward>" --approval-reference "<approval id>"
+   ```
+
+   Lệnh tạo `admission.json`; observation từ nguồn tổng hợp/cross-check hoặc thiếu
+   metadata bắt buộc được quarantine. Nếu core staging file thay đổi, receipt
+   mất hiệu lực và phải admit lại.
+
+6. **Nạp phần đã duyệt vào PostgreSQL và Qdrant**:
+   ```powershell
+   dotnet run --project tools/DigitalOps.RagIngestion -- publish --staging-dir $staging --source-registry $registry
+   ```
+
+   Nếu lần chạy trước bị gián đoạn, chạy lại với `--resume`. CLI kiểm tra hash,
+   offset, ACL, kích thước embedding 1024 và cấu hình collection trước khi kích
+   hoạt version/chunk-set mới:
+   ```powershell
+   dotnet run --project tools/DigitalOps.RagIngestion -- publish --staging-dir $staging --source-registry $registry --resume
+   ```
+
+   Các flag cũ `--validate-only`/`--dry-run` và cách gọi không có command vẫn
+   được giữ tạm thời như compatibility alias, nhưng command mới là interface
+   chính thức cho script/orchestrator bên ngoài.
+
+## 11. Kiểm tra hệ thống
 
 Sau khi API và Web chạy:
 

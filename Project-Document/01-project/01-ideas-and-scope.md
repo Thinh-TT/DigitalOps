@@ -15,6 +15,7 @@ DigitalOps là một hệ thống điều hành số dành cho tổ chức Mặt
 - Soạn thảo văn bản: khởi tạo theo mẫu, tự động kéo dữ liệu hội viên liên quan
 - AI hỗ trợ soạn thảo văn bản
 - Thẩm định & chuẩn hóa văn bản: kiểm tra thể thức/hình thức (không kiểm tra đúng-sai nội dung/pháp lý)
+- Kho tham chiếu văn bản pháp luật/hướng dẫn nghiệp vụ đã được quản trị nguồn, dùng để tra cứu nội bộ và cung cấp trích dẫn hỗ trợ FR-013; cán bộ vẫn tự đối chiếu và chịu trách nhiệm kết luận
 - Phê duyệt & lưu trữ: gắn văn bản trở lại hồ sơ hội viên/vụ việc liên quan
 
 **Mở rộng (chỉ làm nếu còn thời gian, không cam kết):**
@@ -27,6 +28,7 @@ DigitalOps là một hệ thống điều hành số dành cho tổ chức Mặt
 - Membership nâng cao, Welfare/quỹ, CitizenPortal, Training
 - Các việc văn phòng thuần CRUD (con dấu, tài sản, lịch họp thường) trừ khi gắn trực tiếp với văn bản có hạn
 - Điều phối tự động "cứng" không qua xác nhận người dùng
+- Cổng tra cứu pháp luật công cộng, crawler web tổng quát, tư vấn pháp lý hoặc AI tự kết luận hiệu lực/tính hợp pháp của văn bản
 
 ## Công Nghệ Sử Dụng
 
@@ -36,7 +38,7 @@ DigitalOps là một hệ thống điều hành số dành cho tổ chức Mặt
 
 **Xác thực:** ASP.NET Core Identity + JWT (không dùng Keycloak riêng).
 
-**AI:** kiến trúc RAG local-first do DigitalOps điều phối, gọi Ollama qua HTTP với Qwen3 và dùng Qdrant làm derived vector index cho gợi ý điều phối, sinh nháp và hỗ trợ thẩm định. Baseline `T0-00-RAG-MVP-20260801-v3-no-ram-preflight` đã được Project Owner phê duyệt cho MVP/demo; production hardening vẫn là phạm vi riêng theo 02-architecture/03-ai-rag-design.md. PostgreSQL full-text search vẫn là chức năng tìm kiếm chính thức của MVP.
+**AI:** kiến trúc RAG local-first do DigitalOps điều phối, gọi Ollama qua HTTP với Qwen3 và dùng Qdrant làm derived vector index cho gợi ý điều phối, sinh nháp, hỗ trợ thẩm định và tra cứu kho tham chiếu pháp luật đã được duyệt nguồn. Baseline `T0-00-RAG-MVP-20260801-v3-no-ram-preflight` chỉ phê duyệt tập use case/fixture ban đầu; phần mở rộng nguồn pháp luật phải qua admission, provenance và evaluation gate riêng theo 02-architecture/03-ai-rag-design.md trước khi dùng trong demo/production. PostgreSQL full-text search vẫn là chức năng tìm kiếm văn bản nghiệp vụ chính thức của MVP.
 
 **Tự động hóa nhắc hạn:** `IHostedService` chạy định kỳ trong chính API.
 
@@ -64,5 +66,5 @@ DigitalOps là một hệ thống điều hành số dành cho tổ chức Mặt
 
 - Khởi tạo văn bản theo mẫu, tự động kéo dữ liệu hội viên liên quan
 - AI hỗ trợ sinh bản nháp văn bản
-- Thẩm định & chuẩn hóa thể thức (rule + AI hỗ trợ phát hiện lỗi), trả lại chỉnh sửa nếu chưa đạt
+- Thẩm định & chuẩn hóa thể thức (rule + AI hỗ trợ phát hiện lỗi), có thể tra cứu văn bản pháp luật/hướng dẫn đã duyệt nguồn để đưa tham chiếu cho cán bộ đối chiếu; AI không tự kết luận pháp lý
 - Phê duyệt và lưu trữ, gắn văn bản với hồ sơ hội viên/vụ việc liên quan

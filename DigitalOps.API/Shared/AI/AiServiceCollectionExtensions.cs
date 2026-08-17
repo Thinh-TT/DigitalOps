@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using DigitalOps.API.Shared.AI.Retrieval;
 
 namespace DigitalOps.API.Shared.AI;
 
@@ -50,6 +51,8 @@ public static class AiServiceCollectionExtensions
         services.AddScoped<IEmbeddingClient>(serviceProvider =>
             serviceProvider.GetRequiredService<OllamaEmbeddingClient>());
         services.TryAddSingleton<IAiOperationGate, AiOperationGate>();
+        services.TryAddScoped<IRAGRetrievalService, RAGRetrievalService>();
+        services.TryAddScoped<ICitationSnapshotService, CitationSnapshotService>();
 
         return services;
     }

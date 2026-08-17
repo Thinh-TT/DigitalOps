@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <title>RAG Inspector</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --surface-hover: #f1f5f9;
+      --border: #d8dee7;
+      --border-strong: #b8c2cf;
+      --text: #172033;
+      --muted: #657186;
+      --subtle: #8a96a8;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --danger: #b42318;
+      --danger-soft: #feeceb;
+      --warning: #9a6700;
+      --warning-soft: #fff5d6;
+      --success: #067647;
+      --success-soft: #e8f7ef;
+      --info: #175cd3;
+      --shadow: 0 20px 45px rgba(15, 23, 42, .16);
+      --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0c111b;
+      --surface: #111827;
+      --surface-alt: #162033;
+      --surface-hover: #1b2940;
+      --border: #2a374c;
+      --border-strong: #42516a;
+      --text: #edf2f7;
+      --muted: #a1aec0;
+      --subtle: #77859a;
+      --accent: #6ea1ff;
+      --accent-soft: #182b4f;
+      --danger: #ff8a80;
+      --danger-soft: #3b1d23;
+      --warning: #f6c85f;
+      --warning-soft: #382d16;
+      --success: #68d5a0;
+      --success-soft: #143224;
+      --info: #8ab4ff;
+      --shadow: 0 20px 55px rgba(0, 0, 0, .42);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button, a, input, select { outline: none; }
+    :focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+    button { color: inherit; }
+    .app { min-height: 100vh; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 64px;
+      padding: 10px 24px;
+      background: color-mix(in srgb, var(--surface) 96%, transparent);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand { min-width: 0; }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 2px 0 0;
+      font-size: clamp(18px, 2vw, 23px);
+      line-height: 1.2;
+      letter-spacing: -.02em;
+    }
+    .job-id { color: var(--muted); font-family: var(--mono); font-size: .78em; }
+    .topbar-meta {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .btn, .icon-btn {
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      border-radius: 6px;
+      cursor: pointer;
+      min-height: 34px;
+      padding: 7px 11px;
+    }
+    .btn:hover, .icon-btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    html[data-theme="dark"] .btn-primary { color: #08111f; }
+    .icon-btn { width: 36px; padding: 6px; font-weight: 800; }
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(110px, 1fr));
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .metric {
+      min-width: 0;
+      padding: 13px 20px;
+      border-right: 1px solid var(--border);
+    }
+    .metric:last-child { border-right: 0; }
+    .metric-label {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .metric-value { font-size: 21px; font-weight: 750; letter-spacing: -.025em; }
+    .metric-danger .metric-value { color: var(--danger); }
+    .metric-warning .metric-value { color: var(--warning); }
+    .tabs-shell {
+      position: sticky;
+      top: 64px;
+      z-index: 15;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      padding: 0 20px;
+    }
+    .tab {
+      position: relative;
+      flex: 0 0 auto;
+      min-height: 45px;
+      padding: 12px 13px 10px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 650;
+    }
+    .tab:hover { color: var(--text); }
+    .tab[aria-selected="true"] { color: var(--accent); }
+    .tab[aria-selected="true"]::after {
+      position: absolute;
+      right: 10px;
+      bottom: -1px;
+      left: 10px;
+      height: 2px;
+      background: var(--accent);
+      content: "";
+    }
+    .count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      margin-left: 5px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background: var(--surface-alt);
+      color: var(--muted);
+      font-size: 11px;
+    }
+    main { padding: 18px 20px 32px; }
+    [role="tabpanel"][hidden] { display: none; }
+    .panel-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    h2, h3 { margin: 0; letter-spacing: -.015em; }
+    h2 { font-size: 18px; }
+    h3 { font-size: 14px; }
+    .description { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+      gap: 16px;
+    }
+    .section {
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-body { padding: 14px; }
+    .span-2 { grid-column: 1 / -1; }
+    .distribution { display: grid; gap: 10px; }
+    .distribution-row {
+      display: grid;
+      grid-template-columns: minmax(90px, 1fr) 3fr 46px;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .bar { height: 7px; overflow: hidden; background: var(--surface-alt); border-radius: 2px; }
+    .bar > span { display: block; height: 100%; background: var(--accent); }
+    .token-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .token-stat { padding: 10px; border-right: 1px solid var(--border); }
+    .token-stat:last-child { border-right: 0; }
+    .token-stat span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+    .token-stat strong { font-size: 17px; }
+    .health-note {
+      margin: 0 0 12px;
+      padding: 9px 11px;
+      border-left: 3px solid var(--warning);
+      background: var(--warning-soft);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .issue-list { display: grid; gap: 1px; }
+    .issue-line {
+      display: grid;
+      grid-template-columns: 76px minmax(120px, .8fr) minmax(220px, 2fr);
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .issue-line:last-child { border-bottom: 0; }
+    .issue-line:hover { color: var(--accent); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 20px;
+      padding: 2px 7px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .035em;
+      text-transform: uppercase;
+    }
+    .badge-error { color: var(--danger); background: var(--danger-soft); }
+    .badge-warning { color: var(--warning); background: var(--warning-soft); }
+    .badge-info { color: var(--info); background: var(--accent-soft); }
+    .badge-clean { color: var(--success); background: var(--success-soft); }
+    .badge-neutral { color: var(--muted); background: var(--surface-alt); }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(125px, .55fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .toolbar.compact { grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(130px, .55fr)); }
+    .field {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .table-shell {
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    table { width: 100%; min-width: 900px; border-collapse: collapse; }
+    th, td {
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--surface-alt);
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .055em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: var(--surface-hover); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .primary-cell { max-width: 430px; font-weight: 650; }
+    .secondary { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 400; }
+    .mono { font-family: var(--mono); font-size: 11px; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .snippet {
+      display: -webkit-box;
+      max-width: 560px;
+      overflow: hidden;
+      color: var(--muted);
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+    .empty { padding: 30px 16px !important; color: var(--muted); text-align: center; }
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pager-actions { display: flex; align-items: center; gap: 6px; }
+    .pager-actions .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .technical-grid { display: grid; gap: 16px; }
+    details.manifest { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    details.manifest summary { padding: 12px 14px; cursor: pointer; font-weight: 700; }
+    pre {
+      margin: 0;
+      overflow: auto;
+      padding: 14px;
+      background: var(--surface-alt);
+      color: var(--text);
+      font: 12px/1.55 var(--mono);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      background: rgba(2, 6, 23, .52);
+    }
+    .drawer-backdrop.open { display: block; }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 45;
+      display: flex;
+      flex-direction: column;
+      width: min(640px, 92vw);
+      height: 100dvh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      transform: translateX(102%);
+      transition: transform 160ms ease;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer-title { overflow-wrap: anywhere; }
+    .drawer-actions { display: flex; flex: 0 0 auto; gap: 6px; }
+    .drawer-body { flex: 1; overflow: auto; padding: 16px 18px 28px; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(120px, .55fr) minmax(0, 1.45fr);
+      border-top: 1px solid var(--border);
+    }
+    .detail-grid dt, .detail-grid dd {
+      margin: 0;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      overflow-wrap: anywhere;
+    }
+    .detail-grid dt { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .detail-grid dd { padding-left: 12px; }
+    .drawer-section { margin-top: 18px; }
+    .source-link { color: var(--accent); text-decoration: none; }
+    .source-link:hover { text-decoration: underline; }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 60;
+      display: none;
+      padding: 10px 13px;
+      background: var(--text);
+      color: var(--surface);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+    }
+    .toast.show { display: block; }
+    @media (max-width: 900px) {
+      .topbar { align-items: flex-start; padding: 10px 14px; }
+      .topbar-meta .run-time { display: none; }
+      .metric-strip { grid-template-columns: repeat(3, 1fr); }
+      .metric:nth-child(3) { border-right: 0; }
+      .metric:nth-child(-n+3) { border-bottom: 1px solid var(--border); }
+      .tabs { padding: 0 10px; }
+      main { padding: 14px 10px 24px; }
+      .overview-grid { grid-template-columns: 1fr; }
+      .span-2 { grid-column: auto; }
+      .toolbar, .toolbar.compact { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .metric-strip { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(2n) { border-right: 0; }
+      .metric:nth-child(3) { border-right: 1px solid var(--border); }
+      .metric:nth-child(-n+4) { border-bottom: 1px solid var(--border); }
+      .toolbar, .toolbar.compact { grid-template-columns: 1fr; }
+      .token-grid { grid-template-columns: repeat(2, 1fr); }
+      .token-stat { border-bottom: 1px solid var(--border); }
+      .issue-line { grid-template-columns: 72px 1fr; }
+      .issue-line > :last-child { grid-column: 1 / -1; }
+      .drawer { width: 100vw; }
+      .topbar-meta .btn { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .drawer { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="eyebrow">RAG Inspection Workspace</div>
+        <h1>RAG Inspector <span class="job-id" id="jobId"></span></h1>
+      </div>
+      <div class="topbar-meta">
+        <span class="run-time" id="runTime"></span>
+        <button class="btn" id="refreshBtn" type="button">Tải lại</button>
+        <button class="icon-btn" id="themeBtn" type="button" aria-label="Đổi giao diện sáng tối">◐</button>
+      </div>
+    </header>
+
+    <section class="metric-strip" aria-label="Tóm tắt job">
+      <div class="metric"><span class="metric-label">Văn bản</span><strong class="metric-value" id="metricDocuments">0</strong></div>
+      <div class="metric"><span class="metric-label">Chunks</span><strong class="metric-value" id="metricChunks">0</strong></div>
+      <div class="metric metric-warning"><span class="metric-label">Cần xử lý</span><strong class="metric-value" id="metricIssues">0</strong></div>
+      <div class="metric metric-danger"><span class="metric-label">Crawler errors</span><strong class="metric-value" id="metricErrors">0</strong></div>
+      <div class="metric"><span class="metric-label">Tokens trung bình</span><strong class="metric-value" id="metricAverage">0</strong></div>
+      <div class="metric"><span class="metric-label">Tokens P95</span><strong class="metric-value" id="metricP95">0</strong></div>
+    </section>
+
+    <nav class="tabs-shell" aria-label="Khu vực kiểm tra">
+      <div class="tabs" role="tablist" aria-label="Preview tabs">
+        <button class="tab" id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview" tabindex="0" data-tab="overview">Tổng quan</button>
+        <button class="tab" id="tab-documents" role="tab" aria-selected="false" aria-controls="panel-documents" tabindex="-1" data-tab="documents">Văn bản <span class="count" id="documentCount">0</span></button>
+        <button class="tab" id="tab-chunks" role="tab" aria-selected="false" aria-controls="panel-chunks" tabindex="-1" data-tab="chunks">Chunks <span class="count" id="chunkCount">0</span></button>
+        <button class="tab" id="tab-issues" role="tab" aria-selected="false" aria-controls="panel-issues" tabindex="-1" data-tab="issues">Vấn đề <span class="count" id="issueCount">0</span></button>
+        <button class="tab" id="tab-technical" role="tab" aria-selected="false" aria-controls="panel-technical" tabindex="-1" data-tab="technical">Kỹ thuật</button>
+      </div>
+    </nav>
+
+    <main>
+      <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+        <div class="panel-title">
+          <div><h2>Tổng quan chất lượng dữ liệu</h2><p class="description">Kiểm tra nhanh package trước khi nạp vào vector pipeline.</p></div>
+        </div>
+        <p class="health-note">RAG Health là tập cảnh báo kiểm tra trước khi nạp, không phải chứng nhận dữ liệu đúng tuyệt đối. Lỗi và cảnh báo cần được người vận hành review.</p>
+        <div class="overview-grid">
+          <section class="section">
+            <div class="section-head"><h3>Extraction quality</h3></div>
+            <div class="section-body distribution" id="qualityDistribution"></div>
+          </section>
+          <section class="section">
+            <div class="section-head"><h3>Phân bố token</h3></div>
+            <div class="section-body"><div class="token-grid" id="tokenStats"></div></div>
+          </section>
+          <section class="section">
+            <div class="section-head"><h3>Nguồn dữ liệu</h3></div>
+            <div class="section-body distribution" id="sourceDistribution"></div>
+          </section>
+          <section class="section">
+            <div class="section-head"><h3>Loại nội dung</h3></div>
+            <div class="section-body distribution" id="mimeDistribution"></div>
+          </section>
+          <section class="section span-2">
+            <div class="section-head"><h3>Vấn đề cần ưu tiên</h3><button class="btn" type="button" data-switch-tab="issues">Xem tất cả</button></div>
+            <div class="section-body issue-list" id="topIssues"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="panel-documents" role="tabpanel" aria-labelledby="tab-documents" tabindex="0" hidden>
+        <div class="panel-title"><div><h2>Văn bản</h2><p class="description">Tìm nguồn, kiểm tra extraction và mở chi tiết từng observation.</p></div></div>
+        <div class="toolbar">
+          <input class="field" id="documentSearch" type="search" placeholder="Tìm title, key, URL... (/)" aria-label="Tìm văn bản">
+          <select class="field" id="documentQuality" aria-label="Lọc extraction quality"><option value="">Mọi chất lượng</option></select>
+          <select class="field" id="documentSource" aria-label="Lọc nguồn"><option value="">Mọi nguồn</option></select>
+          <select class="field" id="documentMime" aria-label="Lọc MIME"><option value="">Mọi MIME</option></select>
+        </div>
+        <div class="table-shell">
+          <table>
+            <thead><tr><th>Văn bản</th><th>Nguồn</th><th>MIME</th><th>Chất lượng</th><th>Chunks</th><th>Vấn đề</th><th>Thời gian cào</th></tr></thead>
+            <tbody id="documentsBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="documentsPager"></div>
+      </section>
+
+      <section id="panel-chunks" role="tabpanel" aria-labelledby="tab-chunks" tabindex="0" hidden>
+        <div class="panel-title"><div><h2>Chunks</h2><p class="description">Chỉ render trang hiện tại; mở drawer để đọc toàn bộ nội dung.</p></div></div>
+        <div class="toolbar">
+          <input class="field" id="chunkSearch" type="search" placeholder="Tìm nội dung, heading, ID... (/)" aria-label="Tìm chunk">
+          <select class="field" id="chunkDocument" aria-label="Lọc theo văn bản"><option value="">Mọi văn bản</option></select>
+          <select class="field" id="chunkClassification" aria-label="Lọc phân loại"><option value="">Mọi phân loại</option></select>
+          <label class="checkbox-field"><input id="chunkIssuesOnly" type="checkbox"> Chỉ có vấn đề</label>
+        </div>
+        <div class="table-shell">
+          <table>
+            <thead><tr><th>Index</th><th>Văn bản / nội dung</th><th>Tokens</th><th>Target / Soft</th><th>Offsets</th><th>Phân loại</th><th>Vấn đề</th></tr></thead>
+            <tbody id="chunksBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="chunksPager"></div>
+      </section>
+
+      <section id="panel-issues" role="tabpanel" aria-labelledby="tab-issues" tabindex="0" hidden>
+        <div class="panel-title"><div><h2>RAG Health</h2><p class="description">Lỗi, cảnh báo và thông tin phát hiện từ package staging.</p></div></div>
+        <div class="toolbar compact">
+          <input class="field" id="issueSearch" type="search" placeholder="Tìm mã, đối tượng, thông báo... (/)" aria-label="Tìm vấn đề">
+          <select class="field" id="issueSeverity" aria-label="Lọc mức độ"><option value="">Mọi mức độ</option><option value="error">Error</option><option value="warning">Warning</option><option value="info">Info</option></select>
+          <select class="field" id="issueType" aria-label="Lọc loại đối tượng"><option value="">Mọi đối tượng</option></select>
+        </div>
+        <div class="table-shell">
+          <table>
+            <thead><tr><th>Mức độ</th><th>Mã</th><th>Đối tượng</th><th>Phát hiện</th><th>Khuyến nghị</th></tr></thead>
+            <tbody id="issuesBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="issuesPager"></div>
+      </section>
+
+      <section id="panel-technical" role="tabpanel" aria-labelledby="tab-technical" tabindex="0" hidden>
+        <div class="panel-title"><div><h2>Kỹ thuật</h2><p class="description">Chunk set, tokenizer, manifest và metadata nguyên bản.</p></div></div>
+        <div class="technical-grid">
+          <div class="table-shell">
+            <table>
+              <thead><tr><th>Chunk set</th><th>Văn bản</th><th>Strategy</th><th>Tokenizer</th><th>Target</th><th>Soft / Hard</th><th>Overlap</th><th>Declared / Actual</th></tr></thead>
+              <tbody id="chunkSetsBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="chunkSetsPager"></div>
+          <details class="manifest">
+            <summary>Manifest JSON</summary>
+            <pre id="manifestJson"></pre>
+          </details>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true">
+    <div class="drawer-head">
+      <div><div class="eyebrow" id="drawerType">Chi tiết</div><h2 class="drawer-title" id="drawerTitle">Chi tiết bản ghi</h2></div>
+      <div class="drawer-actions"><button class="btn" id="copyBtn" type="button">Sao chép JSON</button><button class="icon-btn" id="closeDrawerBtn" type="button" aria-label="Đóng chi tiết">×</button></div>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script id="preview-data" type="application/json">__RAG_PREVIEW_DATA__</script>
+
+  <script>
+    "use strict";
+
+    const PAGE_SIZE = 50;
+    const data = JSON.parse(document.getElementById("preview-data").textContent);
+    const state = {
+      activeTab: "overview",
+      pages: { documents: 1, chunks: 1, issues: 1 },
+      drawer: null,
+      lastFocus: null,
+      timers: {}
+    };
+
+    const byId = function (id) { return document.getElementById(id); };
+    const normalize = function (value) {
+      return String(value === null || value === undefined ? "" : value).toLocaleLowerCase("vi");
+    };
+    const formatNumber = function (value) {
+      const number = Number(value || 0);
+      return Number.isFinite(number) ? number.toLocaleString("vi-VN") : "0";
+    };
+    const textNode = function (tag, value, className) {
+      const element = document.createElement(tag);
+      element.textContent = String(value === null || value === undefined ? "" : value);
+      if (className) element.className = className;
+      return element;
+    };
+    const badge = function (value, kind) {
+      return textNode("span", value, "badge badge-" + (kind || "neutral"));
+    };
+    const cell = function (value, className) {
+      return textNode("td", value, className);
+    };
+    const safeUrl = function (raw) {
+      try {
+        const url = new URL(String(raw || ""));
+        return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+      } catch (_) {
+        return null;
+      }
+    };
+    const makeInteractiveRow = function (row, handler) {
+      row.tabIndex = 0;
+      row.addEventListener("click", handler);
+      row.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handler();
+        }
+      });
+      return row;
+    };
+    const emptyRow = function (columns, message) {
+      const row = document.createElement("tr");
+      const td = cell(message, "empty");
+      td.colSpan = columns;
+      row.appendChild(td);
+      return row;
+    };
+    const appendOptions = function (select, values, formatter) {
+      Array.from(new Set(values.filter(Boolean))).sort(function (a, b) {
+        return String(a).localeCompare(String(b), "vi");
+      }).forEach(function (value) {
+        const option = document.createElement("option");
+        option.value = String(value);
+        option.textContent = formatter ? formatter(value) : String(value);
+        select.appendChild(option);
+      });
+    };
+    const debounce = function (key, callback) {
+      clearTimeout(state.timers[key]);
+      state.timers[key] = setTimeout(callback, 140);
+    };
+
+    function setInitialTheme() {
+      let stored = null;
+      try { stored = localStorage.getItem("rag-preview-theme"); } catch (_) {}
+      const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = stored || (dark ? "dark" : "light");
+    }
+
+    function toggleTheme() {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("rag-preview-theme", next); } catch (_) {}
+    }
+
+    function renderHeader() {
+      byId("jobId").textContent = data.job_id ? " / " + data.job_id : "";
+      const started = data.manifest.started_at || "N/A";
+      const completed = data.manifest.completed_at || "N/A";
+      byId("runTime").textContent = started + " → " + completed;
+      byId("metricDocuments").textContent = formatNumber(data.summary.documents);
+      byId("metricChunks").textContent = formatNumber(data.summary.chunks);
+      byId("metricIssues").textContent = formatNumber(data.summary.actionable_issues);
+      byId("metricErrors").textContent = formatNumber(data.summary.crawler_errors);
+      byId("metricAverage").textContent = formatNumber(data.summary.token_stats.average);
+      byId("metricP95").textContent = formatNumber(data.summary.token_stats.p95);
+      byId("documentCount").textContent = formatNumber(data.summary.documents);
+      byId("chunkCount").textContent = formatNumber(data.summary.chunks);
+      byId("issueCount").textContent = formatNumber(data.issues.length);
+      document.title = "RAG Inspector · " + (data.job_id || "staging job");
+    }
+
+    function renderDistribution(containerId, counts) {
+      const container = byId(containerId);
+      container.replaceChildren();
+      const entries = Object.entries(counts || {}).sort(function (a, b) {
+        return b[1] - a[1];
+      });
+      const total = entries.reduce(function (sum, entry) { return sum + entry[1]; }, 0);
+      if (!entries.length) {
+        container.appendChild(textNode("div", "Chưa có dữ liệu.", "empty"));
+        return;
+      }
+      entries.forEach(function (entry) {
+        const row = document.createElement("div");
+        row.className = "distribution-row";
+        row.appendChild(textNode("span", entry[0], "truncate"));
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        const fill = document.createElement("span");
+        fill.style.width = (total ? Math.max(2, entry[1] / total * 100) : 0) + "%";
+        bar.appendChild(fill);
+        row.appendChild(bar);
+        row.appendChild(textNode("strong", formatNumber(entry[1])));
+        container.appendChild(row);
+      });
+    }
+
+    function renderOverview() {
+      renderDistribution("qualityDistribution", data.summary.quality_counts);
+      renderDistribution("sourceDistribution", data.summary.source_counts);
+      renderDistribution("mimeDistribution", data.summary.mime_counts);
+      const stats = data.summary.token_stats;
+      const tokenContainer = byId("tokenStats");
+      tokenContainer.replaceChildren();
+      [
+        ["Min", stats.min],
+        ["Median", stats.median],
+        ["Average", stats.average],
+        ["P95", stats.p95],
+        ["Max", stats.max]
+      ].forEach(function (entry) {
+        const item = document.createElement("div");
+        item.className = "token-stat";
+        item.appendChild(textNode("span", entry[0]));
+        item.appendChild(textNode("strong", formatNumber(entry[1])));
+        tokenContainer.appendChild(item);
+      });
+
+      const priorities = { error: 0, warning: 1, info: 2 };
+      const top = data.issues.slice().sort(function (a, b) {
+        return priorities[a.severity] - priorities[b.severity];
+      }).slice(0, 8);
+      const list = byId("topIssues");
+      list.replaceChildren();
+      if (!top.length) {
+        list.appendChild(textNode("div", "Không phát hiện vấn đề trong các rule hiện có.", "empty"));
+        return;
+      }
+      top.forEach(function (item) {
+        const row = document.createElement("div");
+        row.className = "issue-line";
+        row.tabIndex = 0;
+        row.appendChild(badge(item.severity, item.severity));
+        row.appendChild(textNode("span", item.code, "mono"));
+        row.appendChild(textNode("span", item.message));
+        const open = function () { openDrawer("issue", item); };
+        row.addEventListener("click", open);
+        row.addEventListener("keydown", function (event) {
+          if (event.key === "Enter") open();
+        });
+        list.appendChild(row);
+      });
+    }
+
+    function qualityKind(status) {
+      if (status === "clean") return "clean";
+      if (status === "failed") return "error";
+      if (status === "truncated" || status === "ocr_fallback") return "warning";
+      return "neutral";
+    }
+
+    function filteredDocuments() {
+      const query = normalize(byId("documentSearch").value);
+      const quality = byId("documentQuality").value;
+      const source = byId("documentSource").value;
+      const mime = byId("documentMime").value;
+      return data.documents.filter(function (item) {
+        const qualityValue = item.extraction_quality && item.extraction_quality.status || "unknown";
+        const haystack = normalize([
+          item.title,
+          item.canonical_document_key,
+          item.source_document_url,
+          item.observation_id
+        ].join(" "));
+        return (!query || haystack.includes(query))
+          && (!quality || qualityValue === quality)
+          && (!source || item.source_namespace === source)
+          && (!mime || item.mime_type === mime);
+      });
+    }
+
+    function renderDocuments() {
+      const values = filteredDocuments();
+      const page = pageSlice("documents", values);
+      const body = byId("documentsBody");
+      body.replaceChildren();
+      if (!page.items.length) {
+        body.appendChild(emptyRow(7, "Không có văn bản phù hợp bộ lọc."));
+      }
+      page.items.forEach(function (item) {
+        const row = makeInteractiveRow(document.createElement("tr"), function () {
+          openDrawer("document", item);
+        });
+        const titleCell = document.createElement("td");
+        titleCell.className = "primary-cell";
+        titleCell.appendChild(textNode("span", item.title || "Chưa có tiêu đề"));
+        titleCell.appendChild(textNode("span", item.canonical_document_key || item.observation_id || "—", "secondary mono truncate"));
+        row.appendChild(titleCell);
+        row.appendChild(cell(item.source_namespace || "—"));
+        row.appendChild(cell(item.mime_type || "—", "mono"));
+        const qualityCell = document.createElement("td");
+        const status = item.extraction_quality && item.extraction_quality.status || "unknown";
+        qualityCell.appendChild(badge(status, qualityKind(status)));
+        row.appendChild(qualityCell);
+        row.appendChild(cell(formatNumber(item._preview && item._preview.chunk_count)));
+        row.appendChild(cell(formatNumber(item._preview && item._preview.issue_count)));
+        row.appendChild(cell(item.crawled_at || "—", "mono"));
+        body.appendChild(row);
+      });
+      renderPager("documentsPager", "documents", page, renderDocuments);
+    }
+
+    function filteredChunks() {
+      const query = normalize(byId("chunkSearch").value);
+      const documentId = byId("chunkDocument").value;
+      const classification = byId("chunkClassification").value;
+      const onlyIssues = byId("chunkIssuesOnly").checked;
+      return data.chunks.filter(function (item) {
+        const acl = item.chunk_acl || {};
+        const currentClassification = acl.security_classification || "";
+        const preview = item._preview || {};
+        const haystack = normalize([
+          item.text,
+          item.heading_path,
+          item.chunk_id,
+          item.chunk_set_id,
+          preview.document_title
+        ].join(" "));
+        return (!query || haystack.includes(query))
+          && (!documentId || preview.document_id === documentId)
+          && (!classification || currentClassification === classification)
+          && (!onlyIssues || Number(preview.issue_count || 0) > 0);
+      });
+    }
+
+    function renderChunks() {
+      const values = filteredChunks();
+      const page = pageSlice("chunks", values);
+      const body = byId("chunksBody");
+      body.replaceChildren();
+      if (!page.items.length) {
+        body.appendChild(emptyRow(7, "Không có chunk phù hợp bộ lọc."));
+      }
+      page.items.forEach(function (item) {
+        const preview = item._preview || {};
+        const acl = item.chunk_acl || {};
+        const row = makeInteractiveRow(document.createElement("tr"), function () {
+          openDrawer("chunk", item);
+        });
+        row.appendChild(cell("#" + String(item.chunk_index === undefined ? "—" : item.chunk_index), "mono"));
+        const contentCell = document.createElement("td");
+        contentCell.className = "primary-cell";
+        contentCell.appendChild(textNode("span", preview.document_title || "Không tìm thấy văn bản", "truncate"));
+        contentCell.appendChild(textNode("span", item.text || "Chunk rỗng", "secondary snippet"));
+        row.appendChild(contentCell);
+        row.appendChild(cell(formatNumber(item.token_count)));
+        row.appendChild(cell(
+          formatNumber(preview.target_tokens) + " / "
+          + formatNumber(preview.soft_max_tokens || preview.target_tokens)
+        ));
+        row.appendChild(cell(String(item.character_start ?? "—") + "–" + String(item.character_end ?? "—"), "mono"));
+        const classCell = document.createElement("td");
+        classCell.appendChild(badge(acl.security_classification || "missing", acl.security_classification ? "neutral" : "warning"));
+        row.appendChild(classCell);
+        row.appendChild(cell(formatNumber(preview.issue_count)));
+        body.appendChild(row);
+      });
+      renderPager("chunksPager", "chunks", page, renderChunks);
+    }
+
+    function filteredIssues() {
+      const query = normalize(byId("issueSearch").value);
+      const severity = byId("issueSeverity").value;
+      const type = byId("issueType").value;
+      return data.issues.filter(function (item) {
+        const haystack = normalize([
+          item.issue_id,
+          item.code,
+          item.target_type,
+          item.target_id,
+          item.message,
+          item.recommendation,
+          Array.isArray(item.sample_urls) ? item.sample_urls.join(" ") : ""
+        ].join(" "));
+        return (!query || haystack.includes(query))
+          && (!severity || item.severity === severity)
+          && (!type || item.target_type === type);
+      });
+    }
+
+    function renderIssues() {
+      const values = filteredIssues();
+      const page = pageSlice("issues", values);
+      const body = byId("issuesBody");
+      body.replaceChildren();
+      if (!page.items.length) {
+        body.appendChild(emptyRow(5, "Không có vấn đề phù hợp bộ lọc."));
+      }
+      page.items.forEach(function (item) {
+        const row = makeInteractiveRow(document.createElement("tr"), function () {
+          openDrawer("issue", item);
+        });
+        const severityCell = document.createElement("td");
+        severityCell.appendChild(badge(item.severity, item.severity));
+        row.appendChild(severityCell);
+        row.appendChild(cell(item.code, "mono"));
+        const targetCell = document.createElement("td");
+        targetCell.appendChild(textNode("span", item.target_type));
+        targetCell.appendChild(textNode("span", item.target_id, "secondary mono truncate"));
+        if ((item.occurrence_count || 1) > 1) {
+          targetCell.appendChild(textNode("span", "× " + formatNumber(item.occurrence_count), "secondary"));
+        }
+        row.appendChild(targetCell);
+        row.appendChild(cell(item.message));
+        row.appendChild(cell(item.recommendation, "secondary"));
+        body.appendChild(row);
+      });
+      renderPager("issuesPager", "issues", page, renderIssues);
+    }
+
+    function pageSlice(key, values) {
+      const totalPages = Math.max(1, Math.ceil(values.length / PAGE_SIZE));
+      state.pages[key] = Math.min(Math.max(1, state.pages[key] || 1), totalPages);
+      const start = (state.pages[key] - 1) * PAGE_SIZE;
+      return {
+        items: values.slice(start, start + PAGE_SIZE),
+        page: state.pages[key],
+        pages: totalPages,
+        total: values.length,
+        start: values.length ? start + 1 : 0,
+        end: Math.min(start + PAGE_SIZE, values.length)
+      };
+    }
+
+    function renderPager(containerId, key, page, renderer) {
+      const container = byId(containerId);
+      container.replaceChildren();
+      container.appendChild(textNode(
+        "span",
+        "Hiển thị " + formatNumber(page.start) + "–" + formatNumber(page.end) + " / " + formatNumber(page.total)
+      ));
+      const actions = document.createElement("div");
+      actions.className = "pager-actions";
+      const previous = textNode("button", "Trước", "btn");
+      previous.type = "button";
+      previous.disabled = page.page <= 1;
+      previous.addEventListener("click", function () {
+        state.pages[key] -= 1;
+        renderer();
+      });
+      const indicator = textNode("span", "Trang " + page.page + " / " + page.pages);
+      const next = textNode("button", "Sau", "btn");
+      next.type = "button";
+      next.disabled = page.page >= page.pages;
+      next.addEventListener("click", function () {
+        state.pages[key] += 1;
+        renderer();
+      });
+      actions.append(previous, indicator, next);
+      container.appendChild(actions);
+    }
+
+    function renderChunkSets() {
+      const body = byId("chunkSetsBody");
+      body.replaceChildren();
+      const page = pageSlice("chunkSets", data.chunk_sets);
+      if (!page.items.length) {
+        body.appendChild(emptyRow(8, "Chưa có chunk set."));
+      }
+      page.items.forEach(function (item) {
+        const preview = item._preview || {};
+        const row = makeInteractiveRow(document.createElement("tr"), function () {
+          openDrawer("chunk_set", item);
+        });
+        row.appendChild(cell(item.chunk_set_id || "—", "mono"));
+        row.appendChild(cell(preview.document_title || preview.document_id || "—", "primary-cell"));
+        row.appendChild(cell(item.chunking_strategy || "—"));
+        row.appendChild(cell(item.tokenizer_name || "—", "mono"));
+        row.appendChild(cell(formatNumber(item.target_tokens)));
+        row.appendChild(cell(
+          formatNumber(item.soft_max_tokens || item.target_tokens) + " / "
+          + formatNumber(item.max_tokens || 512)
+        ));
+        row.appendChild(cell(formatNumber(item.overlap_tokens)));
+        row.appendChild(cell(formatNumber(item.total_chunks) + " / " + formatNumber(preview.actual_chunks)));
+        body.appendChild(row);
+      });
+      const pager = byId("chunkSetsPager");
+      if (pager) renderPager("chunkSetsPager", "chunkSets", page, renderChunkSets);
+      byId("manifestJson").textContent = JSON.stringify(data.manifest, null, 2);
+    }
+
+    function populateFilters() {
+      appendOptions(
+        byId("documentQuality"),
+        data.documents.map(function (item) {
+          return item.extraction_quality && item.extraction_quality.status || "unknown";
+        })
+      );
+      appendOptions(
+        byId("documentSource"),
+        data.documents.map(function (item) { return item.source_namespace || "unknown"; })
+      );
+      appendOptions(
+        byId("documentMime"),
+        data.documents.map(function (item) { return item.mime_type || "unknown"; })
+      );
+      const titleById = {};
+      data.documents.forEach(function (item) {
+        titleById[String(item.observation_id || "")] = item.title || item.observation_id || "Không tiêu đề";
+      });
+      appendOptions(
+        byId("chunkDocument"),
+        data.documents.map(function (item) { return String(item.observation_id || ""); }),
+        function (value) {
+          const title = titleById[value] || value;
+          return title.length > 72 ? title.slice(0, 69) + "…" : title;
+        }
+      );
+      appendOptions(
+        byId("chunkClassification"),
+        data.chunks.map(function (item) {
+          return item.chunk_acl && item.chunk_acl.security_classification || "missing";
+        })
+      );
+      appendOptions(
+        byId("issueType"),
+        data.issues.map(function (item) { return item.target_type; })
+      );
+    }
+
+    function detailPair(grid, label, value) {
+      grid.appendChild(textNode("dt", label));
+      grid.appendChild(textNode("dd", value === null || value === undefined || value === "" ? "—" : value));
+    }
+
+    function relatedIssues(kind, item) {
+      let targetId = "";
+      let targetType = kind;
+      if (kind === "document") targetId = String(item.observation_id || "unknown");
+      if (kind === "chunk") targetId = String(item.chunk_id || (String(item.chunk_set_id) + "#" + String(item.chunk_index)));
+      if (kind === "chunk_set") targetId = String(item.chunk_set_id || "unknown");
+      return data.issues.filter(function (issue) {
+        return issue.target_type === targetType && issue.target_id === targetId;
+      });
+    }
+
+    function renderRelatedIssues(container, items) {
+      if (!items.length) return;
+      const section = document.createElement("section");
+      section.className = "drawer-section";
+      section.appendChild(textNode("h3", "Vấn đề liên quan (" + items.length + ")"));
+      const list = document.createElement("div");
+      list.className = "issue-list";
+      items.forEach(function (item) {
+        const row = document.createElement("div");
+        row.className = "issue-line";
+        row.appendChild(badge(item.severity, item.severity));
+        row.appendChild(textNode("span", item.code, "mono"));
+        row.appendChild(textNode("span", item.message));
+        list.appendChild(row);
+      });
+      section.appendChild(list);
+      container.appendChild(section);
+    }
+
+    function appendRawJson(container, item) {
+      const section = document.createElement("section");
+      section.className = "drawer-section";
+      section.appendChild(textNode("h3", "JSON nguyên bản"));
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(item, null, 2);
+      section.appendChild(pre);
+      container.appendChild(section);
+    }
+
+    function openDrawer(kind, item) {
+      state.drawer = { kind: kind, item: item };
+      state.lastFocus = document.activeElement;
+      const drawer = byId("drawer");
+      const body = byId("drawerBody");
+      body.replaceChildren();
+      byId("drawerType").textContent = kind.replace("_", " ");
+      let title = item.title || item.code || item.chunk_id || item.chunk_set_id || "Chi tiết bản ghi";
+      byId("drawerTitle").textContent = String(title);
+      const grid = document.createElement("dl");
+      grid.className = "detail-grid";
+
+      if (kind === "document") {
+        detailPair(grid, "Observation ID", item.observation_id);
+        detailPair(grid, "Canonical key", item.canonical_document_key);
+        detailPair(grid, "Source", item.source_namespace);
+        detailPair(grid, "MIME", item.mime_type);
+        detailPair(grid, "Word count", formatNumber(item.word_count));
+        detailPair(grid, "Character count", formatNumber(item.char_count));
+        detailPair(grid, "Chunks", formatNumber(item._preview && item._preview.chunk_count));
+        const quality = item.extraction_quality || {};
+        detailPair(grid, "Extraction", quality.status || "unknown");
+        detailPair(grid, "OCR", quality.ocr_used ? "Có" : "Không");
+        detailPair(grid, "Confidence", quality.confidence_score);
+        detailPair(grid, "Crawled at", item.crawled_at);
+        body.appendChild(grid);
+
+        const actions = document.createElement("div");
+        actions.className = "drawer-section drawer-actions";
+        const source = safeUrl(item.source_document_url);
+        if (source) {
+          const link = textNode("a", "Mở nguồn", "btn source-link");
+          link.href = source;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          actions.appendChild(link);
+        }
+        const viewChunks = textNode("button", "Xem chunks của văn bản", "btn btn-primary");
+        viewChunks.type = "button";
+        viewChunks.addEventListener("click", function () {
+          byId("chunkDocument").value = String(item.observation_id || "");
+          state.pages.chunks = 1;
+          closeDrawer();
+          switchTab("chunks", true);
+          renderChunks();
+        });
+        actions.appendChild(viewChunks);
+        body.appendChild(actions);
+        renderRelatedIssues(body, relatedIssues(kind, item));
+      } else if (kind === "chunk") {
+        const preview = item._preview || {};
+        const acl = item.chunk_acl || {};
+        detailPair(grid, "Chunk ID", item.chunk_id);
+        detailPair(grid, "Chunk set", item.chunk_set_id);
+        detailPair(grid, "Document", preview.document_title);
+        detailPair(grid, "Index", item.chunk_index);
+        detailPair(grid, "Tokens", item.token_count);
+        detailPair(grid, "Target tokens", preview.target_tokens);
+        detailPair(grid, "Soft ceiling", preview.soft_max_tokens || preview.target_tokens);
+        detailPair(grid, "Hard limit", preview.max_tokens || 512);
+        detailPair(grid, "Offsets", String(item.character_start ?? "—") + "–" + String(item.character_end ?? "—"));
+        detailPair(grid, "Heading", item.heading_path);
+        detailPair(grid, "Pages", Array.isArray(item.page_numbers) ? item.page_numbers.join(", ") : "");
+        detailPair(grid, "Classification", acl.security_classification);
+        detailPair(grid, "Allowed roles", Array.isArray(acl.allowed_roles) ? acl.allowed_roles.join(", ") : "");
+        detailPair(grid, "Denied roles", Array.isArray(acl.denied_roles) ? acl.denied_roles.join(", ") : "");
+        body.appendChild(grid);
+        const section = document.createElement("section");
+        section.className = "drawer-section";
+        const sectionHead = document.createElement("div");
+        sectionHead.className = "section-head";
+        sectionHead.appendChild(textNode("h3", "Nội dung đầy đủ"));
+        const copyText = textNode("button", "Sao chép text", "btn");
+        copyText.type = "button";
+        copyText.addEventListener("click", function () { copyValue(item.text || ""); });
+        sectionHead.appendChild(copyText);
+        section.appendChild(sectionHead);
+        const pre = document.createElement("pre");
+        pre.textContent = item.text || "";
+        section.appendChild(pre);
+        body.appendChild(section);
+        renderRelatedIssues(body, relatedIssues(kind, item));
+      } else if (kind === "issue") {
+        detailPair(grid, "Issue ID", item.issue_id);
+        detailPair(grid, "Severity", item.severity);
+        detailPair(grid, "Code", item.code);
+        detailPair(grid, "Target type", item.target_type);
+        detailPair(grid, "Target ID", item.target_id);
+        detailPair(grid, "Số lần xuất hiện", item.occurrence_count || 1);
+        detailPair(grid, "Phát hiện", item.message);
+        detailPair(grid, "Khuyến nghị", item.recommendation);
+        body.appendChild(grid);
+        if (Array.isArray(item.sample_urls) && item.sample_urls.length) {
+          const samples = document.createElement("section");
+          samples.className = "drawer-section";
+          samples.appendChild(textNode("h3", "URL mẫu"));
+          const sampleList = document.createElement("pre");
+          sampleList.textContent = item.sample_urls.join("\n");
+          samples.appendChild(sampleList);
+          body.appendChild(samples);
+        }
+      } else {
+        detailPair(grid, "Chunk set ID", item.chunk_set_id);
+        detailPair(grid, "Observation ID", item.observation_id);
+        detailPair(grid, "Strategy", item.chunking_strategy);
+        detailPair(grid, "Version", item.chunker_version);
+        detailPair(grid, "Tokenizer", item.tokenizer_name);
+        detailPair(grid, "Target tokens", item.target_tokens);
+        detailPair(grid, "Soft ceiling", item.soft_max_tokens || item.target_tokens);
+        detailPair(grid, "Hard limit", item.max_tokens || 512);
+        detailPair(grid, "Overlap tokens", item.overlap_tokens);
+        detailPair(grid, "Declared chunks", item.total_chunks);
+        detailPair(grid, "Actual chunks", item._preview && item._preview.actual_chunks);
+        body.appendChild(grid);
+        renderRelatedIssues(body, relatedIssues(kind, item));
+      }
+      appendRawJson(body, item);
+      byId("drawerBackdrop").classList.add("open");
+      drawer.classList.add("open");
+      drawer.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      byId("closeDrawerBtn").focus();
+    }
+
+    function closeDrawer() {
+      if (!state.drawer) return;
+      state.drawer = null;
+      byId("drawerBackdrop").classList.remove("open");
+      byId("drawer").classList.remove("open");
+      byId("drawer").setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      if (state.lastFocus && typeof state.lastFocus.focus === "function") {
+        state.lastFocus.focus();
+      }
+    }
+
+    function copyValue(value) {
+      const text = String(value || "");
+      const fallback = function () {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        try { document.execCommand("copy"); } catch (_) {}
+        textarea.remove();
+        showToast("Đã sao chép");
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showToast("Đã sao chép");
+        }).catch(fallback);
+      } else {
+        fallback();
+      }
+    }
+
+    function showToast(message) {
+      const toast = byId("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(state.timers.toast);
+      state.timers.toast = setTimeout(function () {
+        toast.classList.remove("show");
+      }, 1600);
+    }
+
+    function renderActiveTab() {
+      if (state.activeTab === "documents") renderDocuments();
+      if (state.activeTab === "chunks") renderChunks();
+      if (state.activeTab === "issues") renderIssues();
+      if (state.activeTab === "technical") renderChunkSets();
+    }
+
+    function switchTab(name, updateHash) {
+      const valid = ["overview", "documents", "chunks", "issues", "technical"];
+      if (!valid.includes(name)) name = "overview";
+      state.activeTab = name;
+      document.querySelectorAll('[role="tab"]').forEach(function (tab) {
+        const selected = tab.dataset.tab === name;
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        tab.tabIndex = selected ? 0 : -1;
+      });
+      document.querySelectorAll('[role="tabpanel"]').forEach(function (panel) {
+        panel.hidden = panel.id !== "panel-" + name;
+      });
+      if (updateHash) {
+        try { history.replaceState(null, "", "#" + name); } catch (_) {}
+      }
+      renderActiveTab();
+    }
+
+    function resetAndRender(key, renderer) {
+      state.pages[key] = 1;
+      renderer();
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('[role="tab"]').forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          switchTab(tab.dataset.tab, true);
+        });
+        tab.addEventListener("keydown", function (event) {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+          const offset = event.key === "ArrowRight" ? 1 : -1;
+          const next = tabs[(tabs.indexOf(tab) + offset + tabs.length) % tabs.length];
+          next.focus();
+          switchTab(next.dataset.tab, true);
+        });
+      });
+      document.querySelectorAll("[data-switch-tab]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          switchTab(button.dataset.switchTab, true);
+        });
+      });
+
+      byId("documentSearch").addEventListener("input", function () {
+        debounce("documents", function () { resetAndRender("documents", renderDocuments); });
+      });
+      ["documentQuality", "documentSource", "documentMime"].forEach(function (id) {
+        byId(id).addEventListener("change", function () {
+          resetAndRender("documents", renderDocuments);
+        });
+      });
+      byId("chunkSearch").addEventListener("input", function () {
+        debounce("chunks", function () { resetAndRender("chunks", renderChunks); });
+      });
+      ["chunkDocument", "chunkClassification", "chunkIssuesOnly"].forEach(function (id) {
+        byId(id).addEventListener("change", function () {
+          resetAndRender("chunks", renderChunks);
+        });
+      });
+      byId("issueSearch").addEventListener("input", function () {
+        debounce("issues", function () { resetAndRender("issues", renderIssues); });
+      });
+      ["issueSeverity", "issueType"].forEach(function (id) {
+        byId(id).addEventListener("change", function () {
+          resetAndRender("issues", renderIssues);
+        });
+      });
+
+      byId("refreshBtn").addEventListener("click", function () { location.reload(); });
+      byId("themeBtn").addEventListener("click", toggleTheme);
+      byId("closeDrawerBtn").addEventListener("click", closeDrawer);
+      byId("drawerBackdrop").addEventListener("click", closeDrawer);
+      byId("copyBtn").addEventListener("click", function () {
+        if (state.drawer) copyValue(JSON.stringify(state.drawer.item, null, 2));
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closeDrawer();
+          return;
+        }
+        if (event.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+          event.preventDefault();
+          const searchByTab = {
+            documents: "documentSearch",
+            chunks: "chunkSearch",
+            issues: "issueSearch"
+          };
+          const target = searchByTab[state.activeTab];
+          if (target) byId(target).focus();
+        }
+        if (event.key === "Tab" && state.drawer) {
+          const focusable = Array.from(byId("drawer").querySelectorAll("button, a[href]")).filter(function (element) {
+            return !element.disabled;
+          });
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      });
+    }
+
+    function initialize() {
+      setInitialTheme();
+      renderHeader();
+      renderOverview();
+      populateFilters();
+      bindEvents();
+      const hash = location.hash.replace("#", "");
+      switchTab(hash || "overview", false);
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
+

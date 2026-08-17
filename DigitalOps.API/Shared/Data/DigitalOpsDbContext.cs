@@ -34,6 +34,26 @@ public sealed class DigitalOpsDbContext(
 
     public DbSet<ReviewHistory> ReviewHistory => Set<ReviewHistory>();
 
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagDocument> RagDocuments => Set<DigitalOps.API.Shared.Data.Entities.RagDocument>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagDocumentVersion> RagDocumentVersions => Set<DigitalOps.API.Shared.Data.Entities.RagDocumentVersion>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagDocumentSource> RagDocumentSources => Set<DigitalOps.API.Shared.Data.Entities.RagDocumentSource>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagChunkSet> RagChunkSets => Set<DigitalOps.API.Shared.Data.Entities.RagChunkSet>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagChunk> RagChunks => Set<DigitalOps.API.Shared.Data.Entities.RagChunk>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagIndexGeneration> RagIndexGenerations => Set<DigitalOps.API.Shared.Data.Entities.RagIndexGeneration>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagIndexPoint> RagIndexPoints => Set<DigitalOps.API.Shared.Data.Entities.RagIndexPoint>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagCitationSnapshot> RagCitationSnapshots => Set<DigitalOps.API.Shared.Data.Entities.RagCitationSnapshot>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagIngestionJob> RagIngestionJobs => Set<DigitalOps.API.Shared.Data.Entities.RagIngestionJob>();
+
+    public DbSet<DigitalOps.API.Shared.Data.Entities.RagIngestionError> RagIngestionErrors => Set<DigitalOps.API.Shared.Data.Entities.RagIngestionError>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

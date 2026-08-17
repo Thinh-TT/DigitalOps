@@ -5,6 +5,23 @@ using System.ComponentModel.DataAnnotations;
 
 namespace DigitalOps.API.Features.Review;
 
+public sealed record ReviewCitationResponse(
+    Guid ChunkId,
+    Guid DocumentId,
+    Guid VersionId,
+    string Title,
+    string? DocumentNumber,
+    string? DocumentType,
+    string? Issuer,
+    string SourceUrl,
+    string SourceTrustTier,
+    string SourceVersion,
+    string LegalStatus,
+    DateOnly? EffectiveFrom,
+    DateOnly? EffectiveTo,
+    bool IsEffectivityUnknown,
+    double Score);
+
 public sealed class ReviewListQuery
 {
     [FromQuery(Name = "page")]
@@ -25,6 +42,7 @@ public sealed record ReviewResponse(
     string ContentSnapshot,
     ReviewResult ReviewResult,
     IReadOnlyList<ReviewIssueResponse> ReviewIssues,
+    IReadOnlyList<ReviewCitationResponse> Citations,
     DateTime ReviewedAt,
     OutgoingDocumentStatus DocumentStatus);
 

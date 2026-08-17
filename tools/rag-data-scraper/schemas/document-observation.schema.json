@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DocumentObservation",
+  "type": "object",
+  "required": [
+    "observation_id",
+    "job_id",
+    "source_id",
+    "source_namespace",
+    "authority_namespace",
+    "document_identity_strategy",
+    "canonical_document_key",
+    "source_document_url",
+    "title",
+    "raw_artifact_uri",
+    "raw_sha256",
+    "mime_type",
+    "normalized_text_uri",
+    "normalized_text_sha256",
+    "char_count",
+    "word_count",
+    "extraction_quality",
+    "document_metadata",
+    "crawled_at"
+  ],
+  "properties": {
+    "observation_id": { "type": "string", "format": "uuid" },
+    "job_id": { "type": "string" },
+    "source_id": { "type": "string" },
+    "source_namespace": { "type": "string" },
+    "authority_namespace": { "type": ["string", "null"] },
+    "document_identity_strategy": {
+      "type": "string",
+      "enum": ["authoritative", "canonical_metadata", "source_scoped", "content_only"]
+    },
+    "canonical_document_key": { "type": "string" },
+    "source_document_url": { "type": "string" },
+    "title": { "type": "string" },
+    "raw_artifact_uri": { "type": "string" },
+    "raw_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "mime_type": { "type": "string" },
+    "normalized_text_uri": { "type": "string" },
+    "normalized_text_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "char_count": { "type": "integer", "minimum": 0 },
+    "word_count": { "type": "integer", "minimum": 0 },
+    "extraction_quality": {
+      "type": "object",
+      "required": ["status", "ocr_used", "confidence_score"],
+      "properties": {
+        "status": { "type": "string", "enum": ["clean", "ocr_fallback", "truncated", "failed"] },
+        "ocr_used": { "type": "boolean" },
+        "confidence_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "document_metadata": { "type": "object" },
+    "crawled_at": { "type": "string", "format": "date-time" }
+  }
+}

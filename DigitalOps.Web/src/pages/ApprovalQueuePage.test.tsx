@@ -116,6 +116,7 @@ function reviewFixture(): ReviewResponse {
     contentSnapshot: "Snapshot ở lần review",
     reviewResult: "Passed",
     reviewIssues: [{ ruleCode: "style", severity: "Warning", message: "Kiểm tra căn lề.", location: "Trang 1" }],
+    citations: [{ chunkId: "chunk", documentId: "document", versionId: "version", title: "Luật mẫu", documentNumber: "01/2026/QH", documentType: "Luật", issuer: "Quốc hội", sourceUrl: "https://vanban.chinhphu.vn/example", sourceTrustTier: "official", sourceVersion: "sha256:abc", legalStatus: "current", effectiveFrom: "2026-01-01", effectiveTo: null, isEffectivityUnknown: false, score: 0.92 }],
     reviewedAt: "2026-08-02T09:00:00Z",
     documentStatus: "PendingApproval",
   };

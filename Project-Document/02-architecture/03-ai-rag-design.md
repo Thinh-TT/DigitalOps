@@ -4,13 +4,15 @@
 
 | Thuộc tính                     | Giá trị                                                                                                                |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Trạng thái                     | Approved for MVP/demo — automated gates v3 đạt; Project Owner đã duyệt human review và architecture |
-| Phạm vi                        | Kiến trúc RAG/LLM local-first cho MVP/demo; không phải phê duyệt production                                           |
+| Trạng thái                     | Baseline v3 Approved for MVP/demo; mở rộng kho tham chiếu pháp luật được chấp thuận ở mức kiến trúc, chưa qua implementation/evaluation gate |
+| Phạm vi                        | Kiến trúc RAG/LLM local-first và tra cứu tham chiếu pháp luật có quản trị nguồn; không phải phê duyệt production hoặc cổng tư vấn pháp lý |
 | AI owner/người duyệt           | Project Owner                                                                                                         |
-| Ngày quyết định                | 2026-08-01                                                                                                            |
+| Ngày quyết định                | Baseline v3: 2026-08-01; mở rộng nguồn pháp luật: 2026-08-03                                                         |
 | Baseline quyết định            | `T0-00-RAG-MVP-20260801-v3-no-ram-preflight`                                                                         |
 | Trạng thái quyết định          | Approved for MVP/demo theo approval của Project Owner ngày 2026-08-01; production vẫn cần review riêng             |
+| Quyết định mở rộng             | Dùng legal corpus làm nguồn tham chiếu có trích dẫn cho FR-013; chỉ bật sau source-admission và evaluation gate mới |
 | Tài liệu liên quan             | 01-project/01-ideas-and-scope.md, 03-functional/01-functional-requirements.md, 01-database-designer.md, 02-api-spec.md |
+| Decision record                | [log-20260803-rag-legal-reference-scope-decision.md](../06-logs/session-log/log-20260803-rag-legal-reference-scope-decision.md) |
 
 Tài liệu kiến trúc local-first đã được Project Owner duyệt cho phạm vi MVP/demo
 sau khi baseline T0-00-RAG-MVP-20260801-v3-no-ram-preflight đạt toàn bộ automated
@@ -21,23 +23,40 @@ Evaluation runner v3 giữ nguyên model/digest, fixture, public API và EF sche
 các deterministic fallback, scaffold và policy không preflight RAM chỉ thuộc
 runner/evidence evaluation, không tự động mở rộng production contract.
 
+Ngày 2026-08-03, Project Owner chấp thuận mở rộng kiến trúc theo hướng kho tham
+chiếu văn bản pháp luật/hướng dẫn nghiệp vụ để hỗ trợ FR-013. Quyết định này
+chốt mục tiêu và guardrail, nhưng không coi crawler hiện có hoặc baseline v3 là
+bằng chứng feature đã sẵn sàng. Crawler chỉ tạo staging artifact; corpus chỉ được
+publish vào RAG index sau admission, provenance, version/effectivity checks và
+evaluation ở mục 8.
+
 ## 2. Phạm vi AI trong MVP
 
 | Use case                   | Vai trò dự kiến của RAG/LLM                                                                | Ràng buộc bắt buộc                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | FR-009 — Gợi ý điều phối   | Phân tích trích yếu/loại văn bản, có thể tham chiếu hồ sơ Staff và nguồn tri thức đã duyệt | Chỉ gợi ý; Văn thư luôn chọn và xác nhận người xử lý.                                            |
 | FR-012 — AI sinh nháp      | Hỗ trợ tạo bản nháp dựa trên mẫu và dữ liệu nghiệp vụ đã được phép đưa vào context         | Cán bộ chịu trách nhiệm chỉnh/sửa; chỉ lần sinh đầu được lưu AiDraftContent.                     |
-| FR-013 — Thẩm định         | Phát hiện vấn đề thể thức cùng rule xác định từ FormatRules                                | Không kết luận đúng-sai nội dung/pháp lý; kết quả phải qua luồng review hiện có.                 |
+| FR-013 — Thẩm định         | Rule xác định kiểm tra thể thức; RAG bổ sung giải thích và tham chiếu pháp luật/hướng dẫn liên quan | Chỉ rule xác định tạo `Error`; RAG chỉ tạo `Warning`/`Info`, không kết luận đúng-sai nội dung/pháp lý. |
+| Tra cứu tham chiếu pháp luật (hỗ trợ FR-013) | Truy hồi đoạn liên quan từ legal corpus đã duyệt nguồn, có metadata hiệu lực/phiên bản và citation | Chỉ là tra cứu nội bộ trong flow đã duyệt; không phải tư vấn pháp lý, cổng tìm kiếm công cộng hoặc căn cứ tự động để phê duyệt. |
 | FR-016 — Tìm kiếm toàn văn | Không dùng RAG thay thế contract search hiện tại                                           | PostgreSQL full-text search là chức năng tìm kiếm chính thức; RAG chỉ là năng lực nội bộ của AI. |
 
-AI không tự giao việc, hoàn tất văn bản, phê duyệt, phát hành hay lưu trữ. AI không được là nguồn sự thật cho trạng thái nghiệp vụ hoặc dữ liệu gốc.
+AI không tự giao việc, hoàn tất văn bản, phê duyệt, phát hành hay lưu trữ. AI
+không được là nguồn sự thật cho trạng thái nghiệp vụ, dữ liệu gốc, hiệu lực pháp
+lý hoặc kết luận thẩm định. “Tra cứu” trong quyết định này là retrieval nội bộ
+cho FR-013; một màn hình/chat/API tra cứu độc lập cần FR, API Specification và UI
+Sitemap riêng được duyệt.
 
 ## 3. Baseline kiến trúc logic
 
 ```mermaid
 flowchart LR
-    SOURCE["Nguồn dữ liệu hợp lệ"] --> INGEST["Ingestion và kiểm tra quyền"]
-    INGEST --> INDEX["Chunk/embedding/vector index"]
+    INTERNAL["Nguồn nội bộ đã duyệt"] --> SYNC["Core knowledge sync"]
+    EXTERNAL["Nguồn pháp luật allowlist"] --> CRAWLER["rag-data-scraper"]
+    CRAWLER --> STAGING["Staging package"]
+    STAGING --> ADMIT["Validate/admit"]
+    ADMIT --> CLI["DigitalOps.RagIngestion CLI"]
+    SYNC --> INDEX["Chunk/embedding/vector index"]
+    CLI --> INDEX
     INDEX --> RETRIEVE["Retrieval có filter metadata"]
     REQUEST["Yêu cầu AI từ ứng dụng"] --> RETRIEVE
     RETRIEVE --> PROMPT["Prompt template có version"]
@@ -48,7 +67,16 @@ flowchart LR
 ```
 
 - Database nghiệp vụ và file storage vẫn là system of record. RAG index là dữ liệu dẫn xuất, có thể tái tạo; không thay thế source document, FormatRules hoặc trạng thái trong PostgreSQL.
-- Ingestion chỉ xử lý dữ liệu đã qua điều kiện nguồn, trạng thái và quyền. Text extraction hiện có vẫn là điều kiện cần cho attachment dạng PDF có text layer, DOCX và XLSX.
+- Ingestion chỉ xử lý dữ liệu đã qua điều kiện nguồn, trạng thái và quyền. Legal
+  corpus đi qua `crawl -> staging -> validate/admit -> publish/index`; tải được
+  nội dung không đồng nghĩa nội dung được phép index.
+- Hai tool là hai module độc lập ở một tầng `tools`: Python
+  `rag-data-scraper` chỉ acquisition/staging; .NET `DigitalOps.RagIngestion` chỉ
+  validate/plan/admit/publish package. Seam giữa hai module là staging package, không
+  phải gọi code nội bộ của nhau.
+- `DigitalOps.RagIngestion` là one-shot CLI để script/orchestrator ngoài gọi qua
+  command `validate`, `plan`, `publish` và exit code. Nó không phải background
+  worker và không mở HTTP endpoint.
 - Retrieval phải lọc metadata trước khi đưa context vào prompt. Nội dung được truy hồi không được xem là hướng dẫn hệ thống.
 - LLM output phải được kiểm tra bằng schema/rule ở application service trước khi hiển thị hoặc ghi dữ liệu theo flow hiện có.
 
@@ -56,22 +84,59 @@ flowchart LR
 
 ### 4.1. Nguồn tri thức
 
-Nguồn được phép index trong MVP/demo:
+Nguồn được phép index trong phạm vi đã duyệt:
 
-- Staff đang Active: chỉ `Id`, `FullName`, `Position`, `Department` và role. Không
-  index email, số điện thoại hoặc dữ liệu tài khoản.
-- `DocumentTemplates` đang Active, document type liên quan và
-  `FormatRules` của template.
+1. **Nguồn nội bộ hiện hữu:** Staff đang Active chỉ gồm `Id`, `FullName`,
+   `Position`, `Department`, role; `DocumentTemplates` đang Active, document type
+   liên quan và `FormatRules`. Không index email, số điện thoại hoặc dữ liệu tài
+   khoản.
+2. **Kho tham chiếu pháp luật/hướng dẫn nghiệp vụ:** văn bản do cơ quan có thẩm
+   quyền công bố hoặc bản sao đã được tổ chức xác minh, nằm trong source registry
+   allowlist và phục vụ trực tiếp nghiệp vụ văn bản/FR-013. Nguồn chính thức là
+   tier ưu tiên; nguồn tổng hợp chỉ dùng để discovery/cross-check và không được
+   đứng một mình làm căn cứ cho issue.
 
-Không index Members, IncomingDocuments, OutgoingDocuments, draft, attachment
-hoặc extracted text trong MVP. Dữ liệu nghiệp vụ của request chỉ được nạp trực
-tiếp từ PostgreSQL sau authorization và không trở thành knowledge source dùng
-chung.
+Mỗi legal document trước khi publish phải có tối thiểu:
+
+- `sourceId`, `sourceUrl`, `sourceDomain`, `sourceTrustTier`, `retrievedAt`,
+  `contentHash`, `sourceVersion` và ngôn ngữ;
+- tên/số hiệu/loại văn bản, cơ quan ban hành, ngày ban hành;
+- trạng thái hiệu lực cùng `effectiveFrom`, `effectiveTo` khi xác định được;
+- quan hệ sửa đổi, bổ sung, thay thế hoặc bị thay thế khi nguồn cung cấp;
+- kết quả validation, extractor version và package/job provenance để có thể
+  audit, tái tạo hoặc rollback.
+
+Nếu thiếu hoặc mâu thuẫn metadata hiệu lực/phiên bản, tài liệu được giữ ở
+staging/quarantine hoặc chỉ được truy hồi với cờ `statusUnknown`; hệ thống phải
+abstain thay vì trình bày như nguồn đang có hiệu lực. Redirect, domain phụ,
+attachment và file OCR/convert không tự kế thừa độ tin cậy nếu chưa qua cùng
+policy.
+
+Crawler trong `tools/rag-data-scraper` là công cụ acquisition/staging, không phải
+nguồn sự thật và không được tự publish trực tiếp vào collection production.
+Source registry, robots/điều khoản truy cập, allowlist, tần suất crawl, size/rate
+limit và người duyệt nguồn là cấu hình quản trị bắt buộc.
+
+PostgreSQL có derived ingestion catalog được tạo bởi migrations
+`AddRagIngestionSchema` và `AddLegalRagGovernance` để lưu
+document/version/source/chunk/index generation, legal/effectivity fields,
+admission audit, job/error và citation snapshot. `DigitalOps.RagIngestion`
+cưỡng chế registry + digest-bound `admission.json` trước publish; các bảng vẫn
+chỉ phục vụ provenance, resume, audit và liên kết Qdrant, không biến bản crawl
+thành văn bản pháp lý chính thức.
+
+Không index Members, IncomingDocuments, OutgoingDocuments, draft hoặc attachment
+nghiệp vụ vào knowledge source dùng chung trong phạm vi này. Dữ liệu nghiệp vụ
+của request chỉ được nạp trực tiếp từ PostgreSQL sau authorization. Quyết định
+mở rộng chỉ áp dụng cho external legal corpus đã được admission, không hợp thức
+hóa việc cào/index web tùy ý.
 
 ### 4.2. Đồng bộ và phiên bản
 
 - Mỗi point có `sourceType`, `sourceId`, `sourceVersion`, `chunkId`, content hash,
-  `isActive`, `accessScope` và thời điểm index.
+  `isActive`, `accessScope` và thời điểm index. Point thuộc legal corpus còn phải
+  mang `sourceTrustTier`, trạng thái/đường thời gian hiệu lực và quan hệ thay thế
+  đủ để retrieval filter hoặc cảnh báo.
 - Thay đổi nội dung, trạng thái hoặc quyền phải upsert/invalidate source; thay
   embedding model/dimension phải re-embed toàn bộ collection.
 - Metadata/permission filter chạy trước retrieval. Sau retrieval, application
@@ -89,6 +154,9 @@ chung.
 5. **Provider governance:** trước production, AI team xác nhận điều khoản lưu/huấn luyện dữ liệu, vùng xử lý, retention, API key management, quota và phương án provider outage.
 6. **Lỗi an toàn:** timeout/lỗi provider hoặc pipeline trả 503 theo API Specification; không thay đổi Content, AiDraftContent, assignment, status, ReviewHistory hoặc dữ liệu gốc.
 7. **Rule trước AI khi phù hợp:** FormatRules có thể kiểm tra xác định phải được thực thi độc lập. RAG/LLM chỉ bổ sung phát hiện/giải thích, không thay thế constraint hay business rule.
+8. **Citation bắt buộc cho legal corpus:** mọi nhận định tham chiếu pháp luật phải chỉ ra tài liệu/chunk, số hiệu hoặc tên, cơ quan ban hành, phiên bản/trạng thái đã truy hồi và URL nguồn. Không có nguồn đạt ngưỡng thì abstain.
+9. **Ưu tiên nguồn và thời gian:** retrieval ưu tiên nguồn chính thức, phiên bản phù hợp ngày nghiệp vụ và loại bản đã còn hiệu lực khi câu hỏi yêu cầu hiện hành; nguồn cũ vẫn có thể dùng cho hồ sơ lịch sử nếu nêu rõ mốc thời gian.
+10. **Chống knowledge poisoning:** staging validation, content hash, duplicate/version detection, source allowlist và publish approval tách rời crawler. Một crawl thành công không tự làm thay đổi corpus đang phục vụ người dùng.
 
 ## 6. Quyết định kiến trúc T0-00
 
@@ -96,7 +164,8 @@ Baseline official hiện tại là `T0-00-RAG-MVP-20260801-v3-no-ram-preflight`.
 Các baseline v1/v2 là evidence lịch sử, không được trộn metric vào baseline v3.
 Mọi thay đổi model/digest, embedding, dimension, vector store, nguồn index,
 prompt contract, SLO, gate hoặc fixture cần quyết định bằng văn bản của Project
-Owner, baseline ID mới và một lượt chạy lại đủ 45 ca. Runbook bàn giao lịch sử nằm tại
+Owner và baseline ID mới. Phần mở rộng legal corpus phải chạy lại 45 ca regression
+của baseline v3 cùng fixture pháp luật bổ sung ở mục 8. Runbook bàn giao lịch sử nằm tại
 [`t0-00-handoff.md`](../06-logs/ai-evaluation/t0-00-handoff.md).
 
 ### 6.1. Provider, model và vector store
@@ -115,14 +184,23 @@ Owner, baseline ID mới và một lượt chạy lại đủ 45 ca. Runbook bà
 - Staff là một point cho mỗi record. FormatRules là một point cho mỗi rule.
   Template chia theo heading; chunk tối đa 512 token, overlap 64 token khi phải
   chia.
+- Văn bản pháp luật chia ưu tiên theo cấu trúc điều/khoản/điểm/phụ lục; không
+  trộn hai điều độc lập vào một chunk nếu còn có thể giữ dưới token budget.
+  Heading path, số điều/khoản và metadata phiên bản/hiệu lực được lặp lại trong
+  metadata của từng chunk, không suy ra chỉ từ nội dung tự do.
 - Collection dùng vector 1024 chiều và cosine distance. Retrieval dùng
   `top-k = 5`, không reranker, filter source type/trạng thái/quyền trước query.
 - `MinScore` official được chốt từ baseline v3 là `0.316666`, tạo zero
   false-positive trên các ca không đủ dữ liệu trong khi Recall@5 đạt 100%.
 - `0.320682` là giá trị provisional của baseline v1, chỉ giữ trong log lịch sử;
   không dùng làm cấu hình Approved.
-- Citation nội bộ có `sourceType`, `sourceId`, `sourceVersion` và `chunkId`.
-  Không expose citation hoặc raw RAG payload qua public API trong MVP.
+- Citation nội bộ có `sourceType`, `sourceId`, `sourceVersion`, `chunkId`,
+  `sourceUrl`, `sourceTrustTier` và legal metadata cần thiết để người dùng đối
+  chiếu.
+  Không expose raw RAG payload. Review contract chỉ expose tập citation tối thiểu
+  đã định nghĩa trong API Specification và UI Sitemap; không tạo endpoint RAG
+  tổng quát. Mỗi review lưu immutable citation snapshot để lịch sử không bị đổi
+  khi corpus refresh.
 
 ### 6.3. Prompt, output và vận hành
 
@@ -148,28 +226,40 @@ Internal output schema:
   reason và internal source references. `confidence` giữ null cho đến khi có bộ
   dữ liệu hiệu chỉnh; không dùng self-confidence của LLM như xác suất.
 - Draft trả content và internal source references.
-- Review trả issue và internal source references. Chỉ rule xác định được tạo
-  severity `Error`; LLM chỉ tạo `Warning`/`Info` và không kết luận pháp lý.
+- Review trả issue và internal source references. Issue dùng legal corpus phải
+  có citation đầy đủ và cờ trạng thái hiệu lực/không xác định. Chỉ rule xác định
+  được tạo severity `Error`; LLM chỉ tạo `Warning`/`Info` và không kết luận pháp
+  lý.
 
 ## 7. Tích hợp với ứng dụng hiện tại
 
-### 7.1. Giữ nguyên public contract
+### 7.1. Giữ nguyên endpoint, mở rộng review response có kiểm soát
 
-Không có endpoint RAG public trong MVP. Các endpoint hiện tại cho assignment suggestion, AI draft và review vẫn là contract duy nhất. RAG/LLM là implementation detail phía server.
+Không có endpoint RAG public trong MVP. Các endpoint hiện tại cho assignment
+suggestion, AI draft và review vẫn là contract duy nhất; `ReviewResponse` được
+mở rộng trường `citations` đã snapshot để người duyệt đối chiếu. RAG/LLM và raw
+retrieval payload vẫn là implementation detail phía server.
 
 | Tác vụ          | Input/output nghiệp vụ đã có               | Quy tắc tích hợp                                                                          |
 | --------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | Gợi ý điều phối | SuggestedStaffId, reason, confidence       | Kiểm tra Staff Active; chỉ cập nhật gợi ý mới nhất khi service thành công; confidence giữ null trong MVP. |
 | Sinh nháp       | Content/AiDraftContent                     | Không ghi đè nội dung đang chỉnh; lần sinh đầu lưu AiDraftContent theo Database Designer. |
-| Review          | ReviewIssues, ReviewHistory, review result | Kiểm tra output schema và FormatRules; thêm history cùng transaction trạng thái.          |
+| Review          | ReviewIssues, ReviewHistory, review result, citations | Kiểm tra output schema và FormatRules; thêm history + immutable citation snapshot cùng transaction trạng thái. |
 
-Source reference/citation của RAG là dữ liệu nội bộ/audit cho đến khi API Specification được phê duyệt thay đổi để expose nó.
+Citation public tối thiểu tuân theo `02-api-spec.md`; chunk text, prompt, vector,
+provider response và admission receipt đầy đủ không được trả ra frontend.
 
 ### 7.2. Ranh giới triển khai
 
 - Backend gọi RAG orchestration qua interface/service riêng, không để controller hoặc React gọi trực tiếp LLM/vector store.
 - Provider credentials chỉ nằm ở server-side secret/configuration; frontend không nhận API key hoặc raw provider response.
 - Full-text search của FR-016 tiếp tục dùng index PostgreSQL hiện có. Việc chọn vector store không được làm thay đổi endpoint hoặc kết quả search hiện hành nếu chưa có tài liệu/API mới được duyệt.
+- `tools/rag-data-scraper` và `tools/DigitalOps.RagIngestion` chạy ngoài process
+  core API. Core API không spawn crawler/CLI trong request path; scheduler,
+  operator hoặc pipeline ngoài có thể gọi CLI bằng contract command/exit code.
+- Không tách thêm library/HTTP service chỉ để bọc ingestion trong MVP. Một project
+  CLI giữ toàn bộ implementation; staging package là interface ổn định duy nhất
+  giữa acquisition và publication.
 
 ### 7.3. Hai provider trong môi trường Development
 
@@ -204,6 +294,23 @@ thiếu hoặc mâu thuẫn bằng chứng và prompt injection.
 | Review | Rule xác định đúng 12/12; không có Passed chứa Error; AI không kết luận nội dung/pháp lý. |
 | SLO/resource | Đạt p95/timeout/RAM ở mục 6.3 trên máy Windows 16 GB CPU-first. |
 
+Legal corpus là thay đổi tập nguồn và rủi ro, nên **không kế thừa trạng thái
+Approved chỉ từ 45 ca v3**. Baseline mới phải giữ toàn bộ 45 ca regression và có
+fixture pháp luật được Project Owner duyệt, tối thiểu bao phủ:
+
+- citation trỏ đúng document/chunk và URL nguồn; không bịa số hiệu/điều khoản;
+- ưu tiên nguồn chính thức trước nguồn tổng hợp và abstain khi chỉ còn nguồn yếu;
+- phiên bản đang hiệu lực, văn bản hết hiệu lực, văn bản bị thay thế/sửa đổi và
+  câu hỏi theo mốc thời gian;
+- duplicate/cross-domain copy, metadata mâu thuẫn, prompt injection trong tài
+  liệu, tài liệu OCR lỗi và không đủ bằng chứng;
+- FR-013 vẫn deterministic với FormatRules: legal retrieval không tự sinh
+  `Error`, không tự đổi Passed/Failed và failure không mutation dữ liệu.
+
+Trước khi fixture mới đạt 100% citation/schema/safety cases và ngưỡng retrieval
+được chốt bằng baseline ID mới, legal corpus chỉ ở staging/validate-only; không
+được dùng để tuyên bố demo/production sẵn sàng.
+
 Baseline `T0-00-RAG-MVP-20260801-v3-no-ram-preflight` đã chạy đủ 45 ca trên
 `LAPTOP-A07DUJIR` với một model resident tại một thời điểm. Kết quả đạt toàn bộ
 automated gate: schema 100%, assignment 100%, draft 9/9, review 12/12,
@@ -227,9 +334,41 @@ Mỗi lượt dùng làm evidence phải chạy đủ 45 ca trên cùng một th
 runtime; không ghép metric giữa nhiều máy hoặc nhiều lượt. Log cũ là evidence
 bất biến; mỗi thiết bị/lượt chạy tạo session log mới.
 
-## 9. Ngoài phạm vi approval MVP/demo
+## 9. Ranh giới phạm vi và điều kiện mở rộng
 
-- Không cấu hình hoặc tuyên bố production-ready dựa trên approval này.
-- Không định nghĩa database table, EF migration, public endpoint hoặc UI RAG mới.
-- Không thay PostgreSQL full-text search bằng semantic search.
-- Không OCR ảnh/PDF scan, không tự động điều phối/phê duyệt và không dùng AI để kết luận pháp lý/nội dung.
+Quyết định 2026-08-03 **chỉ** đưa kho tham chiếu pháp luật có quản trị nguồn vào
+kiến trúc RAG để hỗ trợ flow FR-013. Nó không tự cấp quyền mở rộng sản phẩm hoặc
+coi tất cả khả năng của crawler là yêu cầu của DigitalOps.
+
+Trong ranh giới hiện tại:
+
+- Crawler được phép thu thập vào staging từ source registry/allowlist;
+  `DigitalOps.RagIngestion publish` là bước riêng có validation, provenance và
+  approval. `validate`/`plan` không gọi mạng và không ghi DB/Qdrant.
+- FR-013 có thể nhận `Warning`/`Info` kèm citation để cán bộ đối chiếu. FormatRules
+  vẫn quyết định `Error` và Passed/Failed.
+- PostgreSQL full-text search tiếp tục là contract FR-016 cho văn bản nghiệp vụ;
+  legal semantic retrieval là implementation detail của AI.
+- OCR/convert trong scraper chỉ là kỹ thuật acquisition cho legal staging, không
+  thay đổi contract attachment/text-extraction của core app.
+
+Ngoài phạm vi quyết định này:
+
+- Cổng/chat/API tra cứu pháp luật độc lập cho người dùng hoặc công chúng; muốn có
+  phải bổ sung Functional Requirement, API Specification, UI Sitemap, quyền và
+  audit contract rồi mới triển khai.
+- Tư vấn pháp lý, tự xác nhận hiệu lực/tính hợp pháp, tự phê duyệt hoặc dùng AI
+  thay người có thẩm quyền.
+- Crawler web tổng quát, crawl ngoài allowlist, vượt robots/điều khoản truy cập,
+  đăng nhập/captcha hoặc mua/né quyền truy cập dữ liệu.
+- Cam kết legal corpus đầy đủ toàn quốc, luôn cập nhật tức thời hoặc thay thế cơ
+  sở dữ liệu/phát hành chính thức.
+- Hai migration derived catalog `AddRagIngestionSchema` và
+  `AddLegalRagGovernance`, cùng phần mở rộng citation của review API/UI, là phạm
+  vi T4-03 đã được đồng bộ trong Database Designer/API Specification/UI Sitemap.
+  Không thêm endpoint tra cứu RAG hoặc schema nghiệp vụ khác nếu chưa có contract
+  và task riêng được duyệt. Phần code này không được hiểu là evaluation gate đã
+  hoàn tất.
+- Tuyên bố production-ready từ baseline v3. TLS/auth, backup/restore, HA,
+  monitoring, capacity, retention/governance, source refresh/rollback và secret
+  rotation vẫn cần production review riêng.

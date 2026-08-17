@@ -124,6 +124,10 @@ public sealed record FormatRuleKnowledgeCandidate(
     string Content,
     double Score);
 
+public sealed record RagChunkKnowledgeCandidate(
+    Guid QdrantPointId,
+    double Score);
+
 public interface IQdrantKnowledgeClient
 {
     Task EnsureCollectionAsync(CancellationToken cancellationToken = default);
@@ -176,6 +180,14 @@ public interface IQdrantKnowledgeClient
         Guid templateId,
         string documentTypeCode,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RagChunkKnowledgeCandidate>> SearchRagChunksAsync(
+        float[] queryVector,
+        int limit,
+        double minScore,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RagChunkKnowledgeCandidate>>(
+            Array.Empty<RagChunkKnowledgeCandidate>());
 }
 
 public interface IAiOperationGate

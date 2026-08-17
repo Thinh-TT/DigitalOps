@@ -729,6 +729,770 @@ namespace DigitalOps.API.Shared.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagChunk", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("chunk_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.PrimitiveCollection<string[]>("AllowedRoles")
+                        .IsRequired()
+                        .HasColumnType("character varying(64)[]")
+                        .HasColumnName("allowed_roles");
+
+                    b.Property<int>("CharacterEnd")
+                        .HasColumnType("integer")
+                        .HasColumnName("character_end");
+
+                    b.Property<int>("CharacterStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("character_start");
+
+                    b.Property<int>("ChunkIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("chunk_index");
+
+                    b.Property<Guid>("ChunkSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("chunk_set_id");
+
+                    b.Property<string>("ContentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("content_sha256")
+                        .IsFixedLength();
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.PrimitiveCollection<string[]>("DeniedRoles")
+                        .IsRequired()
+                        .HasColumnType("character varying(64)[]")
+                        .HasColumnName("denied_roles");
+
+                    b.Property<string>("HeadingPath")
+                        .HasColumnType("text")
+                        .HasColumnName("heading_path");
+
+                    b.PrimitiveCollection<int[]>("PageNumbers")
+                        .IsRequired()
+                        .HasColumnType("integer[]")
+                        .HasColumnName("page_numbers");
+
+                    b.Property<string>("SecurityClassification")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("internal")
+                        .HasColumnName("security_classification");
+
+                    b.Property<string>("StructureMetadataJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("structure_metadata");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<int>("TokenCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("token_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_chunks");
+
+                    b.HasIndex("ChunkSetId", "ChunkIndex")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rag_chunks_set_index");
+
+                    b.HasIndex("ChunkSetId", "ContentSha256")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rag_chunks_set_hash");
+
+                    b.ToTable("rag_chunks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_chunks_offsets", "character_start >= 0 AND character_end > character_start");
+
+                            t.HasCheckConstraint("ck_rag_chunks_token_count", "token_count > 0 AND token_count <= 512");
+                        });
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagChunkSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("chunk_set_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ChunkerVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("chunker_version");
+
+                    b.Property<string>("ChunkingStrategy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("chunking_strategy");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int?>("MaxTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_tokens");
+
+                    b.Property<int>("OverlapTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("overlap_tokens");
+
+                    b.Property<int?>("SoftMaxTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("soft_max_tokens");
+
+                    b.Property<int>("TargetTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_tokens");
+
+                    b.Property<string>("TokenizerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("tokenizer_name");
+
+                    b.Property<int>("TotalChunks")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_chunks");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_chunk_sets");
+
+                    b.HasIndex("VersionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rag_chunk_sets_version_id");
+
+                    b.ToTable("rag_chunk_sets", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_chunk_sets_limits", "target_tokens > 0 AND overlap_tokens >= 0 AND overlap_tokens < target_tokens AND (soft_max_tokens IS NULL OR (soft_max_tokens >= target_tokens AND soft_max_tokens <= 512)) AND (max_tokens IS NULL OR (max_tokens >= COALESCE(soft_max_tokens, target_tokens) AND max_tokens <= 512)) AND total_chunks > 0");
+                        });
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagCitationSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("BusinessEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("business_entity_id");
+
+                    b.Property<string>("BusinessEntityType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("business_entity_type");
+
+                    b.Property<string>("CitationPayloadJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("citation_payload");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("QueryText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("query_text");
+
+                    b.PrimitiveCollection<Guid[]>("RetrievedChunkIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("retrieved_chunk_ids");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_citation_snapshots");
+
+                    b.ToTable("rag_citation_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid?>("ActiveChunkSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("active_chunk_set_id");
+
+                    b.Property<Guid?>("ActiveVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("active_version_id");
+
+                    b.Property<string>("AuthorityNamespace")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("authority_namespace");
+
+                    b.Property<string>("CanonicalDocumentKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("canonical_document_key");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DocumentIdentityStrategy")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("document_identity_strategy");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_documents");
+
+                    b.HasIndex("ActiveChunkSetId")
+                        .HasDatabaseName("ix_rag_documents_active_chunk_set_id");
+
+                    b.HasIndex("ActiveVersionId")
+                        .HasDatabaseName("ix_rag_documents_active_version_id");
+
+                    b.HasIndex("CanonicalDocumentKey")
+                        .IsUnique()
+                        .HasDatabaseName("idx_rag_docs_canonical_key");
+
+                    b.ToTable("rag_documents", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocumentSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_mapping_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("AdmissionApprovedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("admission_approved_at");
+
+                    b.Property<string>("AdmissionApprovedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("admission_approved_by");
+
+                    b.Property<string>("AdmissionReference")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("admission_reference");
+
+                    b.Property<string>("CorpusType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("general")
+                        .HasColumnName("corpus_type");
+
+                    b.Property<DateTime>("CrawledAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("crawled_at");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("PublishPolicy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("blocked")
+                        .HasColumnName("publish_policy");
+
+                    b.Property<string>("RegistryEntryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("registry_entry_id");
+
+                    b.Property<string>("RegistryVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("registry_version");
+
+                    b.Property<string>("SourceDocumentUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("source_document_url");
+
+                    b.Property<string>("SourceDomain")
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("source_domain");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_id");
+
+                    b.Property<string>("SourceNamespace")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_namespace");
+
+                    b.Property<string>("SourceTrustTier")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("unverified")
+                        .HasColumnName("source_trust_tier");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_document_sources");
+
+                    b.HasIndex("DocumentId")
+                        .HasDatabaseName("ix_rag_document_sources_document_id");
+
+                    b.HasIndex("CorpusType", "SourceTrustTier")
+                        .HasDatabaseName("idx_rag_doc_sources_corpus_trust");
+
+                    b.HasIndex("VersionId", "SourceId", "SourceDocumentUrl")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rag_doc_sources_version_source_url");
+
+                    b.ToTable("rag_document_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_document_sources_corpus", "corpus_type IN ('general', 'legal_reference')");
+
+                            t.HasCheckConstraint("ck_rag_document_sources_publish_policy", "publish_policy IN ('authoritative', 'verified_copy', 'cross_check_only', 'blocked')");
+
+                            t.HasCheckConstraint("ck_rag_document_sources_trust", "source_trust_tier IN ('official', 'verified_copy', 'aggregator', 'unverified')");
+
+                            t.HasCheckConstraint("ck_rag_document_sources_trust_policy_pair", "(source_trust_tier = 'official' AND publish_policy = 'authoritative') OR (source_trust_tier = 'verified_copy' AND publish_policy = 'verified_copy') OR (source_trust_tier = 'aggregator' AND publish_policy = 'cross_check_only') OR (source_trust_tier = 'unverified' AND publish_policy = 'blocked')");
+                        });
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocumentVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("CharCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("char_count");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("document_number");
+
+                    b.Property<string>("DocumentType")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("document_type");
+
+                    b.Property<DateOnly?>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateOnly?>("EffectiveTo")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_to");
+
+                    b.Property<string>("ExtractionQualityJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("extraction_quality");
+
+                    b.Property<DateOnly?>("IssuedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_date");
+
+                    b.Property<string>("Issuer")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("language");
+
+                    b.Property<string>("LegalStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("status_unknown")
+                        .HasColumnName("legal_status");
+
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("mime_type");
+
+                    b.Property<string>("NormalizedTextSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("normalized_text_sha256")
+                        .IsFixedLength();
+
+                    b.Property<string>("NormalizedTextUri")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("normalized_text_uri");
+
+                    b.Property<string>("RawArtifactUri")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("raw_artifact_uri");
+
+                    b.Property<string>("RawSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("raw_sha256")
+                        .IsFixedLength();
+
+                    b.Property<string>("SourceVersion")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_version");
+
+                    b.Property<int>("WordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("word_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_document_versions");
+
+                    b.HasIndex("DocumentId")
+                        .HasDatabaseName("idx_rag_doc_versions_doc_id");
+
+                    b.HasIndex("DocumentId", "NormalizedTextSha256")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rag_doc_versions_document_hash");
+
+                    b.ToTable("rag_document_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_document_versions_effectivity", "effective_from IS NULL OR effective_to IS NULL OR effective_from <= effective_to");
+
+                            t.HasCheckConstraint("ck_rag_document_versions_legal_status", "legal_status IN ('current', 'expired', 'repealed', 'superseded', 'status_unknown')");
+                        });
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIndexGeneration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("index_generation_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("activated_at");
+
+                    b.Property<string>("CollectionName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("collection_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DistanceMetric")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("distance_metric");
+
+                    b.Property<int>("EmbeddingDimension")
+                        .HasColumnType("integer")
+                        .HasColumnName("embedding_dimension");
+
+                    b.Property<string>("EmbeddingModel")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("embedding_model");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_index_generations");
+
+                    b.ToTable("rag_index_generations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_index_generations_status", "status IN ('building', 'active', 'retired', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIndexPoint", b =>
+                {
+                    b.Property<Guid>("PointId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("point_id");
+
+                    b.Property<Guid>("ChunkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("chunk_id");
+
+                    b.Property<Guid>("ChunkSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("chunk_set_id");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<Guid>("IndexGenerationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("index_generation_id");
+
+                    b.Property<DateTime?>("IndexedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("indexed_at");
+
+                    b.Property<Guid>("QdrantPointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("qdrant_point_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("PointId")
+                        .HasName("pk_rag_index_points");
+
+                    b.HasIndex("ChunkId")
+                        .HasDatabaseName("ix_rag_index_points_chunk_id");
+
+                    b.HasIndex("QdrantPointId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rag_index_points_qdrant_point_id");
+
+                    b.HasIndex("IndexGenerationId", "ChunkId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rag_index_points_generation_chunk");
+
+                    b.ToTable("rag_index_points", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_index_points_status", "status IN ('pending', 'indexed', 'failed', 'deleted')");
+                        });
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIngestionError", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("error_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("JobId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("job_id");
+
+                    b.Property<string>("StackTrace")
+                        .HasColumnType("text")
+                        .HasColumnName("stack_trace");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("stage");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rag_ingestion_errors");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_rag_ingestion_errors_job_id");
+
+                    b.ToTable("rag_ingestion_errors", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIngestionJob", b =>
+                {
+                    b.Property<string>("JobId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("job_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("ErrorSummary")
+                        .HasColumnType("text")
+                        .HasColumnName("error_summary");
+
+                    b.Property<int>("FailedObservations")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("failed_observations");
+
+                    b.Property<int>("ProcessedObservations")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("processed_observations");
+
+                    b.Property<string>("StagingDirectory")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("staging_directory");
+
+                    b.Property<DateTime>("StartedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("started_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalObservations")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("total_observations");
+
+                    b.HasKey("JobId")
+                        .HasName("pk_rag_ingestion_jobs");
+
+                    b.ToTable("rag_ingestion_jobs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rag_ingestion_jobs_status", "status IN ('running', 'completed', 'failed')");
+                        });
+                });
+
             modelBuilder.Entity("DigitalOps.API.Shared.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1209,6 +1973,115 @@ namespace DigitalOps.API.Shared.Data.Migrations
                     b.Navigation("OutgoingDocument");
 
                     b.Navigation("ReviewedByStaff");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagChunk", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagChunkSet", "ChunkSet")
+                        .WithMany()
+                        .HasForeignKey("ChunkSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_chunks_rag_chunk_sets_chunk_set_id");
+
+                    b.Navigation("ChunkSet");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagChunkSet", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagDocumentVersion", "Version")
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_chunk_sets_rag_document_versions_version_id");
+
+                    b.Navigation("Version");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocument", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagChunkSet", "ActiveChunkSet")
+                        .WithMany()
+                        .HasForeignKey("ActiveChunkSetId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_rag_documents_rag_chunk_sets_active_chunk_set_id");
+
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagDocumentVersion", "ActiveVersion")
+                        .WithMany()
+                        .HasForeignKey("ActiveVersionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_rag_documents_rag_document_versions_active_version_id");
+
+                    b.Navigation("ActiveChunkSet");
+
+                    b.Navigation("ActiveVersion");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocumentSource", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagDocument", "Document")
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_document_sources_rag_documents_document_id");
+
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagDocumentVersion", "Version")
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_document_sources_rag_document_versions_version_id");
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Version");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagDocumentVersion", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagDocument", "Document")
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_document_versions_rag_documents_document_id");
+
+                    b.Navigation("Document");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIndexPoint", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagChunk", "Chunk")
+                        .WithMany()
+                        .HasForeignKey("ChunkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_index_points_rag_chunks_chunk_id");
+
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagIndexGeneration", "IndexGeneration")
+                        .WithMany()
+                        .HasForeignKey("IndexGenerationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_index_points_rag_index_generations_index_generation_id");
+
+                    b.Navigation("Chunk");
+
+                    b.Navigation("IndexGeneration");
+                });
+
+            modelBuilder.Entity("DigitalOps.API.Shared.Data.Entities.RagIngestionError", b =>
+                {
+                    b.HasOne("DigitalOps.API.Shared.Data.Entities.RagIngestionJob", "IngestionJob")
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rag_ingestion_errors_rag_ingestion_jobs_job_id");
+
+                    b.Navigation("IngestionJob");
                 });
 
             modelBuilder.Entity("DigitalOps.API.Shared.Identity.Staff", b =>
