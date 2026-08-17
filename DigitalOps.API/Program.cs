@@ -10,6 +10,7 @@ using DigitalOps.API.Features.Members;
 using DigitalOps.API.Features.OutgoingDocuments;
 using DigitalOps.API.Features.Reminders;
 using DigitalOps.API.Features.Review;
+using DigitalOps.API.Features.Search;
 using DigitalOps.API.Features.StaffManagement;
 using DigitalOps.API.Shared.Data;
 using DigitalOps.API.Shared.Errors;
@@ -90,6 +91,7 @@ builder.Services.AddScoped<IOutgoingDocumentService, OutgoingDocumentService>();
 builder.Services.AddScoped<IDocumentReviewGenerator, DocumentReviewGenerator>();
 builder.Services.AddScoped<IOutgoingDocumentReviewService, OutgoingDocumentReviewService>();
 builder.Services.AddScoped<IOutgoingDocumentApprovalService, OutgoingDocumentApprovalService>();
+builder.Services.AddScoped<IDocumentSearchService, DocumentSearchService>();
 builder.Services
     .AddOptions<ReminderWorkerOptions>()
     .Bind(builder.Configuration.GetSection(ReminderWorkerOptions.SectionName))
@@ -108,6 +110,16 @@ builder.Services.AddSingleton<
     AttachmentStorageOptionsValidator>();
 builder.Services.AddSingleton<IAttachmentStorage, LocalAttachmentStorage>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
+builder.Services.AddSingleton<IAttachmentTextExtractor, AttachmentTextExtractor>();
+builder.Services.AddScoped<IAttachmentExtractionProcessor, AttachmentExtractionProcessor>();
+builder.Services
+    .AddOptions<TextExtractionWorkerOptions>()
+    .Bind(builder.Configuration.GetSection(TextExtractionWorkerOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<
+    IValidateOptions<TextExtractionWorkerOptions>,
+    TextExtractionWorkerOptionsValidator>();
+builder.Services.AddHostedService<TextExtractionWorker>();
 builder.Services
     .AddOptions<DocumentCatalogSeedOptions>()
     .Bind(builder.Configuration.GetSection(DocumentCatalogSeedOptions.SectionName));

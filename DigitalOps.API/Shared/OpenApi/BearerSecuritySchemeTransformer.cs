@@ -32,6 +32,24 @@ public sealed class BearerSecuritySchemeTransformer :
             Description = "Enter a JWT access token."
         };
 
+        if (document.Components.Schemas is not null)
+        {
+            foreach (var (_, schema) in document.Components.Schemas)
+            {
+                if (schema is OpenApiSchema openApiSchema && openApiSchema.Enum is not null)
+                {
+                    for (var i = openApiSchema.Enum.Count - 1; i >= 0; i--)
+                    {
+                        var enumItem = openApiSchema.Enum[i];
+                        if (enumItem is null || enumItem.ToString() == "null")
+                        {
+                            openApiSchema.Enum.RemoveAt(i);
+                        }
+                    }
+                }
+            }
+        }
+
         return Task.CompletedTask;
     }
 

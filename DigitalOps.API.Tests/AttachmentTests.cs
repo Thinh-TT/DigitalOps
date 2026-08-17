@@ -168,139 +168,139 @@ public sealed class AttachmentServiceTests
                 "../escape.pdf",
                 new MemoryStream(PdfBytes)));
     }
+}
 
-    private sealed class AttachmentTestDatabase : IAsyncDisposable
+internal sealed class AttachmentTestDatabase : IAsyncDisposable
+{
+    private readonly SqliteConnection _connection;
+
+    private AttachmentTestDatabase(
+        SqliteConnection connection,
+        DigitalOpsDbContext context,
+        string rootPath,
+        LocalAttachmentStorage storage,
+        AttachmentService service)
     {
-        private readonly SqliteConnection _connection;
-
-        private AttachmentTestDatabase(
-            SqliteConnection connection,
-            DigitalOpsDbContext context,
-            string rootPath,
-            LocalAttachmentStorage storage,
-            AttachmentService service)
-        {
-            _connection = connection;
-            Context = context;
-            RootPath = rootPath;
-            Storage = storage;
-            Service = service;
-        }
-
-        public DigitalOpsDbContext Context { get; }
-
-        public string RootPath { get; }
-
-        public LocalAttachmentStorage Storage { get; }
-
-        public AttachmentService Service { get; }
-
-        public static async Task<AttachmentTestDatabase> CreateAsync()
-        {
-            var connection = new SqliteConnection("Data Source=:memory:");
-            await connection.OpenAsync();
-            var context = new DigitalOpsDbContext(
-                new DbContextOptionsBuilder<DigitalOpsDbContext>()
-                    .UseSqlite(connection)
-                    .ReplaceService<IModelCustomizer, AuthenticationTestModelCustomizer>()
-                    .Options);
-            await context.Database.EnsureCreatedAsync();
-
-            var rootPath = Path.Combine(
-                Path.GetTempPath(),
-                "digitalops-attachment-tests",
-                Guid.NewGuid().ToString("N"));
-            var storageOptions = Options.Create(new AttachmentStorageOptions
-            {
-                RootPath = rootPath,
-                MaxFileSizeBytes = AttachmentStorageOptions.DefaultMaxFileSizeBytes
-            });
-            var environment = new TestWebHostEnvironment
-            {
-                ContentRootPath = Path.GetTempPath(),
-                WebRootPath = Path.Combine(Path.GetTempPath(), "wwwroot")
-            };
-            var storage = new LocalAttachmentStorage(storageOptions, environment);
-            var service = new AttachmentService(
-                context,
-                storage,
-                storageOptions,
-                TimeProvider.System,
-                NullLogger<AttachmentService>.Instance);
-            return new AttachmentTestDatabase(
-                connection,
-                context,
-                rootPath,
-                storage,
-                service);
-        }
-
-        public async Task<(IncomingDocument Document, Staff Staff)> CreateIncomingAsync()
-        {
-            var user = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                UserName = $"user-{Guid.NewGuid():N}",
-                Email = $"{Guid.NewGuid():N}@test.local"
-            };
-            var staff = new Staff
-            {
-                Id = Guid.NewGuid(),
-                IdentityUserId = user.Id,
-                IdentityUser = user,
-                FullName = "B Test Clerk",
-                Email = user.Email!,
-                IsActive = true
-            };
-            var type = new DocumentType
-            {
-                Id = Guid.NewGuid(),
-                Code = $"TYPE-{Guid.NewGuid():N}",
-                Name = "Test type",
-                IsActive = true
-            };
-            var document = new IncomingDocument
-            {
-                Id = Guid.NewGuid(),
-                ReferenceNumber = "01/TEST",
-                SenderOrg = "Test sender",
-                Summary = "Test attachment",
-                ReceivedDate = new DateOnly(2026, 7, 31),
-                Deadline = new DateOnly(2026, 8, 1),
-                DocumentTypeId = type.Id,
-                DocumentType = type,
-                Status = IncomingDocumentStatus.New
-            };
-            Context.AddRange(staff, type, document);
-            await Context.SaveChangesAsync();
-            return (document, staff);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await Context.DisposeAsync();
-            await _connection.DisposeAsync();
-            if (Directory.Exists(RootPath))
-            {
-                Directory.Delete(RootPath, recursive: true);
-            }
-        }
+        _connection = connection;
+        Context = context;
+        RootPath = rootPath;
+        Storage = storage;
+        Service = service;
     }
 
-    private sealed class TestWebHostEnvironment : IWebHostEnvironment
+    public DigitalOpsDbContext Context { get; }
+
+    public string RootPath { get; }
+
+    public LocalAttachmentStorage Storage { get; }
+
+    public AttachmentService Service { get; }
+
+    public static async Task<AttachmentTestDatabase> CreateAsync()
     {
-        public string ApplicationName { get; set; } = "DigitalOps.API.Tests";
+        var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var context = new DigitalOpsDbContext(
+            new DbContextOptionsBuilder<DigitalOpsDbContext>()
+                .UseSqlite(connection)
+                .ReplaceService<IModelCustomizer, AuthenticationTestModelCustomizer>()
+                .Options);
+        await context.Database.EnsureCreatedAsync();
 
-        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
-
-        public string WebRootPath { get; set; } = string.Empty;
-
-        public string EnvironmentName { get; set; } = "Testing";
-
-        public string ContentRootPath { get; set; } = string.Empty;
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        var rootPath = Path.Combine(
+            Path.GetTempPath(),
+            "digitalops-attachment-tests",
+            Guid.NewGuid().ToString("N"));
+        var storageOptions = Options.Create(new AttachmentStorageOptions
+        {
+            RootPath = rootPath,
+            MaxFileSizeBytes = AttachmentStorageOptions.DefaultMaxFileSizeBytes
+        });
+        var environment = new TestWebHostEnvironment
+        {
+            ContentRootPath = Path.GetTempPath(),
+            WebRootPath = Path.Combine(Path.GetTempPath(), "wwwroot")
+        };
+        var storage = new LocalAttachmentStorage(storageOptions, environment);
+        var service = new AttachmentService(
+            context,
+            storage,
+            storageOptions,
+            TimeProvider.System,
+            NullLogger<AttachmentService>.Instance);
+        return new AttachmentTestDatabase(
+            connection,
+            context,
+            rootPath,
+            storage,
+            service);
     }
+
+    public async Task<(IncomingDocument Document, Staff Staff)> CreateIncomingAsync()
+    {
+        var user = new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = $"user-{Guid.NewGuid():N}",
+            Email = $"{Guid.NewGuid():N}@test.local"
+        };
+        var staff = new Staff
+        {
+            Id = Guid.NewGuid(),
+            IdentityUserId = user.Id,
+            IdentityUser = user,
+            FullName = "B Test Clerk",
+            Email = user.Email!,
+            IsActive = true
+        };
+        var type = new DocumentType
+        {
+            Id = Guid.NewGuid(),
+            Code = $"TYPE-{Guid.NewGuid():N}",
+            Name = "Test type",
+            IsActive = true
+        };
+        var document = new IncomingDocument
+        {
+            Id = Guid.NewGuid(),
+            ReferenceNumber = "01/TEST",
+            SenderOrg = "Test sender",
+            Summary = "Test attachment",
+            ReceivedDate = new DateOnly(2026, 7, 31),
+            Deadline = new DateOnly(2026, 8, 1),
+            DocumentTypeId = type.Id,
+            DocumentType = type,
+            Status = IncomingDocumentStatus.New
+        };
+        Context.AddRange(staff, type, document);
+        await Context.SaveChangesAsync();
+        return (document, staff);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+        await _connection.DisposeAsync();
+        if (Directory.Exists(RootPath))
+        {
+            Directory.Delete(RootPath, recursive: true);
+        }
+    }
+}
+
+internal sealed class TestWebHostEnvironment : IWebHostEnvironment
+{
+    public string ApplicationName { get; set; } = "DigitalOps.API.Tests";
+
+    public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+
+    public string WebRootPath { get; set; } = string.Empty;
+
+    public string EnvironmentName { get; set; } = "Testing";
+
+    public string ContentRootPath { get; set; } = string.Empty;
+
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
 public sealed class AttachmentApiTests

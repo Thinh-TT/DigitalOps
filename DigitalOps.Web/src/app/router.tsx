@@ -47,6 +47,7 @@ import {
   OutgoingDocumentDetailPage,
   OutgoingDocumentListPage,
 } from "../pages/OutgoingDocumentPages";
+import { DocumentSearchPage } from "../pages/DocumentSearchPage";
 
 const commonRoutes: RouteObject[] = [
   { path: "incoming-documents", element: <IncomingDocumentListPage /> },
@@ -54,14 +55,7 @@ const commonRoutes: RouteObject[] = [
   { path: "reminders", element: <ReminderPage /> },
   { path: "outgoing-documents", element: <OutgoingDocumentListPage /> },
   { path: "outgoing-documents/:id", element: <OutgoingDocumentDetailPage /> },
-  placeholder("outgoing-documents", "SCR-011", "Văn bản đi", "Danh sách văn bản đi."),
-  placeholder(
-    "outgoing-documents/:id",
-    "SCR-012 / SCR-013",
-    "Chi tiết văn bản đi",
-    "Soạn thảo, AI draft, review và lịch sử.",
-  ),
-  placeholder("search", "SCR-016", "Tìm kiếm toàn văn", "Tra cứu văn bản và nội dung file."),
+  { path: "search", element: <DocumentSearchPage /> },
 ];
 
 const administratorRoutes: RouteObject[] = [
