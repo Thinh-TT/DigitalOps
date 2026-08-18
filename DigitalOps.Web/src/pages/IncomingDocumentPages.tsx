@@ -1339,11 +1339,16 @@ function readReturnTo(state: unknown): string {
     && state !== null
     && "returnTo" in state
     && typeof state.returnTo === "string"
-    && state.returnTo.startsWith("/incoming-documents")
+    && isAllowedReturnTo(state.returnTo, "/incoming-documents")
   ) {
     return state.returnTo;
   }
   return "/incoming-documents";
+}
+
+function isAllowedReturnTo(value: string, prefix: string) {
+  return value === prefix || value.startsWith(`${prefix}/`) || value.startsWith(`${prefix}?`)
+    || value === "/search" || value.startsWith("/search?");
 }
 
 function readSuccess(state: unknown): string | null {
